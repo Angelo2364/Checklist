@@ -1,19 +1,104 @@
-# React + Vite
+# Checklist
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Lista de tarefas em React com sessões, prioridades por cor e lembretes no computador a cada 30 minutos. Tudo fica salvo no próprio navegador, sem servidor e sem conta.
 
-Currently, two official plugins are available:
+## O que ele faz
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Tarefas:** adicionar, marcar como feita e apagar.
+- **Sessões:** agrupar tarefas (por exemplo "Afazeres do RPG"). Também dá para ter tarefas soltas, fora de qualquer sessão. Cada sessão pode ser recolhida e mostra quantas tarefas já foram feitas.
+- **Prioridade:** a bolinha à direita de cada tarefa troca de cor a cada clique: sem prioridade, verde (tranquila), amarelo (média) e vermelho (urgente).
+- **Lembretes:** a cada 30 minutos chega uma notificação com a hora atual e as tarefas que ainda faltam, organizadas por sessão e com as mais urgentes primeiro.
+- **Salvamento automático:** tudo é guardado no `localStorage` e continua lá depois de fechar ou recarregar a página.
+- **Tema:** segue o modo claro ou escuro do sistema, com cores pastel em rosa, azul e amarelo.
 
-## React Compiler
+## Arquivos
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
+| Arquivo | Para que serve |
+| --- | --- |
+| `Checklist.jsx` | Componente com toda a lógica e a interface |
+| `Checklist.css` | Estilos e cores do site |
 
-Note: This will impact Vite dev & build performances.
-You can also try [the experimental native React Compiler support in plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md#rust-react-compiler) by using `compiler: true` in the plugin options instead of using the Babel plugin.
+## Como usar no seu projeto React
 
-## Expanding the ESLint configuration
+1. Coloque `Checklist.jsx` e `Checklist.css` na mesma pasta, por exemplo `src/`.
+2. Importe o componente onde quiser exibi-lo:
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```jsx
+import Checklist from "./Checklist";
+
+export default function App() {
+  return <Checklist />;
+}
+```
+
+Se você ainda não tem um projeto React, uma forma rápida de criar um é com o Vite:
+
+```bash
+npm create vite@latest meu-checklist -- --template react
+cd meu-checklist
+npm install
+```
+
+Depois copie os dois arquivos para `src/`, edite o `src/App.jsx` como acima e rode:
+
+```bash
+npm run dev
+```
+
+O site abre em `http://localhost:5173`. O Vite já vem com um `index.css` que pode interferir no visual. Se algo ficar estranho, apague o import de `index.css` no `main.jsx`.
+
+## Notificações
+
+Para ativar, clique em **Ativar lembretes** no fim da página e permita as notificações quando o navegador perguntar.
+
+- Funcionam apenas em `localhost` ou em um site com `https`. Abrir o arquivo direto do computador (`file://`) não funciona.
+- A aba precisa ficar aberta, mesmo em segundo plano. Se fechar a aba, os lembretes param.
+- Se não houver nenhuma tarefa pendente, nenhuma notificação é enviada.
+- O botão **Testar agora** mostra como a notificação aparece.
+- Se você bloqueou as notificações, libere pelo cadeado ao lado do endereço do site e recarregue a página.
+- O modo "Não perturbe" ou "Assistente de foco" do sistema pode silenciar as notificações.
+
+## Onde ficam os dados
+
+Tudo é salvo no `localStorage` do navegador, com estas chaves:
+
+| Chave | Conteúdo |
+| --- | --- |
+| `checklist:tarefas` | Lista de tarefas |
+| `checklist:divisoes` | Lista de sessões |
+| `checklist:notificar` | Se os lembretes estão ativados |
+| `checklist:ultimaNotificacao` | Hora da última notificação enviada |
+
+Formato dos dados:
+
+```js
+// tarefa
+{ id: 1712345678.9, texto: "Comprar pão", feita: false, grupoId: null, prioridade: 0 }
+// prioridade: 0 = sem, 1 = verde, 2 = amarelo, 3 = vermelho
+// grupoId: id da sessão, ou null se a tarefa estiver solta
+
+// sessão
+{ id: 1712345999.1, nome: "Afazeres do RPG", aberta: true }
+```
+
+**Cuidados:**
+- Os dados ficam só naquele navegador e naquele computador. Outro navegador, outro computador ou uma janela anônima começam com a lista vazia.
+- Limpar os dados do site ou o cache do navegador apaga a lista. Se tiver algo importante, anote em outro lugar.
+
+## Personalização
+
+- **Intervalo dos lembretes:** altere a constante `INTERVALO` no topo do `Checklist.jsx` (o valor é em milissegundos, `30 * 60 * 1000` equivale a 30 minutos).
+- **Cores:** estão no começo do `Checklist.css`, no bloco `:root`. O bloco `@media (prefers-color-scheme: dark)` logo abaixo define as cores do modo escuro.
+- **Cores das prioridades:** variáveis `--prio-verde`, `--prio-amarelo` e `--prio-vermelho`.
+- **Largura da coluna:** propriedade `max-width` da classe `.ck`.
+
+## Como funcionam os lembretes
+
+O componente confere a cada 30 segundos se já se passaram 30 minutos desde a última notificação. Por isso, ao recarregar a página ele não manda uma notificação repetida logo em seguida, e se o navegador atrasar o relógio com a aba em segundo plano, o lembrete chega assim que possível.
+
+## Possíveis melhorias
+
+- Mover uma tarefa de uma sessão para outra.
+- Renomear sessões.
+- Definir horário de início e fim dos lembretes.
+- Exportar e importar a lista em um arquivo, para fazer backup.
