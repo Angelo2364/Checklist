@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import "./app.css";
+import "./App.css";
 
 const STORAGE_TASKS = "checklist:tarefas";
 const STORAGE_GROUPS = "checklist:divisoes";
