@@ -508,3 +508,22 @@ button.secundario:hover {
     transition: none !important;
   }
 }
+
+/* dica do atalho de teclado */
+.ck-atalho {
+  margin-left: auto;
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--suave);
+  background: var(--fundo);
+  border: 1px solid var(--linha);
+  border-radius: 6px;
+}
+
+@media (hover: none) {
+  .ck-atalho {
+    display: none; /* celular não tem teclado */
+  }
+}

@@ -7,6 +7,10 @@ const STORAGE_LAST = "checklist:ultimaNotificacao";
 const STORAGE_NOTIFY = "checklist:notificar";
 const INTERVALO = 30 * 60 * 1000; // 30 minutos
 
+// Atalhos: Ctrl (ou Cmd no Mac) + a tecla abaixo
+const ATALHO_TAREFA = "f";
+const ATALHO_SESSAO = "d";
+
 function lerStorage(chave, padrao) {
   try {
     const bruto = localStorage.getItem(chave);
@@ -64,19 +68,20 @@ function IconeMais() {
 }
 
 /* Barra fina com o "+" e um rótulo (abre o campo ao clicar) */
-function BarraMais({ rotulo, onClick }) {
+function BarraMais({ rotulo, onClick, atalho }) {
   return (
     <button type="button" className="ck-barra-mais" onClick={onClick}>
       <span className="ck-mais" aria-hidden="true">
         <IconeMais />
       </span>
       <span>{rotulo}</span>
+      {atalho && <kbd className="ck-atalho">Ctrl {atalho.toUpperCase()}</kbd>}
     </button>
   );
 }
 
 /* Campo para escrever uma tarefa nova (usado fora e dentro das sessões) */
-function NovaTarefa({ onAdd, placeholder, onFechar }) {
+function NovaTarefa({ onAdd, placeholder, onFechar, idCampo }) {
   const [texto, setTexto] = useState("");
 
   function enviar(e) {
@@ -99,6 +104,7 @@ function NovaTarefa({ onAdd, placeholder, onFechar }) {
       }}
     >
       <input
+        id={idCampo}
         type="text"
         value={texto}
         autoFocus
@@ -182,6 +188,28 @@ export default function Checklist() {
   useEffect(() => {
     salvarStorage(STORAGE_NOTIFY, notificar);
   }, [notificar]);
+
+  // Atalhos de teclado: abrem o campo e já deixam o cursor nele
+  useEffect(() => {
+    function aoApertar(e) {
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
+      const tecla = e.key.toLowerCase();
+
+      if (tecla === ATALHO_TAREFA) {
+        e.preventDefault(); // impede a busca do navegador
+        setCriandoSolta(true);
+        // se o campo já estava aberto, só devolve o foco a ele
+        document.getElementById("campo-tarefa")?.focus();
+      } else if (tecla === ATALHO_SESSAO) {
+        e.preventDefault(); // impede o "favoritar" do navegador
+        setCriandoGrupo(true);
+        document.getElementById("campo-sessao")?.focus();
+      }
+    }
+
+    window.addEventListener("keydown", aoApertar);
+    return () => window.removeEventListener("keydown", aoApertar);
+  }, []);
 
   const idsGrupos = new Set(grupos.map((g) => g.id));
   // Tarefas sem sessão (ou de uma sessão que não existe mais)
@@ -331,6 +359,7 @@ export default function Checklist() {
 
       {criandoSolta ? (
         <NovaTarefa
+          idCampo="campo-tarefa"
           placeholder="Nova tarefa"
           onAdd={(texto) => adicionarTarefa(texto, null)}
           onFechar={() => setCriandoSolta(false)}
@@ -338,6 +367,7 @@ export default function Checklist() {
       ) : (
         <BarraMais
           rotulo="Adicionar tarefa"
+          atalho={ATALHO_TAREFA}
           onClick={() => setCriandoSolta(true)}
         />
       )}
@@ -367,6 +397,7 @@ export default function Checklist() {
               }
             }}
             placeholder="Nome da sessão (ex: Afazeres do RPG)"
+            id="campo-sessao"
             aria-label="Nome da nova sessão"
             maxLength={60}
           />
@@ -377,6 +408,7 @@ export default function Checklist() {
       ) : (
         <BarraMais
           rotulo="Adicionar sessão"
+          atalho={ATALHO_SESSAO}
           onClick={() => setCriandoGrupo(true)}
         />
       )}
