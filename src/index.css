@@ -1,0 +1,510 @@
+/* ---------- cores: rosa, azul e amarelo em tons pastel ---------- */
+:root {
+  --fora: #fdeef4;
+  --fundo: #fffbfd;
+  --fundo-hover: #fff1f7;
+  --tinta: #3b3552;
+  --suave: #857d9e;
+  --linha: #f6dce8;
+  --barra: color-mix(in srgb, var(--fora) 55%, var(--fundo));
+  --barra-hover: color-mix(in srgb, var(--fora) 85%, var(--fundo));
+
+  --rosa: #f9a8c6;
+  --rosa-hover: #f594b9;
+  --azul: #a5d6f8;
+  --azul-forte: #3d8bcc;
+  --amarelo: #ffe597;
+  --grupo-bg: #fff4c9;
+  --sobre-pastel: #3b3552; /* texto em cima das cores pastel */
+
+  --perigo: #e5566d;
+  --prio-verde: #6fd39a;
+  --prio-amarelo: #ffd24d;
+  --prio-vermelho: #ff6b7f;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --fora: #1b1828;
+    --fundo: #252036;
+    --fundo-hover: #2e2842;
+    --tinta: #f4eeff;
+    --suave: #a69fc0;
+    --linha: #3b3556;
+    --grupo-bg: #3a3524;
+    --azul-forte: #7cc0f2;
+    --perigo: #ff7a8e;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--fora);
+  color: var(--tinta);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+  font-size: 15px;
+}
+
+/* ---------- coluna central ---------- */
+.ck {
+  width: 100%;
+  max-width: 600px;
+  min-height: 100vh;
+  margin: 0 auto;
+  background: var(--fundo);
+  border-left: 1px solid var(--linha);
+  border-right: 1px solid var(--linha);
+}
+
+.ck-topo {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 16px;
+  background: color-mix(in srgb, var(--fundo) 88%, transparent);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--linha);
+}
+
+.ck-topo h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 24px;
+}
+
+.ck-contagem {
+  font-size: 13px;
+  color: var(--suave);
+}
+
+/* ---------- botões e foco ---------- */
+button {
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 8px 18px;
+  color: var(--sobre-pastel);
+  background: var(--rosa);
+  border: 1px solid var(--rosa);
+  border-radius: 999px;
+}
+
+button:hover {
+  background: var(--rosa-hover);
+  border-color: var(--rosa-hover);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+button.secundario {
+  color: var(--tinta);
+  background: transparent;
+  border-color: var(--linha);
+}
+
+button.secundario:hover {
+  background: var(--fundo-hover);
+}
+
+:focus-visible {
+  outline: 2px solid var(--azul-forte);
+  outline-offset: 2px;
+}
+
+/* ---------- lista de tarefas ---------- */
+.ck-secao {
+  margin: 0;
+  padding: 12px 16px 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--suave);
+  border-bottom: 1px solid var(--linha);
+}
+
+.ck-lista {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.ck-lista li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 12px;
+  border-bottom: 1px solid var(--linha);
+  transition: background 0.15s;
+}
+
+.ck-lista li:hover {
+  background: var(--fundo-hover);
+}
+
+.ck-grupo .ck-lista li:last-child {
+  border-bottom: 0;
+}
+
+.ck-lista label {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1;
+  min-width: 0;
+  padding: 16px;
+  cursor: pointer;
+}
+
+.ck-lista input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  width: 22px;
+  height: 22px;
+  left: 16px;
+}
+
+.ck-caixa {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--suave);
+  border-radius: 50%;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.ck-lista input:checked + .ck-caixa {
+  background-color: var(--azul);
+  border-color: var(--azul);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233b3552' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7'/%3E%3C/svg%3E");
+  background-size: 75%;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.ck-lista input:focus-visible + .ck-caixa {
+  outline: 2px solid var(--azul-forte);
+  outline-offset: 2px;
+}
+
+.ck-texto {
+  overflow-wrap: anywhere;
+  font-size: 15px;
+  line-height: 20px;
+}
+
+.ck-lista .feita .ck-texto {
+  color: var(--suave);
+  text-decoration: line-through;
+}
+
+/* bolinha de prioridade */
+.ck-prio {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  background: transparent;
+  border: 2px dashed var(--suave);
+  border-radius: 50%;
+  transition: transform 0.12s;
+}
+
+.ck-prio:hover {
+  transform: scale(1.18);
+  background: transparent;
+  border-color: var(--suave);
+}
+
+.ck-prio.p1,
+.ck-prio.p1:hover {
+  background: var(--prio-verde);
+  border: 2px solid var(--prio-verde);
+}
+
+.ck-prio.p2,
+.ck-prio.p2:hover {
+  background: var(--prio-amarelo);
+  border: 2px solid var(--prio-amarelo);
+}
+
+.ck-prio.p3,
+.ck-prio.p3:hover {
+  background: var(--prio-vermelho);
+  border: 2px solid var(--prio-vermelho);
+}
+
+.ck-lista .feita .ck-prio {
+  opacity: 0.4;
+}
+
+.ck-apagar {
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--suave);
+  background: transparent;
+  border-color: transparent;
+}
+
+.ck-apagar:hover {
+  color: var(--perigo);
+  background: color-mix(in srgb, var(--perigo) 12%, transparent);
+  border-color: transparent;
+}
+
+.ck-vazio {
+  margin: 0;
+  padding: 48px 16px;
+  text-align: center;
+  color: var(--suave);
+  border-bottom: 1px solid var(--linha);
+}
+
+.ck-link {
+  display: block;
+  width: 100%;
+  padding: 16px;
+  text-align: left;
+  font-weight: 400;
+  color: var(--azul-forte);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--linha);
+  border-radius: 0;
+}
+
+.ck-link:hover {
+  background: var(--fundo-hover);
+}
+
+/* ---------- botão + e campos pequenos ---------- */
+.ck-mais {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  line-height: 0;
+  color: var(--azul-forte);
+  background: transparent;
+  border: 1px solid var(--linha);
+  border-radius: 50%;
+}
+
+.ck-mais svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+.ck-mais:hover,
+.ck-mais[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--azul) 35%, transparent);
+  border-color: var(--azul);
+}
+
+.ck-barra-mais {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 16px;
+  font-weight: 600;
+  text-align: left;
+  color: var(--suave);
+  background: var(--barra);
+  border: 0;
+  border-bottom: 1px solid var(--linha);
+  border-radius: 0;
+}
+
+.ck-barra-mais:hover {
+  color: var(--tinta);
+  background: var(--barra-hover);
+}
+
+.ck-barra-mais:hover .ck-mais {
+  background: color-mix(in srgb, var(--azul) 35%, transparent);
+  border-color: var(--azul);
+}
+
+.ck-nova-divisao,
+.ck-form-grupo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ck-nova-divisao {
+  padding: 8px 16px;
+  background: var(--barra);
+  border-bottom: 1px solid var(--linha);
+}
+
+.ck-form-grupo {
+  padding: 8px 16px;
+  background: var(--barra);
+  border-bottom: 1px solid var(--linha);
+}
+
+.ck-nova-divisao input,
+.ck-form-grupo input {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 14px;
+  font: inherit;
+  color: var(--tinta);
+  background: var(--fundo);
+  border: 1px solid var(--linha);
+  border-radius: 999px;
+}
+
+.ck-nova-divisao input::placeholder,
+.ck-form-grupo input::placeholder {
+  color: var(--suave);
+}
+
+.ck-nova-divisao input:focus-visible,
+.ck-form-grupo input:focus-visible {
+  outline: none;
+  border-color: var(--azul-forte);
+  box-shadow: 0 0 0 1px var(--azul-forte);
+}
+
+.ck-nova-divisao button,
+.ck-form-grupo button {
+  padding: 6px 14px;
+  font-size: 14px;
+}
+
+/* ---------- divisões ---------- */
+.ck-grupo {
+  border-bottom: 8px solid var(--fundo-hover);
+}
+
+.ck-grupo-topo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 12px;
+  background: var(--grupo-bg);
+  border-bottom: 1px solid var(--linha);
+}
+
+.ck-grupo-titulo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  padding: 14px 16px;
+  text-align: left;
+  color: var(--tinta);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.ck-grupo-titulo:hover {
+  background: color-mix(in srgb, var(--amarelo) 40%, transparent);
+}
+
+.ck-seta {
+  flex: none;
+  width: 14px;
+  font-size: 22px;
+  line-height: 1;
+  color: var(--suave);
+  transition: transform 0.15s;
+}
+
+.ck-seta.aberta {
+  transform: rotate(90deg);
+}
+
+.ck-grupo-nome {
+  overflow: hidden;
+  font-size: 17px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ck-grupo-qtd {
+  flex: none;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--suave);
+}
+
+.ck-grupo-topo .ck-apagar {
+  color: var(--tinta);
+  opacity: 0.65;
+}
+
+.ck-grupo-topo .ck-apagar:hover {
+  color: var(--perigo);
+  opacity: 1;
+}
+
+.ck-vazio-grupo {
+  margin: 0;
+  padding: 20px 16px;
+  color: var(--suave);
+  border-bottom: 1px solid var(--linha);
+}
+
+/* ---------- lembretes ---------- */
+.ck-aviso {
+  padding: 16px;
+}
+
+.ck-aviso p {
+  margin: 0 0 12px;
+  line-height: 20px;
+}
+
+.ck-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ck-aviso small {
+  display: block;
+  margin-top: 12px;
+  color: var(--suave);
+}
+
+/* ---------- telas pequenas e movimento ---------- */
+@media (max-width: 600px) {
+  .ck {
+    border-left: 0;
+    border-right: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .ck-grupo-topo .ck-apagar {
+    font-size: 12px;
+    padding: 6px 8px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
+}
