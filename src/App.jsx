@@ -127,10 +127,16 @@ function ListaTarefas({ tarefas, alternar, apagar, mudarPrioridade }) {
     <ul className="ck-lista">
       {tarefas.map((t) => (
         <li key={t.id} className={t.feita ? "feita" : ""}>
-          <label>
+          <label
+            title={t.feita ? "Feita" : t.meio ? "Meio feita" : "Pendente"}
+          >
             <input
               type="checkbox"
               checked={t.feita}
+              ref={(el) => {
+                // "meio check" aparece como estado indeterminado
+                if (el) el.indeterminate = !!t.meio && !t.feita;
+              }}
               onChange={() => alternar(t.id)}
             />
             <span className="ck-caixa" aria-hidden="true" />
@@ -216,6 +222,7 @@ export default function Checklist() {
   const soltas = tarefas.filter((t) => !t.grupoId || !idsGrupos.has(t.grupoId));
   const pendentes = tarefas.filter((t) => !t.feita);
   const feitas = tarefas.length - pendentes.length;
+  const meias = pendentes.filter((t) => t.meio).length;
 
   function enviarNotificacao() {
     if (typeof Notification === "undefined") return;
@@ -229,7 +236,10 @@ export default function Checklist() {
 
     const maisUrgentePrimeiro = (a, b) =>
       (b.prioridade || 0) - (a.prioridade || 0);
-    const linha = (t) => `${PRIORIDADES[t.prioridade || 0].marca}${t.texto}`;
+    const linha = (t) =>
+      `${PRIORIDADES[t.prioridade || 0].marca}${t.texto}${
+        t.meio ? " (meio feita)" : ""
+      }`;
 
     todas
       .filter((t) => !t.grupoId || !ids.has(t.grupoId))
@@ -289,8 +299,14 @@ export default function Checklist() {
   }
 
   function alternar(id) {
+    // pendente → meio feita → feita → pendente
     setTarefas((atual) =>
-      atual.map((t) => (t.id === id ? { ...t, feita: !t.feita } : t))
+      atual.map((t) => {
+        if (t.id !== id) return t;
+        if (t.feita) return { ...t, feita: false, meio: false };
+        if (t.meio) return { ...t, feita: true, meio: false };
+        return { ...t, meio: true };
+      })
     );
   }
 
@@ -353,7 +369,9 @@ export default function Checklist() {
         <span className="ck-contagem">
           {tarefas.length === 0
             ? "Nenhuma tarefa"
-            : `${feitas} de ${tarefas.length} concluídas`}
+            : `${feitas} de ${tarefas.length} concluídas${
+                meias > 0 ? ` · ${meias} pela metade` : ""
+              }`}
         </span>
       </header>
 

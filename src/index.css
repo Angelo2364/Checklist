@@ -192,6 +192,12 @@ button.secundario:hover {
   background-repeat: no-repeat;
 }
 
+/* meio check: círculo preenchido pela metade */
+.ck-lista input:indeterminate + .ck-caixa {
+  background: linear-gradient(90deg, var(--azul) 50%, transparent 50%);
+  border-color: var(--azul-forte);
+}
+
 .ck-lista input:focus-visible + .ck-caixa {
   outline: 2px solid var(--azul-forte);
   outline-offset: 2px;
