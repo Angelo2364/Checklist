@@ -7,7 +7,7 @@ Lista de tarefas em React com sessões, prioridades por cor e lembretes no compu
 - **Tarefas:** adicionar, marcar e apagar. O círculo tem três estados a cada clique: pendente, meio feita (círculo pela metade) e feita.
 - **Sessões:** agrupar tarefas (por exemplo "Afazeres do RPG"). Também dá para ter tarefas soltas, fora de qualquer sessão. Cada sessão pode ser recolhida e mostra quantas tarefas já foram feitas.
 - **Tarefas que se repetem:** ao criar a tarefa, escolha "Repetir" (todo dia, toda semana, a cada N dias). Mesmo que você apague ou conclua, ela volta quando chegar o dia. Para parar, apague a rotina na coluna da direita.
-- **Calendário:** coluna lateral com o mês, eventos com horário opcional e um botão "Google" que abre o evento já preenchido no Google Agenda. Os eventos de hoje também entram na notificação.
+- **Calendário:** coluna lateral com o mês, eventos com horário, endereço (link para o Google Maps) e descrição opcionais e um botão "Google" que abre o evento já preenchido no Google Agenda. Os eventos de hoje também entram na notificação.
 - **Reordenar:** a alça com bolinhas (⋮⋮) à esquerda de cada tarefa e sessão permite arrastar para mudar a ordem. Também dá para focar na alça (Tab) e usar as setas ↑ ↓. A tarefa só se move dentro da própria sessão, e ao mover uma sessão as tarefas dela vão juntas.
 - **Prioridade:** a bolinha à direita de cada tarefa troca de cor a cada clique: sem prioridade, verde (tranquila), amarelo (média) e vermelho (urgente).
 - **Lembretes:** a cada 30 minutos chega uma notificação com a hora atual e as tarefas que ainda faltam, organizadas por sessão e com as mais urgentes primeiro.
@@ -19,21 +19,13 @@ Lista de tarefas em React com sessões, prioridades por cor e lembretes no compu
 
 | Arquivo | Para que serve |
 | --- | --- |
-| `Checklist.jsx` | Componente com toda a lógica e a interface |
-| `Checklist.css` | Estilos e cores do site |
+| `App.jsx` | Componente com toda a lógica e a interface |
+| `App.css` | Estilos e cores do site |
 
 ## Como usar no seu projeto React
 
-1. Coloque `Checklist.jsx` e `Checklist.css` na mesma pasta, por exemplo `src/`.
-2. Importe o componente onde quiser exibi-lo:
-
-```jsx
-import Checklist from "./Checklist";
-
-export default function App() {
-  return <Checklist />;
-}
-```
+1. Coloque `App.jsx` e `App.css` na pasta `src/`, no lugar dos que o Vite cria.
+2. O `main.jsx` do Vite já importa o `App`, então não precisa mudar nada. O `App.jsx` já importa o `App.css` sozinho.
 
 Se você ainda não tem um projeto React, uma forma rápida de criar um é com o Vite:
 
@@ -43,7 +35,7 @@ cd meu-checklist
 npm install
 ```
 
-Depois copie os dois arquivos para `src/`, edite o `src/App.jsx` como acima e rode:
+Depois copie os dois arquivos para `src/`, e rode:
 
 ```bash
 npm run dev
@@ -60,7 +52,7 @@ O site abre em `http://localhost:5173`. O Vite já vem com um `index.css` que po
 | `Enter` | Adiciona e mantém o campo aberto para a próxima |
 | `Esc` | Fecha o campo |
 
-Esses atalhos substituem a busca na página (`Ctrl + F`) e o "favoritar" (`Ctrl + D`) do navegador apenas neste site. Para usar outras teclas, altere as constantes `ATALHO_TAREFA` e `ATALHO_SESSAO` no topo do `Checklist.jsx`.
+Esses atalhos substituem a busca na página (`Ctrl + F`) e o "favoritar" (`Ctrl + D`) do navegador apenas neste site. Para usar outras teclas, altere as constantes `ATALHO_TAREFA` e `ATALHO_SESSAO` no topo do `App.jsx`.
 
 ## Notificações
 
@@ -104,8 +96,8 @@ Formato dos dados:
 
 ## Personalização
 
-- **Intervalo dos lembretes:** altere a constante `INTERVALO` no topo do `Checklist.jsx` (o valor é em milissegundos, `30 * 60 * 1000` equivale a 30 minutos).
-- **Cores:** estão no começo do `Checklist.css`, no bloco `:root`. O bloco `@media (prefers-color-scheme: dark)` logo abaixo define as cores do modo escuro.
+- **Intervalo dos lembretes:** altere a constante `INTERVALO` no topo do `App.jsx` (o valor é em milissegundos, `30 * 60 * 1000` equivale a 30 minutos).
+- **Cores:** estão no começo do `App.css`, no bloco `:root`. O bloco `@media (prefers-color-scheme: dark)` logo abaixo define as cores do modo escuro.
 - **Cores das prioridades:** variáveis `--prio-verde`, `--prio-amarelo` e `--prio-vermelho`.
 - **Largura da coluna:** propriedade `max-width` da classe `.ck`.
 

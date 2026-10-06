@@ -793,3 +793,49 @@ a.ck-apagar:hover {
     display: none; /* arrastar com o dedo não é suportado pelo navegador */
   }
 }
+
+/* ---------- endereço e descrição do evento ---------- */
+.ck-form-grupo .ck-campo-largo {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+.ck-form-grupo textarea {
+  padding: 8px 14px;
+  font: inherit;
+  color: var(--tinta);
+  background: var(--fundo);
+  border: 1px solid var(--linha);
+  border-radius: 14px;
+  resize: vertical;
+}
+
+.ck-form-grupo textarea::placeholder {
+  color: var(--suave);
+}
+
+.ck-form-grupo textarea:focus-visible {
+  outline: none;
+  border-color: var(--azul-forte);
+  box-shadow: 0 0 0 1px var(--azul-forte);
+}
+
+.ck-ev-info {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--suave);
+}
+
+.ck-ev-desc {
+  white-space: pre-line;
+}
+
+a.ck-ev-mapa {
+  text-decoration: none;
+}
+
+a.ck-ev-mapa:hover {
+  color: var(--azul-forte);
+  text-decoration: underline;
+}

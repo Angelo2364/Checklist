@@ -45,7 +45,9 @@ function linkGoogle(e) {
   } else {
     datas = `${e.data.replaceAll("-", "")}/${somarDias(e.data, 1).replaceAll("-", "")}`;
   }
-  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(e.titulo)}&dates=${datas}`;
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(e.titulo)}&dates=${datas}` +
+    (e.endereco ? `&location=${encodeURIComponent(e.endereco)}` : "") +
+    (e.descricao ? `&details=${encodeURIComponent(e.descricao)}` : "");
 }
 
 /* Calendário do mês com eventos */
@@ -56,6 +58,8 @@ function Calendario({ eventos, adicionar, apagar }) {
   const [abrindo, setAbrindo] = useState(false);
   const [titulo, setTitulo] = useState("");
   const [hora, setHora] = useState("");
+  const [endereco, setEndereco] = useState("");
+  const [descricao, setDescricao] = useState("");
 
   const ano = mes.getFullYear();
   const m = mes.getMonth();
@@ -69,9 +73,17 @@ function Calendario({ eventos, adicionar, apagar }) {
   function enviar(e) {
     e.preventDefault();
     if (!titulo.trim()) return;
-    adicionar({ titulo: titulo.trim(), data: sel, hora });
+    adicionar({
+      titulo: titulo.trim(),
+      data: sel,
+      hora,
+      endereco: endereco.trim(),
+      descricao: descricao.trim(),
+    });
     setTitulo("");
     setHora("");
+    setEndereco("");
+    setDescricao("");
   }
 
   return (
@@ -116,7 +128,21 @@ function Calendario({ eventos, adicionar, apagar }) {
           {doDia.map((e) => (
             <li key={e.id}>
               <span className="ck-ev-hora">{e.hora || "dia todo"}</span>
-              <span className="ck-ev-titulo">{e.titulo}</span>
+              <span className="ck-ev-titulo">
+                {e.titulo}
+                {e.endereco && (
+                  <a
+                    className="ck-ev-info ck-ev-mapa"
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(e.endereco)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    title="Abrir no Google Maps"
+                  >
+                    📍 {e.endereco}
+                  </a>
+                )}
+                {e.descricao && <span className="ck-ev-info ck-ev-desc">{e.descricao}</span>}
+              </span>
               <a className="ck-apagar" href={linkGoogle(e)} target="_blank" rel="noreferrer" title="Abrir no Google Agenda">Google</a>
               <button type="button" className="ck-apagar" onClick={() => apagar(e.id)} aria-label={`Apagar ${e.titulo}`}>Apagar</button>
             </li>
@@ -144,6 +170,26 @@ function Calendario({ eventos, adicionar, apagar }) {
             maxLength={100}
           />
           <input type="time" value={hora} onChange={(e) => setHora(e.target.value)} aria-label="Horário (opcional)" />
+          <input
+            type="text"
+            className="ck-campo-largo"
+            value={endereco}
+            onChange={(e) => setEndereco(e.target.value)}
+            onKeyDown={(e) => e.key === "Escape" && setAbrindo(false)}
+            placeholder="Endereço (opcional)"
+            aria-label="Endereço"
+            maxLength={200}
+          />
+          <textarea
+            className="ck-campo-largo"
+            value={descricao}
+            onChange={(e) => setDescricao(e.target.value)}
+            onKeyDown={(e) => e.key === "Escape" && setAbrindo(false)}
+            placeholder="Descrição (opcional)"
+            aria-label="Descrição"
+            rows={2}
+            maxLength={500}
+          />
           <button type="submit" disabled={!titulo.trim()}>Adicionar</button>
         </form>
       ) : (
@@ -402,7 +448,7 @@ function ListaTarefas({ tarefas, alternar, apagar, mudarPrioridade, ordem }) {
   );
 }
 
-export default function Checklist() {
+export default function App() {
   const [tarefas, setTarefas] = useState(() => lerStorage(STORAGE_TASKS, []));
   const [grupos, setGrupos] = useState(() => lerStorage(STORAGE_GROUPS, []));
   const [eventos, setEventos] = useState(() => lerStorage(STORAGE_EVENTS, []));
@@ -548,7 +594,9 @@ export default function Checklist() {
 
     if (evs.length) {
       linhas.push("Hoje na agenda:");
-      evs.forEach((e) => linhas.push(`  • ${e.hora ? e.hora + " " : ""}${e.titulo}`));
+      evs.forEach((e) =>
+        linhas.push(`  • ${e.hora ? e.hora + " " : ""}${e.titulo}${e.endereco ? ` (${e.endereco})` : ""}`)
+      );
     }
 
     new Notification(`Checklist · ${horaAtual()}`, {
