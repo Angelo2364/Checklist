@@ -4,10 +4,13 @@ Lista de tarefas em React com sessões, prioridades por cor e lembretes no compu
 
 ## O que ele faz
 
-- **Tarefas:** adicionar, marcar como feita e apagar.
+- **Tarefas:** adicionar, marcar e apagar. O círculo tem três estados a cada clique: pendente, meio feita (círculo pela metade) e feita.
 - **Sessões:** agrupar tarefas (por exemplo "Afazeres do RPG"). Também dá para ter tarefas soltas, fora de qualquer sessão. Cada sessão pode ser recolhida e mostra quantas tarefas já foram feitas.
+- **Tarefas que se repetem:** ao criar a tarefa, escolha "Repetir" (todo dia, toda semana, a cada N dias). Mesmo que você apague ou conclua, ela volta quando chegar o dia. Para parar, apague a rotina na coluna da direita.
+- **Calendário:** coluna lateral com o mês, eventos com horário opcional e um botão "Google" que abre o evento já preenchido no Google Agenda. Os eventos de hoje também entram na notificação.
 - **Prioridade:** a bolinha à direita de cada tarefa troca de cor a cada clique: sem prioridade, verde (tranquila), amarelo (média) e vermelho (urgente).
 - **Lembretes:** a cada 30 minutos chega uma notificação com a hora atual e as tarefas que ainda faltam, organizadas por sessão e com as mais urgentes primeiro.
+- **Atalhos de teclado:** `Ctrl + F` abre o campo de nova tarefa e `Ctrl + D` abre o de nova sessão, já com o cursor pronto para digitar.
 - **Salvamento automático:** tudo é guardado no `localStorage` e continua lá depois de fechar ou recarregar a página.
 - **Tema:** segue o modo claro ou escuro do sistema, com cores pastel em rosa, azul e amarelo.
 
@@ -47,6 +50,17 @@ npm run dev
 
 O site abre em `http://localhost:5173`. O Vite já vem com um `index.css` que pode interferir no visual. Se algo ficar estranho, apague o import de `index.css` no `main.jsx`.
 
+## Atalhos de teclado
+
+| Atalho | O que faz |
+| --- | --- |
+| `Ctrl + F` (ou `Cmd + F` no Mac) | Abre o campo de nova tarefa |
+| `Ctrl + D` (ou `Cmd + D` no Mac) | Abre o campo de nova sessão |
+| `Enter` | Adiciona e mantém o campo aberto para a próxima |
+| `Esc` | Fecha o campo |
+
+Esses atalhos substituem a busca na página (`Ctrl + F`) e o "favoritar" (`Ctrl + D`) do navegador apenas neste site. Para usar outras teclas, altere as constantes `ATALHO_TAREFA` e `ATALHO_SESSAO` no topo do `Checklist.jsx`.
+
 ## Notificações
 
 Para ativar, clique em **Ativar lembretes** no fim da página e permita as notificações quando o navegador perguntar.
@@ -66,6 +80,8 @@ Tudo é salvo no `localStorage` do navegador, com estas chaves:
 | --- | --- |
 | `checklist:tarefas` | Lista de tarefas |
 | `checklist:divisoes` | Lista de sessões |
+| `checklist:eventos` | Eventos do calendário |
+| `checklist:rotinas` | Tarefas que se repetem |
 | `checklist:notificar` | Se os lembretes estão ativados |
 | `checklist:ultimaNotificacao` | Hora da última notificação enviada |
 
@@ -73,7 +89,7 @@ Formato dos dados:
 
 ```js
 // tarefa
-{ id: 1712345678.9, texto: "Comprar pão", feita: false, grupoId: null, prioridade: 0 }
+{ id: 1712345678.9, texto: "Comprar pão", feita: false, meio: false, grupoId: null, prioridade: 0 }
 // prioridade: 0 = sem, 1 = verde, 2 = amarelo, 3 = vermelho
 // grupoId: id da sessão, ou null se a tarefa estiver solta
 

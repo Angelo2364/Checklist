@@ -11,6 +11,171 @@ const INTERVALO = 30 * 60 * 1000; // 30 minutos
 const ATALHO_TAREFA = "f";
 const ATALHO_SESSAO = "d";
 
+const STORAGE_EVENTS = "checklist:eventos";
+const STORAGE_ROUTINES = "checklist:rotinas";
+
+const OPCOES_REPETE = [
+  [0, "Não repete"],
+  [1, "Todo dia"],
+  [2, "A cada 2 dias"],
+  [3, "A cada 3 dias"],
+  [7, "Toda semana"],
+  [14, "A cada 2 semanas"],
+  [30, "A cada 30 dias"],
+];
+
+const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+
+const z2 = (n) => String(n).padStart(2, "0");
+const iso = (d) => `${d.getFullYear()}-${z2(d.getMonth() + 1)}-${z2(d.getDate())}`;
+function somarDias(dataISO, n) {
+  const [a, m, d] = dataISO.split("-").map(Number);
+  return iso(new Date(a, m - 1, d + n));
+}
+const rotuloRepete = (n) =>
+  n === 1 ? "todo dia" : n === 7 ? "toda semana" : `a cada ${n} dias`;
+
+// link que abre o evento já preenchido no Google Agenda
+function linkGoogle(e) {
+  const f = (d) => iso(d).replaceAll("-", "") + `T${z2(d.getHours())}${z2(d.getMinutes())}00`;
+  let datas;
+  if (e.hora) {
+    const ini = new Date(`${e.data}T${e.hora}`);
+    datas = `${f(ini)}/${f(new Date(ini.getTime() + 3600000))}`;
+  } else {
+    datas = `${e.data.replaceAll("-", "")}/${somarDias(e.data, 1).replaceAll("-", "")}`;
+  }
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(e.titulo)}&dates=${datas}`;
+}
+
+/* Calendário do mês com eventos */
+function Calendario({ eventos, adicionar, apagar }) {
+  const hojeISO = iso(new Date());
+  const [mes, setMes] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  const [sel, setSel] = useState(hojeISO);
+  const [abrindo, setAbrindo] = useState(false);
+  const [titulo, setTitulo] = useState("");
+  const [hora, setHora] = useState("");
+
+  const ano = mes.getFullYear();
+  const m = mes.getMonth();
+  const vazios = new Date(ano, m, 1).getDay();
+  const total = new Date(ano, m + 1, 0).getDate();
+  const comEvento = new Set(eventos.map((e) => e.data));
+  const doDia = eventos
+    .filter((e) => e.data === sel)
+    .sort((a, b) => (a.hora || "").localeCompare(b.hora || ""));
+
+  function enviar(e) {
+    e.preventDefault();
+    if (!titulo.trim()) return;
+    adicionar({ titulo: titulo.trim(), data: sel, hora });
+    setTitulo("");
+    setHora("");
+  }
+
+  return (
+    <section className="ck-cal">
+      <div className="ck-cal-topo">
+        <button type="button" className="ck-cal-nav" aria-label="Mês anterior" onClick={() => setMes(new Date(ano, m - 1, 1))}>‹</button>
+        <strong>{MESES[m]} de {ano}</strong>
+        <button type="button" className="ck-cal-nav" aria-label="Próximo mês" onClick={() => setMes(new Date(ano, m + 1, 1))}>›</button>
+      </div>
+
+      <div className="ck-cal-grade">
+        {["D", "S", "T", "Q", "Q", "S", "S"].map((d, i) => (
+          <span key={i} className="ck-cal-sem">{d}</span>
+        ))}
+        {Array.from({ length: vazios }, (_, i) => <span key={`v${i}`} />)}
+        {Array.from({ length: total }, (_, i) => {
+          const id = iso(new Date(ano, m, i + 1));
+          return (
+            <button
+              key={id}
+              type="button"
+              className={`ck-dia${id === hojeISO ? " hoje" : ""}${id === sel ? " sel" : ""}`}
+              aria-pressed={id === sel}
+              aria-label={`Dia ${i + 1}`}
+              onClick={() => setSel(id)}
+            >
+              {i + 1}
+              {comEvento.has(id) && <i />}
+            </button>
+          );
+        })}
+      </div>
+
+      <h3 className="ck-cal-data">
+        {new Date(`${sel}T00:00`).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}
+      </h3>
+
+      {doDia.length === 0 ? (
+        <p className="ck-vazio-cal">Nenhum evento neste dia.</p>
+      ) : (
+        <ul className="ck-eventos">
+          {doDia.map((e) => (
+            <li key={e.id}>
+              <span className="ck-ev-hora">{e.hora || "dia todo"}</span>
+              <span className="ck-ev-titulo">{e.titulo}</span>
+              <a className="ck-apagar" href={linkGoogle(e)} target="_blank" rel="noreferrer" title="Abrir no Google Agenda">Google</a>
+              <button type="button" className="ck-apagar" onClick={() => apagar(e.id)} aria-label={`Apagar ${e.titulo}`}>Apagar</button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {abrindo ? (
+        <form
+          className="ck-form-grupo"
+          onSubmit={enviar}
+          onBlur={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget) && !titulo.trim()) setAbrindo(false);
+          }}
+        >
+          <input
+            id="campo-evento"
+            type="text"
+            autoFocus
+            value={titulo}
+            onChange={(e) => setTitulo(e.target.value)}
+            onKeyDown={(e) => e.key === "Escape" && setAbrindo(false)}
+            placeholder="Novo evento"
+            aria-label="Título do evento"
+            maxLength={100}
+          />
+          <input type="time" value={hora} onChange={(e) => setHora(e.target.value)} aria-label="Horário (opcional)" />
+          <button type="submit" disabled={!titulo.trim()}>Adicionar</button>
+        </form>
+      ) : (
+        <BarraMais rotulo="Adicionar evento" onClick={() => setAbrindo(true)} />
+      )}
+    </section>
+  );
+}
+
+/* Lista das tarefas que se repetem */
+function Rotinas({ rotinas, apagar }) {
+  if (rotinas.length === 0) return null;
+  return (
+    <section className="ck-rotinas">
+      <h3>Rotinas</h3>
+      <ul>
+        {rotinas.map((r) => (
+          <li key={r.id}>
+            <span className="ck-rot-texto">
+              {r.texto}
+              <span className="ck-rot-info">
+                ↻ {rotuloRepete(r.cada)} · próxima em {r.proxima.split("-").reverse().slice(0, 2).join("/")}
+              </span>
+            </span>
+            <button type="button" className="ck-apagar" onClick={() => apagar(r.id)} aria-label={`Apagar rotina ${r.texto}`}>Apagar</button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function lerStorage(chave, padrao) {
   try {
     const bruto = localStorage.getItem(chave);
@@ -83,12 +248,13 @@ function BarraMais({ rotulo, onClick, atalho }) {
 /* Campo para escrever uma tarefa nova (usado fora e dentro das sessões) */
 function NovaTarefa({ onAdd, placeholder, onFechar, idCampo }) {
   const [texto, setTexto] = useState("");
+  const [repete, setRepete] = useState("0");
 
   function enviar(e) {
     e.preventDefault();
     const limpo = texto.trim();
     if (!limpo) return;
-    onAdd(limpo);
+    onAdd(limpo, Number(repete));
     setTexto("");
   }
 
@@ -114,6 +280,16 @@ function NovaTarefa({ onAdd, placeholder, onFechar, idCampo }) {
         aria-label={placeholder}
         maxLength={200}
       />
+      <select
+        value={repete}
+        onChange={(e) => setRepete(e.target.value)}
+        aria-label="Repetir tarefa"
+        title="Repetir esta tarefa"
+      >
+        {OPCOES_REPETE.map(([v, nome]) => (
+          <option key={v} value={v}>{v ? `↻ ${nome}` : nome}</option>
+        ))}
+      </select>
       <button type="submit" disabled={!texto.trim()}>
         Adicionar
       </button>
@@ -141,6 +317,9 @@ function ListaTarefas({ tarefas, alternar, apagar, mudarPrioridade }) {
             />
             <span className="ck-caixa" aria-hidden="true" />
             <span className="ck-texto">{t.texto}</span>
+            {t.repeteDias > 0 && (
+              <span className="ck-repete" title="Volta sozinha, mesmo se você apagar">↻ {rotuloRepete(t.repeteDias)}</span>
+            )}
           </label>
           <button
             type="button"
@@ -166,6 +345,8 @@ function ListaTarefas({ tarefas, alternar, apagar, mudarPrioridade }) {
 export default function Checklist() {
   const [tarefas, setTarefas] = useState(() => lerStorage(STORAGE_TASKS, []));
   const [grupos, setGrupos] = useState(() => lerStorage(STORAGE_GROUPS, []));
+  const [eventos, setEventos] = useState(() => lerStorage(STORAGE_EVENTS, []));
+  const [rotinas, setRotinas] = useState(() => lerStorage(STORAGE_ROUTINES, []));
   const [nomeGrupo, setNomeGrupo] = useState("");
   const [criandoSolta, setCriandoSolta] = useState(false);
   const [criandoGrupo, setCriandoGrupo] = useState(false);
@@ -180,8 +361,12 @@ export default function Checklist() {
   // Mantém os dados atuais acessíveis dentro do setInterval
   const tarefasRef = useRef([]);
   const gruposRef = useRef([]);
+  const eventosRef = useRef([]);
+  const rotinasRef = useRef([]);
   tarefasRef.current = tarefas;
   gruposRef.current = grupos;
+  eventosRef.current = eventos;
+  rotinasRef.current = rotinas;
 
   useEffect(() => {
     salvarStorage(STORAGE_TASKS, tarefas);
@@ -190,6 +375,45 @@ export default function Checklist() {
   useEffect(() => {
     salvarStorage(STORAGE_GROUPS, grupos);
   }, [grupos]);
+
+  useEffect(() => {
+    salvarStorage(STORAGE_EVENTS, eventos);
+  }, [eventos]);
+
+  useEffect(() => {
+    salvarStorage(STORAGE_ROUTINES, rotinas);
+  }, [rotinas]);
+
+  // Rotinas: quando chega o dia, a tarefa volta (mesmo se você apagou a anterior)
+  useEffect(() => {
+    function gerar() {
+      const hoje = iso(new Date());
+      const devidas = rotinasRef.current.filter((r) => r.proxima <= hoje);
+      if (devidas.length === 0) return;
+
+      setTarefas((atual) => [
+        ...atual,
+        ...devidas
+          .filter((r) => !atual.some((t) => t.rotinaId === r.id && !t.feita))
+          .map((r) => ({
+            id: novoId(), texto: r.texto, feita: false, meio: false,
+            grupoId: r.grupoId, prioridade: r.prioridade || 0,
+            rotinaId: r.id, repeteDias: r.cada,
+          })),
+      ]);
+      setRotinas((atual) =>
+        atual.map((r) => (r.proxima <= hoje ? { ...r, proxima: somarDias(hoje, r.cada) } : r))
+      );
+    }
+
+    gerar();
+    const id = setInterval(gerar, 60 * 1000);
+    document.addEventListener("visibilitychange", gerar);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", gerar);
+    };
+  }, []);
 
   useEffect(() => {
     salvarStorage(STORAGE_NOTIFY, notificar);
@@ -229,7 +453,12 @@ export default function Checklist() {
     if (Notification.permission !== "granted") return;
 
     const todas = tarefasRef.current.filter((t) => !t.feita);
-    if (todas.length === 0) return;
+    const agora = new Date();
+    const hm = `${z2(agora.getHours())}:${z2(agora.getMinutes())}`;
+    const evs = eventosRef.current
+      .filter((e) => e.data === iso(agora) && (!e.hora || e.hora >= hm))
+      .sort((a, b) => (a.hora || "").localeCompare(b.hora || ""));
+    if (todas.length === 0 && evs.length === 0) return;
 
     const ids = new Set(gruposRef.current.map((g) => g.id));
     const linhas = [];
@@ -255,9 +484,15 @@ export default function Checklist() {
       doGrupo.forEach((t) => linhas.push(`  • ${linha(t)}`));
     });
 
+    if (evs.length) {
+      linhas.push("Hoje na agenda:");
+      evs.forEach((e) => linhas.push(`  • ${e.hora ? e.hora + " " : ""}${e.titulo}`));
+    }
+
     new Notification(`Checklist · ${horaAtual()}`, {
-      body: `Faltam ${todas.length}:\n${linhas.join("\n")}`,
+      body: `${todas.length ? `Faltam ${todas.length}:\n` : ""}${linhas.join("\n")}`,
       tag: "checklist-pendentes", // substitui a notificação anterior
+      renotify: true, // sem isso, a substituta chega em silêncio
     });
     salvarStorage(STORAGE_LAST, Date.now());
   }
@@ -273,7 +508,12 @@ export default function Checklist() {
 
     checar();
     const id = setInterval(checar, 30 * 1000);
-    return () => clearInterval(id);
+    // ao voltar para a aba, recupera um lembrete que ficou atrasado
+    document.addEventListener("visibilitychange", checar);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", checar);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notificar, permissao]);
 
@@ -291,11 +531,32 @@ export default function Checklist() {
   }
 
   /* tarefas */
-  function adicionarTarefa(texto, grupoId = null) {
+  function adicionarTarefa(texto, grupoId = null, repetirDias = 0) {
+    let rotinaId;
+    if (repetirDias > 0) {
+      rotinaId = novoId();
+      setRotinas((atual) => [
+        ...atual,
+        { id: rotinaId, texto, cada: repetirDias, grupoId, prioridade: 0,
+          proxima: somarDias(iso(new Date()), repetirDias) },
+      ]);
+    }
     setTarefas((atual) => [
       ...atual,
-      { id: novoId(), texto, feita: false, grupoId },
+      { id: novoId(), texto, feita: false, grupoId, rotinaId, repeteDias: repetirDias },
     ]);
+  }
+
+  function adicionarEvento(ev) {
+    setEventos((atual) => [...atual, { id: novoId(), ...ev }]);
+  }
+
+  function apagarEvento(id) {
+    setEventos((atual) => atual.filter((e) => e.id !== id));
+  }
+
+  function apagarRotina(id) {
+    setRotinas((atual) => atual.filter((r) => r.id !== id));
   }
 
   function alternar(id) {
@@ -363,6 +624,7 @@ export default function Checklist() {
   const ativo = notificar && permissao === "granted";
 
   return (
+    <div className="ck-layout">
     <main className="ck">
       <header className="ck-topo">
         <h1>Tarefas</h1>
@@ -379,7 +641,7 @@ export default function Checklist() {
         <NovaTarefa
           idCampo="campo-tarefa"
           placeholder="Nova tarefa"
-          onAdd={(texto) => adicionarTarefa(texto, null)}
+          onAdd={(texto, rep) => adicionarTarefa(texto, null, rep)}
           onFechar={() => setCriandoSolta(false)}
         />
       ) : (
@@ -496,7 +758,7 @@ export default function Checklist() {
                 {grupoAdd === g.id && (
                   <NovaTarefa
                     placeholder={`Nova tarefa em ${g.nome}`}
-                    onAdd={(texto) => adicionarTarefa(texto, g.id)}
+                    onAdd={(texto, rep) => adicionarTarefa(texto, g.id, rep)}
                     onFechar={() => setGrupoAdd(null)}
                   />
                 )}
@@ -571,5 +833,11 @@ export default function Checklist() {
         )}
       </section>
     </main>
+
+    <aside className="ck-lateral">
+      <Calendario eventos={eventos} adicionar={adicionarEvento} apagar={apagarEvento} />
+      <Rotinas rotinas={rotinas} apagar={apagarRotina} />
+    </aside>
+    </div>
   );
 }

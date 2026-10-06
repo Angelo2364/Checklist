@@ -55,7 +55,7 @@ body {
   width: 100%;
   max-width: 600px;
   min-height: 100vh;
-  margin: 0 auto;
+  margin: 0;
   background: var(--fundo);
   border-left: 1px solid var(--linha);
   border-right: 1px solid var(--linha);
@@ -532,4 +532,217 @@ button.secundario:hover {
   .ck-atalho {
     display: none; /* celular não tem teclado */
   }
+}
+
+/* ---------- coluna lateral (calendário) ---------- */
+.ck-layout {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.ck-lateral {
+  flex: none;
+  width: 340px;
+  position: sticky;
+  top: 0;
+  min-height: 100vh;
+  max-height: 100vh;
+  overflow-y: auto;
+  background: var(--fundo);
+  border-right: 1px solid var(--linha);
+}
+
+@media (max-width: 1000px) {
+  .ck-layout { flex-direction: column; align-items: stretch; }
+  .ck, .ck-lateral { width: 100%; max-width: 600px; margin: 0 auto; }
+  .ck-lateral {
+    position: static;
+    min-height: 0;
+    max-height: none;
+    border-left: 1px solid var(--linha);
+    border-top: 8px solid var(--fundo-hover);
+  }
+}
+
+@media (max-width: 600px) {
+  .ck-lateral { border-left: 0; border-right: 0; }
+}
+
+.ck-cal { padding: 12px 16px 16px; }
+
+.ck-cal-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  text-transform: capitalize;
+}
+
+.ck-cal-nav {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  font-size: 20px;
+  line-height: 1;
+  color: var(--azul-forte);
+  background: transparent;
+  border: 1px solid var(--linha);
+}
+
+.ck-cal-nav:hover {
+  background: color-mix(in srgb, var(--azul) 35%, transparent);
+  border-color: var(--azul);
+}
+
+.ck-cal-grade {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+  text-align: center;
+}
+
+.ck-cal-sem {
+  padding: 4px 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--suave);
+}
+
+.ck-dia {
+  position: relative;
+  aspect-ratio: 1;
+  padding: 0;
+  font-weight: 500;
+  color: var(--tinta);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 50%;
+}
+
+.ck-dia:hover {
+  background: var(--fundo-hover);
+  border-color: var(--linha);
+}
+
+.ck-dia.hoje,
+.ck-dia.hoje:hover {
+  color: var(--sobre-pastel);
+  background: var(--amarelo);
+  border-color: var(--amarelo);
+}
+
+.ck-dia.sel {
+  border-color: var(--azul-forte);
+  box-shadow: 0 0 0 1px var(--azul-forte);
+}
+
+.ck-dia i {
+  position: absolute;
+  bottom: 4px;
+  left: 50%;
+  width: 5px;
+  height: 5px;
+  margin-left: -2.5px;
+  background: var(--rosa-hover);
+  border-radius: 50%;
+}
+
+.ck-cal-data {
+  margin: 14px 0 6px;
+  font-size: 15px;
+  text-transform: capitalize;
+}
+
+.ck-vazio-cal {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: var(--suave);
+}
+
+.ck-eventos,
+.ck-rotinas ul {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+}
+
+.ck-eventos li,
+.ck-rotinas li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--linha);
+}
+
+.ck-ev-hora {
+  flex: none;
+  min-width: 48px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--azul-forte);
+}
+
+.ck-ev-titulo,
+.ck-rot-texto {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+a.ck-apagar {
+  display: inline-block;
+  text-decoration: none;
+  border: 1px solid transparent;
+  border-radius: 999px;
+}
+
+a.ck-apagar:hover {
+  color: var(--azul-forte);
+  background: color-mix(in srgb, var(--azul) 30%, transparent);
+}
+
+.ck-cal .ck-barra-mais,
+.ck-cal .ck-form-grupo {
+  border: 1px solid var(--linha);
+  border-radius: 12px;
+}
+
+.ck-form-grupo { flex-wrap: wrap; }
+.ck-form-grupo input[type="text"] { flex: 1 1 140px; }
+
+.ck-form-grupo input[type="time"],
+.ck-form-grupo select {
+  flex: none;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--tinta);
+  background: var(--fundo);
+  border: 1px solid var(--linha);
+  border-radius: 999px;
+}
+
+/* ---------- rotinas ---------- */
+.ck-repete {
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--azul-forte);
+}
+
+.ck-rotinas {
+  padding: 12px 16px 16px;
+  border-top: 8px solid var(--fundo-hover);
+}
+
+.ck-rotinas h3 { margin: 0 0 6px; font-size: 15px; }
+
+.ck-rot-info {
+  display: block;
+  font-size: 12px;
+  color: var(--suave);
 }
