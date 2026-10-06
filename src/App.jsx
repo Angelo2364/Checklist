@@ -297,12 +297,72 @@ function NovaTarefa({ onAdd, placeholder, onFechar, idCampo }) {
   );
 }
 
+/* Alça com bolinhas: arraste ou use as setas ↑ ↓ com ela em foco */
+function Alca({ id, tipo, grupo, ordem, imagem }) {
+  return (
+    <span
+      role="button"
+      tabIndex={0}
+      id={`alca-${id}`}
+      className="ck-alca"
+      draggable
+      title="Arraste para reordenar (ou use as setas ↑ ↓)"
+      aria-label="Reordenar: arraste ou use as setas para cima e para baixo"
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", String(id));
+        const el = e.currentTarget.closest(imagem);
+        if (el) e.dataTransfer.setDragImage(el, 0, 0);
+        setTimeout(() => ordem.setArrastando({ tipo, id, grupo }), 0);
+      }}
+      onDragEnd={ordem.fim}
+      onKeyDown={(e) => {
+        if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+          e.preventDefault();
+          ordem.moverPor(tipo, id, e.key === "ArrowUp" ? -1 : 1);
+        }
+      }}
+    >
+      <svg viewBox="0 0 10 16" width="10" height="16" aria-hidden="true" fill="currentColor">
+        {[3, 8, 13].map((y) => [2.5, 7.5].map((x) => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.4" />))}
+      </svg>
+    </span>
+  );
+}
+
+// Só aceita soltar item do mesmo tipo e do mesmo grupo (tarefa não sai da sessão)
+function alvoProps(ordem, tipo, id, grupo) {
+  const ok = () => {
+    const a = ordem.arrastando;
+    return a && a.tipo === tipo && a.id !== id && a.grupo === grupo;
+  };
+  return {
+    onDragOver: (e) => {
+      if (ok()) {
+        e.preventDefault();
+        ordem.setSobre(id);
+      }
+    },
+    onDrop: (e) => {
+      if (!ok()) return;
+      e.preventDefault();
+      ordem.mover(tipo, ordem.arrastando.id, id);
+      ordem.fim();
+    },
+  };
+}
+
 /* Lista de tarefas (usada fora e dentro das sessões) */
-function ListaTarefas({ tarefas, alternar, apagar, mudarPrioridade }) {
+function ListaTarefas({ tarefas, alternar, apagar, mudarPrioridade, ordem }) {
   return (
     <ul className="ck-lista">
       {tarefas.map((t) => (
-        <li key={t.id} className={t.feita ? "feita" : ""}>
+        <li
+          key={t.id}
+          className={`${t.feita ? "feita" : ""}${ordem.arrastando?.id === t.id ? " arrastando" : ""}${ordem.sobre === t.id && ordem.arrastando?.tipo === "tarefa" ? " alvo" : ""}`}
+          {...alvoProps(ordem, "tarefa", t.id, t.grupoId || null)}
+        >
+          <Alca id={t.id} tipo="tarefa" grupo={t.grupoId || null} ordem={ordem} imagem="li" />
           <label
             title={t.feita ? "Feita" : t.meio ? "Meio feita" : "Pendente"}
           >
@@ -347,6 +407,8 @@ export default function Checklist() {
   const [grupos, setGrupos] = useState(() => lerStorage(STORAGE_GROUPS, []));
   const [eventos, setEventos] = useState(() => lerStorage(STORAGE_EVENTS, []));
   const [rotinas, setRotinas] = useState(() => lerStorage(STORAGE_ROUTINES, []));
+  const [arrastando, setArrastando] = useState(null); // {tipo, id, grupo}
+  const [sobre, setSobre] = useState(null);
   const [nomeGrupo, setNomeGrupo] = useState("");
   const [criandoSolta, setCriandoSolta] = useState(false);
   const [criandoGrupo, setCriandoGrupo] = useState(false);
@@ -584,6 +646,52 @@ export default function Checklist() {
     setTarefas((atual) => atual.filter((t) => t.id !== id));
   }
 
+  /* ordem: mover item para a posição de outro (mesma lista) */
+  function moverItem(setLista, idA, idB) {
+    setLista((atual) => {
+      const de = atual.findIndex((x) => x.id === idA);
+      const para = atual.findIndex((x) => x.id === idB);
+      if (de < 0 || para < 0 || de === para) return atual;
+      const copia = [...atual];
+      const [item] = copia.splice(de, 1);
+      copia.splice(para, 0, item);
+      return copia;
+    });
+  }
+
+  function mover(tipo, idA, idB) {
+    moverItem(tipo === "grupo" ? setGrupos : setTarefas, idA, idB);
+  }
+
+  function moverPor(tipo, id, delta) {
+    let irmaos;
+    if (tipo === "grupo") {
+      irmaos = grupos;
+    } else {
+      const t = tarefas.find((x) => x.id === id);
+      if (!t) return;
+      irmaos = tarefas.filter((x) => (x.grupoId || null) === (t.grupoId || null));
+    }
+    const alvo = irmaos[irmaos.findIndex((x) => x.id === id) + delta];
+    if (!alvo) return;
+    mover(tipo, id, alvo.id);
+    // o React move o elemento de lugar e o foco se perde: devolve ele
+    requestAnimationFrame(() => document.getElementById(`alca-${id}`)?.focus());
+  }
+
+  const ordem = {
+    arrastando,
+    sobre,
+    setArrastando,
+    setSobre,
+    fim: () => {
+      setArrastando(null);
+      setSobre(null);
+    },
+    mover,
+    moverPor,
+  };
+
   function limparFeitas() {
     setTarefas((atual) => atual.filter((t) => !t.feita));
   }
@@ -703,6 +811,7 @@ export default function Checklist() {
           alternar={alternar}
           apagar={apagar}
           mudarPrioridade={mudarPrioridade}
+          ordem={ordem}
         />
       )}
 
@@ -718,8 +827,13 @@ export default function Checklist() {
         const aberta = g.aberta !== false;
 
         return (
-          <section key={g.id} className="ck-grupo">
+          <section
+            key={g.id}
+            className={`ck-grupo${arrastando?.id === g.id ? " arrastando" : ""}${sobre === g.id && arrastando?.tipo === "grupo" ? " alvo" : ""}`}
+            {...alvoProps(ordem, "grupo", g.id, null)}
+          >
             <div className="ck-grupo-topo">
+              <Alca id={g.id} tipo="grupo" grupo={null} ordem={ordem} imagem=".ck-grupo-topo" />
               <button
                 type="button"
                 className="ck-grupo-titulo"
@@ -770,6 +884,7 @@ export default function Checklist() {
                     alternar={alternar}
                     apagar={apagar}
                     mudarPrioridade={mudarPrioridade}
+          ordem={ordem}
                   />
                 )}
               </>

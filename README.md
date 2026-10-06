@@ -8,6 +8,7 @@ Lista de tarefas em React com sessões, prioridades por cor e lembretes no compu
 - **Sessões:** agrupar tarefas (por exemplo "Afazeres do RPG"). Também dá para ter tarefas soltas, fora de qualquer sessão. Cada sessão pode ser recolhida e mostra quantas tarefas já foram feitas.
 - **Tarefas que se repetem:** ao criar a tarefa, escolha "Repetir" (todo dia, toda semana, a cada N dias). Mesmo que você apague ou conclua, ela volta quando chegar o dia. Para parar, apague a rotina na coluna da direita.
 - **Calendário:** coluna lateral com o mês, eventos com horário opcional e um botão "Google" que abre o evento já preenchido no Google Agenda. Os eventos de hoje também entram na notificação.
+- **Reordenar:** a alça com bolinhas (⋮⋮) à esquerda de cada tarefa e sessão permite arrastar para mudar a ordem. Também dá para focar na alça (Tab) e usar as setas ↑ ↓. A tarefa só se move dentro da própria sessão, e ao mover uma sessão as tarefas dela vão juntas.
 - **Prioridade:** a bolinha à direita de cada tarefa troca de cor a cada clique: sem prioridade, verde (tranquila), amarelo (média) e vermelho (urgente).
 - **Lembretes:** a cada 30 minutos chega uma notificação com a hora atual e as tarefas que ainda faltam, organizadas por sessão e com as mais urgentes primeiro.
 - **Atalhos de teclado:** `Ctrl + F` abre o campo de nova tarefa e `Ctrl + D` abre o de nova sessão, já com o cursor pronto para digitar.
