@@ -882,3 +882,20 @@ a.ck-ev-mapa:hover {
 .ck-form-grupo input[type="text"] {
   min-width: 120px;
 }
+
+/* seletor de horário em 24h */
+.ck-hora24 {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 3px;
+  color: var(--suave);
+}
+
+.ck-hora24 select {
+  padding: 7px 8px;
+}
+
+.ck-hora24 select:disabled {
+  opacity: 0.5;
+}

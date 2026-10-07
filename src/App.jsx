@@ -57,6 +57,32 @@ function linkGoogle(e) {
     (e.descricao ? `&details=${encodeURIComponent(e.descricao)}` : "");
 }
 
+/* Horário sempre em 24 horas (o campo nativo segue a configuração do sistema) */
+function Hora24({ value, onChange, rotulo, opcional }) {
+  const [h, m] = value ? value.split(":") : ["", "00"];
+  const horas = Array.from({ length: 24 }, (_, i) => z2(i));
+  const base = Array.from({ length: 12 }, (_, i) => z2(i * 5));
+  const minutos = base.includes(m) ? base : [...base, m].sort();
+  const mudar = (nh, nm) => onChange(nh === "" ? "" : `${nh}:${nm}`);
+
+  return (
+    <span className="ck-hora24" role="group" aria-label={rotulo} title={rotulo}>
+      <select value={h} onChange={(e) => mudar(e.target.value, m)} aria-label={`${rotulo} - hora`}>
+        {opcional && <option value="">--</option>}
+        {horas.map((x) => (
+          <option key={x} value={x}>{x}</option>
+        ))}
+      </select>
+      <span aria-hidden="true">:</span>
+      <select value={m} disabled={h === ""} onChange={(e) => mudar(h, e.target.value)} aria-label={`${rotulo} - minuto`}>
+        {minutos.map((x) => (
+          <option key={x} value={x}>{x}</option>
+        ))}
+      </select>
+    </span>
+  );
+}
+
 /* Calendário do mês com eventos */
 function Calendario({ eventos, adicionar, apagar }) {
   const hojeISO = iso(new Date());
@@ -176,7 +202,7 @@ function Calendario({ eventos, adicionar, apagar }) {
             aria-label="Título do evento"
             maxLength={100}
           />
-          <input type="time" value={hora} onChange={(e) => setHora(e.target.value)} aria-label="Horário (opcional)" />
+          <Hora24 value={hora} onChange={setHora} opcional rotulo="Horário do evento (opcional)" />
           <input
             type="text"
             className="ck-campo-largo"
@@ -257,6 +283,7 @@ function horaAtual() {
   return new Date().toLocaleTimeString("pt-BR", {
     hour: "2-digit",
     minute: "2-digit",
+    hourCycle: "h23",
   });
 }
 
@@ -352,13 +379,7 @@ function NovaTarefa({ onAdd, placeholder, onFechar, idCampo }) {
         ))}
       </select>
       {repete !== "0" && (
-        <input
-          type="time"
-          value={hora}
-          onChange={(e) => setHora(e.target.value)}
-          aria-label="Horário em que a tarefa volta"
-          title="Horário em que a tarefa volta (00:00 = meia-noite)"
-        />
+        <Hora24 value={hora} onChange={setHora} rotulo="Horário em que a tarefa volta" />
       )}
       <button type="submit" disabled={!texto.trim()}>
         Adicionar
@@ -452,13 +473,7 @@ function EditarTarefa({ tarefa, onSalvar, onCancelar }) {
         ))}
       </select>
       {repete !== "0" && (
-        <input
-          type="time"
-          value={hora}
-          onChange={(e) => setHora(e.target.value)}
-          aria-label="Horário em que a tarefa volta"
-          title="Horário em que a tarefa volta (00:00 = meia-noite)"
-        />
+        <Hora24 value={hora} onChange={setHora} rotulo="Horário em que a tarefa volta" />
       )}
       <span className="ck-edit-acoes">
         <button type="submit" disabled={!texto.trim()}>Salvar</button>
