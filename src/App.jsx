@@ -64,6 +64,7 @@ function Hora24({ value, onChange, rotulo, opcional }) {
   const [m, setM] = useState(inicio[1]);
   const refH = useRef(null);
   const refM = useRef(null);
+  const levarAoMinuto = useRef(false);
 
   const juntar = (hh, mm) =>
     hh === ""
@@ -80,6 +81,16 @@ function Hora24({ value, onChange, rotulo, opcional }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
+  // depois de atualizar, foca os minutos com o cursor no fim (sem selecionar o dígito já digitado)
+  useEffect(() => {
+    if (levarAoMinuto.current) {
+      levarAoMinuto.current = false;
+      const el = refM.current;
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+    }
+  });
+
   const limpar = (texto, max) => {
     let x = texto.replace(/\D/g, "").slice(0, 2);
     if (x.length === 2 && Number(x) > max) x = String(max);
@@ -87,6 +98,17 @@ function Hora24({ value, onChange, rotulo, opcional }) {
   };
 
   function digitarHora(e) {
+    const bruto = e.target.value.replace(/\D/g, "").slice(0, 2);
+    // 24 a 29 não existem: o 2º dígito já é o começo dos minutos (25 vira 02h e minutos 5_)
+    if (bruto.length === 2 && bruto[0] === "2" && Number(bruto[1]) > 3) {
+      const dig = bruto[1];
+      const min = Number(dig) > 5 ? "0" + dig : dig;
+      setH("02");
+      setM(min);
+      onChange(juntar("02", min));
+      levarAoMinuto.current = true;
+      return;
+    }
     let t = limpar(e.target.value, 23);
     if (t.length === 1 && Number(t) > 2) t = "0" + t; // 3 a 9 só podem ser a hora inteira
     setH(t);
