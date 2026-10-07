@@ -899,3 +899,21 @@ a.ck-ev-mapa:hover {
 .ck-hora24 select:disabled {
   opacity: 0.5;
 }
+
+/* × da edição: o padding dos botões do formulário deixava ele torto */
+.ck-form-grupo .ck-icone {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  font-size: inherit;
+}
+
+/* horário digitado: dois campinhos (hora : minuto) */
+.ck-form-grupo .ck-hora24 input[type="text"] {
+  flex: none;
+  width: 40px;
+  min-width: 0;
+  padding: 7px 4px;
+  text-align: center;
+  font-size: 13px;
+}

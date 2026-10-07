@@ -57,28 +57,142 @@ function linkGoogle(e) {
     (e.descricao ? `&details=${encodeURIComponent(e.descricao)}` : "");
 }
 
-/* Horário sempre em 24 horas (o campo nativo segue a configuração do sistema) */
+/* Horário em 24 horas, digitado livremente (as setas ↑ ↓ também funcionam) */
 function Hora24({ value, onChange, rotulo, opcional }) {
-  const [h, m] = value ? value.split(":") : ["", "00"];
-  const horas = Array.from({ length: 24 }, (_, i) => z2(i));
-  const base = Array.from({ length: 12 }, (_, i) => z2(i * 5));
-  const minutos = base.includes(m) ? base : [...base, m].sort();
-  const mudar = (nh, nm) => onChange(nh === "" ? "" : `${nh}:${nm}`);
+  const inicio = value ? value.split(":") : ["", ""];
+  const [h, setH] = useState(inicio[0]);
+  const [m, setM] = useState(inicio[1]);
+  const refH = useRef(null);
+  const refM = useRef(null);
+
+  const juntar = (hh, mm) =>
+    hh === ""
+      ? ""
+      : `${z2(Math.min(23, Number(hh)))}:${z2(mm === "" ? 0 : Math.min(59, Number(mm)))}`;
+
+  // se o formulário trocar o valor por fora (ex.: foi limpo), acompanha
+  useEffect(() => {
+    if (value !== juntar(h, m)) {
+      const [a, b] = value ? value.split(":") : ["", ""];
+      setH(a);
+      setM(b);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  const limpar = (texto, max) => {
+    let x = texto.replace(/\D/g, "").slice(0, 2);
+    if (x.length === 2 && Number(x) > max) x = String(max);
+    return x;
+  };
+
+  function digitarHora(e) {
+    let t = limpar(e.target.value, 23);
+    if (t.length === 1 && Number(t) > 2) t = "0" + t; // 3 a 9 só podem ser a hora inteira
+    setH(t);
+    onChange(juntar(t, m));
+    if (t.length === 2) refM.current.focus(); // pula para os minutos
+  }
+
+  function digitarMinuto(e) {
+    let t = limpar(e.target.value, 59);
+    if (t.length === 1 && Number(t) > 5) t = "0" + t;
+    const hh = h === "" && t !== "" ? "00" : h;
+    setH(hh);
+    setM(t);
+    onChange(juntar(hh, t));
+  }
+
+  // ao sair do campo, completa com zero (7 vira 07)
+  function sairHora(e) {
+    const t = e.target.value;
+    if (t === "") {
+      if (opcional) {
+        setM("");
+        onChange("");
+      } else {
+        setH("00");
+        onChange(juntar("00", m));
+      }
+      return;
+    }
+    const pronto = t.padStart(2, "0");
+    setH(pronto);
+    onChange(juntar(pronto, m));
+  }
+
+  function sairMinuto(e) {
+    if (h === "") return;
+    const pronto = (e.target.value || "00").padStart(2, "0");
+    setM(pronto);
+    onChange(juntar(h, pronto));
+  }
+
+  function mexer(delta, max, atual, aplicar) {
+    aplicar(z2((((Number(atual) || 0) + delta) % max + max) % max));
+  }
+
+  const selecionar = {
+    onFocus: (e) => e.target.select(), // clicar ou entrar no campo seleciona tudo: é só digitar por cima
+    onMouseUp: (e) => e.preventDefault(),
+  };
 
   return (
     <span className="ck-hora24" role="group" aria-label={rotulo} title={rotulo}>
-      <select value={h} onChange={(e) => mudar(e.target.value, m)} aria-label={`${rotulo} - hora`}>
-        {opcional && <option value="">--</option>}
-        {horas.map((x) => (
-          <option key={x} value={x}>{x}</option>
-        ))}
-      </select>
+      <input
+        ref={refH}
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        maxLength={2}
+        value={h}
+        placeholder={opcional ? "--" : "00"}
+        aria-label={`${rotulo} - hora`}
+        onChange={digitarHora}
+        onBlur={sairHora}
+        {...selecionar}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+            e.preventDefault();
+            mexer(e.key === "ArrowUp" ? 1 : -1, 24, h, (n) => {
+              setH(n);
+              onChange(juntar(n, m));
+            });
+          } else if (e.key === ":") {
+            e.preventDefault();
+            if (h !== "") setH(h.padStart(2, "0"));
+            refM.current.focus();
+          }
+        }}
+      />
       <span aria-hidden="true">:</span>
-      <select value={m} disabled={h === ""} onChange={(e) => mudar(h, e.target.value)} aria-label={`${rotulo} - minuto`}>
-        {minutos.map((x) => (
-          <option key={x} value={x}>{x}</option>
-        ))}
-      </select>
+      <input
+        ref={refM}
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        maxLength={2}
+        value={m}
+        placeholder={opcional ? "--" : "00"}
+        aria-label={`${rotulo} - minuto`}
+        onChange={digitarMinuto}
+        onBlur={sairMinuto}
+        {...selecionar}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+            e.preventDefault();
+            mexer(e.key === "ArrowUp" ? 1 : -1, 60, m, (n) => {
+              const hh = h === "" ? "00" : h;
+              setH(hh);
+              setM(n);
+              onChange(juntar(hh, n));
+            });
+          } else if (e.key === "Backspace" && e.target.value === "") {
+            e.preventDefault();
+            refH.current.focus(); // apagou os minutos: volta para a hora
+          }
+        }}
+      />
     </span>
   );
 }
