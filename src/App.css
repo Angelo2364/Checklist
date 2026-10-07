@@ -839,3 +839,34 @@ a.ck-ev-mapa:hover {
   color: var(--azul-forte);
   text-decoration: underline;
 }
+
+/* ---------- editar tarefa ---------- */
+.ck-icone {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  line-height: 0;
+  color: var(--suave);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 50%;
+}
+
+.ck-icone:hover {
+  color: var(--azul-forte);
+  background: color-mix(in srgb, var(--azul) 30%, transparent);
+  border-color: transparent;
+}
+
+.ck-lista li.editando {
+  padding-right: 0;
+}
+
+.ck-lista li.editando .ck-form-grupo {
+  flex: 1;
+  min-width: 0;
+  border-bottom: 0;
+}

@@ -5,7 +5,6 @@ const STORAGE_TASKS = "checklist:tarefas";
 const STORAGE_GROUPS = "checklist:divisoes";
 const STORAGE_LAST = "checklist:ultimaNotificacao";
 const STORAGE_NOTIFY = "checklist:notificar";
-const INTERVALO = 30 * 60 * 1000; // 30 minutos
 
 // Atalhos: Ctrl (ou Cmd no Mac) + a tecla abaixo
 const ATALHO_TAREFA = "f";
@@ -34,6 +33,14 @@ function somarDias(dataISO, n) {
 }
 const rotuloRepete = (n) =>
   n === 1 ? "todo dia" : n === 7 ? "toda semana" : `a cada ${n} dias`;
+const rotuloRotina = (n, hora) =>
+  rotuloRepete(n) + (hora && hora !== "00:00" ? ` às ${hora}` : "");
+
+// meia hora do relógio em que estamos: "2026-10-07 21:30"
+function slotAtual() {
+  const a = new Date();
+  return `${iso(a)} ${z2(a.getHours())}:${a.getMinutes() < 30 ? "00" : "30"}`;
+}
 
 // link que abre o evento já preenchido no Google Agenda
 function linkGoogle(e) {
@@ -211,7 +218,7 @@ function Rotinas({ rotinas, apagar }) {
             <span className="ck-rot-texto">
               {r.texto}
               <span className="ck-rot-info">
-                ↻ {rotuloRepete(r.cada)} · próxima em {r.proxima.split("-").reverse().slice(0, 2).join("/")}
+                ↻ {rotuloRotina(r.cada, r.hora)} · próxima em {r.proxima.split("-").reverse().slice(0, 2).join("/")} às {r.hora || "00:00"}
               </span>
             </span>
             <button type="button" className="ck-apagar" onClick={() => apagar(r.id)} aria-label={`Apagar rotina ${r.texto}`}>Apagar</button>
@@ -295,12 +302,13 @@ function BarraMais({ rotulo, onClick, atalho }) {
 function NovaTarefa({ onAdd, placeholder, onFechar, idCampo }) {
   const [texto, setTexto] = useState("");
   const [repete, setRepete] = useState("0");
+  const [hora, setHora] = useState("00:00");
 
   function enviar(e) {
     e.preventDefault();
     const limpo = texto.trim();
     if (!limpo) return;
-    onAdd(limpo, Number(repete));
+    onAdd(limpo, Number(repete), hora || "00:00");
     setTexto("");
   }
 
@@ -336,6 +344,15 @@ function NovaTarefa({ onAdd, placeholder, onFechar, idCampo }) {
           <option key={v} value={v}>{v ? `↻ ${nome}` : nome}</option>
         ))}
       </select>
+      {repete !== "0" && (
+        <input
+          type="time"
+          value={hora}
+          onChange={(e) => setHora(e.target.value)}
+          aria-label="Horário em que a tarefa volta"
+          title="Horário em que a tarefa volta (00:00 = meia-noite)"
+        />
+      )}
       <button type="submit" disabled={!texto.trim()}>
         Adicionar
       </button>
@@ -398,11 +415,59 @@ function alvoProps(ordem, tipo, id, grupo) {
   };
 }
 
+/* Formulário para editar uma tarefa já criada */
+function EditarTarefa({ tarefa, onSalvar, onCancelar }) {
+  const [texto, setTexto] = useState(tarefa.texto);
+  const [repete, setRepete] = useState(String(tarefa.repeteDias || 0));
+  const [hora, setHora] = useState(tarefa.repeteHora || "00:00");
+
+  return (
+    <form
+      className="ck-form-grupo"
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (texto.trim()) onSalvar(texto.trim(), Number(repete), hora || "00:00");
+      }}
+      onKeyDown={(e) => e.key === "Escape" && onCancelar()}
+    >
+      <input
+        type="text"
+        value={texto}
+        autoFocus
+        onFocus={(e) => e.target.select()}
+        onChange={(e) => setTexto(e.target.value)}
+        aria-label="Nome da tarefa"
+        maxLength={200}
+      />
+      <select value={repete} onChange={(e) => setRepete(e.target.value)} aria-label="Repetir tarefa">
+        {OPCOES_REPETE.map(([v, nome]) => (
+          <option key={v} value={v}>{v ? `↻ ${nome}` : nome}</option>
+        ))}
+      </select>
+      {repete !== "0" && (
+        <input
+          type="time"
+          value={hora}
+          onChange={(e) => setHora(e.target.value)}
+          aria-label="Horário em que a tarefa volta"
+          title="Horário em que a tarefa volta (00:00 = meia-noite)"
+        />
+      )}
+      <button type="submit" disabled={!texto.trim()}>Salvar</button>
+      <button type="button" className="secundario" onClick={onCancelar}>Cancelar</button>
+    </form>
+  );
+}
+
 /* Lista de tarefas (usada fora e dentro das sessões) */
-function ListaTarefas({ tarefas, alternar, apagar, mudarPrioridade, ordem }) {
+function ListaTarefas({ tarefas, alternar, apagar, mudarPrioridade, ordem, edicao }) {
   return (
     <ul className="ck-lista">
-      {tarefas.map((t) => (
+      {tarefas.map((t) => edicao.id === t.id ? (
+        <li key={t.id} className="editando">
+          <EditarTarefa tarefa={t} onSalvar={(texto, dias, hora) => edicao.salvar(t.id, texto, dias, hora)} onCancelar={edicao.cancelar} />
+        </li>
+      ) : (
         <li
           key={t.id}
           className={`${t.feita ? "feita" : ""}${ordem.arrastando?.id === t.id ? " arrastando" : ""}${ordem.sobre === t.id && ordem.arrastando?.tipo === "tarefa" ? " alvo" : ""}`}
@@ -424,7 +489,7 @@ function ListaTarefas({ tarefas, alternar, apagar, mudarPrioridade, ordem }) {
             <span className="ck-caixa" aria-hidden="true" />
             <span className="ck-texto">{t.texto}</span>
             {t.repeteDias > 0 && (
-              <span className="ck-repete" title="Volta sozinha, mesmo se você apagar">↻ {rotuloRepete(t.repeteDias)}</span>
+              <span className="ck-repete" title="Volta sozinha, mesmo se você apagar">↻ {rotuloRotina(t.repeteDias, t.repeteHora)}</span>
             )}
           </label>
           <button
@@ -434,6 +499,17 @@ function ListaTarefas({ tarefas, alternar, apagar, mudarPrioridade, ordem }) {
             title={`${PRIORIDADES[t.prioridade || 0].nome} (clique para trocar)`}
             aria-label={`Prioridade: ${PRIORIDADES[t.prioridade || 0].nome}. Clique para trocar.`}
           />
+          <button
+            type="button"
+            className="ck-icone"
+            onClick={() => edicao.abrir(t.id)}
+            title="Editar tarefa"
+            aria-label={`Editar ${t.texto}`}
+          >
+            <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" />
+            </svg>
+          </button>
           <button
             type="button"
             className="ck-apagar"
@@ -453,6 +529,7 @@ export default function App() {
   const [grupos, setGrupos] = useState(() => lerStorage(STORAGE_GROUPS, []));
   const [eventos, setEventos] = useState(() => lerStorage(STORAGE_EVENTS, []));
   const [rotinas, setRotinas] = useState(() => lerStorage(STORAGE_ROUTINES, []));
+  const [editando, setEditando] = useState(null); // id da tarefa em edição
   const [arrastando, setArrastando] = useState(null); // {tipo, id, grupo}
   const [sobre, setSobre] = useState(null);
   const [nomeGrupo, setNomeGrupo] = useState("");
@@ -495,9 +572,31 @@ export default function App() {
   // Rotinas: quando chega o dia, a tarefa volta (mesmo se você apagou a anterior)
   useEffect(() => {
     function gerar() {
-      const hoje = iso(new Date());
-      const devidas = rotinasRef.current.filter((r) => r.proxima <= hoje);
+      const agora = new Date();
+      const hoje = iso(agora);
+      const hm = `${z2(agora.getHours())}:${z2(agora.getMinutes())}`;
+      // vence no dia marcado, a partir do horário da rotina (padrão: meia-noite)
+      const vencida = (r) =>
+        r.proxima < hoje || (r.proxima === hoje && hm >= (r.hora || "00:00"));
+      const devidas = rotinasRef.current.filter(vencida);
       if (devidas.length === 0) return;
+
+      // avisa as que realmente vão voltar (as que ainda estão pendentes não voltam de novo)
+      const voltam = devidas.filter(
+        (r) => !tarefasRef.current.some((t) => t.rotinaId === r.id && !t.feita)
+      );
+      if (
+        voltam.length > 0 &&
+        typeof Notification !== "undefined" &&
+        Notification.permission === "granted" &&
+        lerStorage(STORAGE_NOTIFY, false)
+      ) {
+        new Notification(`Tarefa de volta · ${horaAtual()}`, {
+          body: voltam.map((r) => `• ${r.texto}`).join("\n"),
+          tag: "checklist-rotina",
+          renotify: true,
+        });
+      }
 
       setTarefas((atual) => [
         ...atual,
@@ -506,11 +605,11 @@ export default function App() {
           .map((r) => ({
             id: novoId(), texto: r.texto, feita: false, meio: false,
             grupoId: r.grupoId, prioridade: r.prioridade || 0,
-            rotinaId: r.id, repeteDias: r.cada,
+            rotinaId: r.id, repeteDias: r.cada, repeteHora: r.hora || "00:00",
           })),
       ]);
       setRotinas((atual) =>
-        atual.map((r) => (r.proxima <= hoje ? { ...r, proxima: somarDias(hoje, r.cada) } : r))
+        atual.map((r) => (vencida(r) ? { ...r, proxima: somarDias(hoje, r.cada) } : r))
       );
     }
 
@@ -568,29 +667,18 @@ export default function App() {
       .sort((a, b) => (a.hora || "").localeCompare(b.hora || ""));
     if (todas.length === 0 && evs.length === 0) return;
 
-    const ids = new Set(gruposRef.current.map((g) => g.id));
     const linhas = [];
 
-    const maisUrgentePrimeiro = (a, b) =>
-      (b.prioridade || 0) - (a.prioridade || 0);
-    const linha = (t) =>
-      `${PRIORIDADES[t.prioridade || 0].marca}${t.texto}${
-        t.meio ? " (meio feita)" : ""
-      }`;
-
-    todas
-      .filter((t) => !t.grupoId || !ids.has(t.grupoId))
-      .sort(maisUrgentePrimeiro)
-      .forEach((t) => linhas.push(`• ${linha(t)}`));
-
-    gruposRef.current.forEach((g) => {
-      const doGrupo = todas
-        .filter((t) => t.grupoId === g.id)
-        .sort(maisUrgentePrimeiro);
-      if (doGrupo.length === 0) return;
-      linhas.push(`${g.nome}:`);
-      doGrupo.forEach((t) => linhas.push(`  • ${linha(t)}`));
-    });
+    // todas as pendentes juntas, das mais urgentes para as menos urgentes
+    const nomeGrupo = new Map(gruposRef.current.map((g) => [g.id, g.nome]));
+    [...todas]
+      .sort((a, b) => (b.prioridade || 0) - (a.prioridade || 0))
+      .forEach((t) => {
+        const sessao = nomeGrupo.get(t.grupoId);
+        linhas.push(
+          `• ${PRIORIDADES[t.prioridade || 0].marca}${t.texto}${t.meio ? " (meio feita)" : ""}${sessao ? ` · ${sessao}` : ""}`
+        );
+      });
 
     if (evs.length) {
       linhas.push("Hoje na agenda:");
@@ -604,16 +692,18 @@ export default function App() {
       tag: "checklist-pendentes", // substitui a notificação anterior
       renotify: true, // sem isso, a substituta chega em silêncio
     });
-    salvarStorage(STORAGE_LAST, Date.now());
   }
 
-  // Confere a cada 30s se já passaram 30 min desde a última notificação
+  // Confere a cada 30s se entrou uma nova meia hora do relógio (21:00, 21:30...)
   useEffect(() => {
     if (!notificar || permissao !== "granted") return;
 
     const checar = () => {
-      const ultima = lerStorage(STORAGE_LAST, 0);
-      if (Date.now() - ultima >= INTERVALO) enviarNotificacao();
+      const slot = slotAtual();
+      if (lerStorage(STORAGE_LAST, "") === slot) return; // essa meia hora já foi avisada
+      salvarStorage(STORAGE_LAST, slot);
+      // só avisa nos primeiros 5 min da meia hora, para não mostrar aviso velho
+      if (new Date().getMinutes() % 30 < 5) enviarNotificacao();
     };
 
     checar();
@@ -635,25 +725,25 @@ export default function App() {
     setPermissao(p);
 
     if (p === "granted") {
-      salvarStorage(STORAGE_LAST, 0);
+      salvarStorage(STORAGE_LAST, slotAtual()); // começa a avisar na próxima meia hora
       setNotificar(true);
     }
   }
 
   /* tarefas */
-  function adicionarTarefa(texto, grupoId = null, repetirDias = 0) {
+  function adicionarTarefa(texto, grupoId = null, repetirDias = 0, hora = "00:00") {
     let rotinaId;
     if (repetirDias > 0) {
       rotinaId = novoId();
       setRotinas((atual) => [
         ...atual,
-        { id: rotinaId, texto, cada: repetirDias, grupoId, prioridade: 0,
+        { id: rotinaId, texto, cada: repetirDias, hora, grupoId, prioridade: 0,
           proxima: somarDias(iso(new Date()), repetirDias) },
       ]);
     }
     setTarefas((atual) => [
       ...atual,
-      { id: novoId(), texto, feita: false, grupoId, rotinaId, repeteDias: repetirDias },
+      { id: novoId(), texto, feita: false, grupoId, rotinaId, repeteDias: repetirDias, repeteHora: hora },
     ]);
   }
 
@@ -740,6 +830,40 @@ export default function App() {
     moverPor,
   };
 
+  /* editar: nome, repetição e horário de uma tarefa que já existe */
+  function salvarEdicao(id, texto, dias, hora) {
+    const t = tarefas.find((x) => x.id === id);
+    if (!t) return;
+    const rotina = rotinas.find((r) => r.id === t.rotinaId);
+    let rotinaId = null;
+
+    if (dias > 0 && rotina) {
+      rotinaId = rotina.id; // já repetia: atualiza nome, intervalo e horário
+      setRotinas((a) =>
+        a.map((r) =>
+          r.id === rotina.id
+            ? { ...r, texto, cada: dias, hora, proxima: dias === r.cada ? r.proxima : somarDias(iso(new Date()), dias) }
+            : r
+        )
+      );
+    } else if (dias > 0) {
+      rotinaId = novoId(); // passou a repetir
+      setRotinas((a) => [
+        ...a,
+        { id: rotinaId, texto, cada: dias, hora, grupoId: t.grupoId || null, prioridade: 0, proxima: somarDias(iso(new Date()), dias) },
+      ]);
+    } else if (rotina) {
+      setRotinas((a) => a.filter((r) => r.id !== rotina.id)); // parou de repetir
+    }
+
+    setTarefas((a) =>
+      a.map((x) => (x.id === id ? { ...x, texto, repeteDias: dias, repeteHora: dias > 0 ? hora : undefined, rotinaId } : x))
+    );
+    setEditando(null);
+  }
+
+  const edicao = { id: editando, abrir: setEditando, cancelar: () => setEditando(null), salvar: salvarEdicao };
+
   function limparFeitas() {
     setTarefas((atual) => atual.filter((t) => !t.feita));
   }
@@ -797,7 +921,7 @@ export default function App() {
         <NovaTarefa
           idCampo="campo-tarefa"
           placeholder="Nova tarefa"
-          onAdd={(texto, rep) => adicionarTarefa(texto, null, rep)}
+          onAdd={(texto, rep, hora) => adicionarTarefa(texto, null, rep, hora)}
           onFechar={() => setCriandoSolta(false)}
         />
       ) : (
@@ -860,6 +984,7 @@ export default function App() {
           apagar={apagar}
           mudarPrioridade={mudarPrioridade}
           ordem={ordem}
+          edicao={edicao}
         />
       )}
 
@@ -920,7 +1045,7 @@ export default function App() {
                 {grupoAdd === g.id && (
                   <NovaTarefa
                     placeholder={`Nova tarefa em ${g.nome}`}
-                    onAdd={(texto, rep) => adicionarTarefa(texto, g.id, rep)}
+                    onAdd={(texto, rep, hora) => adicionarTarefa(texto, g.id, rep, hora)}
                     onFechar={() => setGrupoAdd(null)}
                   />
                 )}
@@ -933,6 +1058,7 @@ export default function App() {
                     apagar={apagar}
                     mudarPrioridade={mudarPrioridade}
           ordem={ordem}
+          edicao={edicao}
                   />
                 )}
               </>
@@ -963,8 +1089,8 @@ export default function App() {
           <>
             <p>
               {ativo
-                ? "Lembrete ativo: a cada 30 minutos você recebe as tarefas que faltam e a hora."
-                : "Receba as tarefas pendentes e a hora a cada 30 minutos."}
+                ? "Lembrete ativo: toda hora cheia e meia hora (21:00, 21:30, 22:00...) você recebe as tarefas que faltam."
+                : "Receba as tarefas pendentes toda hora cheia e meia hora (21:00, 21:30...)."}
             </p>
             <div className="ck-acoes">
               {ativo ? (

@@ -1,16 +1,16 @@
 # Checklist
 
-Lista de tarefas em React com sessões, prioridades por cor e lembretes no computador a cada 30 minutos. Tudo fica salvo no próprio navegador, sem servidor e sem conta.
+Lista de tarefas em React com sessões, prioridades por cor e lembretes no computador nas horas cheias e meias (21:00, 21:30...). Tudo fica salvo no próprio navegador, sem servidor e sem conta.
 
 ## O que ele faz
 
-- **Tarefas:** adicionar, marcar e apagar. O círculo tem três estados a cada clique: pendente, meio feita (círculo pela metade) e feita.
+- **Tarefas:** adicionar, editar (lápis: nome e repetição), marcar e apagar. O círculo tem três estados a cada clique: pendente, meio feita (círculo pela metade) e feita.
 - **Sessões:** agrupar tarefas (por exemplo "Afazeres do RPG"). Também dá para ter tarefas soltas, fora de qualquer sessão. Cada sessão pode ser recolhida e mostra quantas tarefas já foram feitas.
-- **Tarefas que se repetem:** ao criar a tarefa, escolha "Repetir" (todo dia, toda semana, a cada N dias). Mesmo que você apague ou conclua, ela volta quando chegar o dia. Para parar, apague a rotina na coluna da direita.
+- **Tarefas que se repetem:** ao criar a tarefa, escolha "Repetir" (todo dia, toda semana, a cada N dias). Mesmo que você apague ou conclua, ela volta quando chegar o dia. Dá para escolher o horário em que ela volta (por exemplo 18:00); sem escolher, volta à meia-noite. Quando volta, você também recebe uma notificação. Para parar, apague a rotina na coluna da direita ou edite a tarefa e escolha "Não repete".
 - **Calendário:** coluna lateral com o mês, eventos com horário, endereço (link para o Google Maps) e descrição opcionais e um botão "Google" que abre o evento já preenchido no Google Agenda. Os eventos de hoje também entram na notificação.
 - **Reordenar:** a alça com bolinhas (⋮⋮) à esquerda de cada tarefa e sessão permite arrastar para mudar a ordem. Também dá para focar na alça (Tab) e usar as setas ↑ ↓. A tarefa só se move dentro da própria sessão, e ao mover uma sessão as tarefas dela vão juntas.
 - **Prioridade:** a bolinha à direita de cada tarefa troca de cor a cada clique: sem prioridade, verde (tranquila), amarelo (média) e vermelho (urgente).
-- **Lembretes:** a cada 30 minutos chega uma notificação com a hora atual e as tarefas que ainda faltam, organizadas por sessão e com as mais urgentes primeiro.
+- **Lembretes:** toda hora cheia e meia hora do relógio (21:00, 21:30, 22:00...) chega uma notificação com as tarefas que ainda faltam, com as mais urgentes primeiro, de todas as sessões juntas (o nome da sessão aparece ao lado de cada tarefa).
 - **Atalhos de teclado:** `Ctrl + F` abre o campo de nova tarefa e `Ctrl + D` abre o de nova sessão, já com o cursor pronto para digitar.
 - **Salvamento automático:** tudo é guardado no `localStorage` e continua lá depois de fechar ou recarregar a página.
 - **Tema:** segue o modo claro ou escuro do sistema, com cores pastel em rosa, azul e amarelo.
@@ -76,7 +76,7 @@ Tudo é salvo no `localStorage` do navegador, com estas chaves:
 | `checklist:eventos` | Eventos do calendário |
 | `checklist:rotinas` | Tarefas que se repetem |
 | `checklist:notificar` | Se os lembretes estão ativados |
-| `checklist:ultimaNotificacao` | Hora da última notificação enviada |
+| `checklist:ultimaNotificacao` | Última meia hora do relógio já avisada |
 
 Formato dos dados:
 
@@ -96,14 +96,13 @@ Formato dos dados:
 
 ## Personalização
 
-- **Intervalo dos lembretes:** altere a constante `INTERVALO` no topo do `App.jsx` (o valor é em milissegundos, `30 * 60 * 1000` equivale a 30 minutos).
 - **Cores:** estão no começo do `App.css`, no bloco `:root`. O bloco `@media (prefers-color-scheme: dark)` logo abaixo define as cores do modo escuro.
 - **Cores das prioridades:** variáveis `--prio-verde`, `--prio-amarelo` e `--prio-vermelho`.
 - **Largura da coluna:** propriedade `max-width` da classe `.ck`.
 
 ## Como funcionam os lembretes
 
-O componente confere a cada 30 segundos se já se passaram 30 minutos desde a última notificação. Por isso, ao recarregar a página ele não manda uma notificação repetida logo em seguida, e se o navegador atrasar o relógio com a aba em segundo plano, o lembrete chega assim que possível.
+O componente confere a cada 30 segundos em qual meia hora do relógio estamos (por exemplo 21:00 ou 21:30). Quando entra uma meia hora que ainda não foi avisada, ele notifica. Se o navegador atrasar o aviso (aba em segundo plano), ele só mostra se o atraso for de até 5 minutos, para não aparecer um lembrete velho. Ao ativar os lembretes, o primeiro aviso vem na próxima meia hora.
 
 ## Possíveis melhorias
 
