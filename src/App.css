@@ -870,3 +870,15 @@ a.ck-ev-mapa:hover {
   min-width: 0;
   border-bottom: 0;
 }
+
+/* botões da edição ficam sempre juntos, na mesma linha */
+.ck-edit-acoes {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+}
+
+.ck-form-grupo input[type="text"] {
+  min-width: 120px;
+}

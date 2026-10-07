@@ -207,7 +207,7 @@ function Calendario({ eventos, adicionar, apagar }) {
 }
 
 /* Lista das tarefas que se repetem */
-function Rotinas({ rotinas, apagar }) {
+function Rotinas({ rotinas, apagar, mudarPrioridade }) {
   if (rotinas.length === 0) return null;
   return (
     <section className="ck-rotinas">
@@ -221,6 +221,13 @@ function Rotinas({ rotinas, apagar }) {
                 ↻ {rotuloRotina(r.cada, r.hora)} · próxima em {r.proxima.split("-").reverse().slice(0, 2).join("/")} às {r.hora || "00:00"}
               </span>
             </span>
+            <button
+              type="button"
+              className={`ck-prio p${r.prioridade || 0}`}
+              onClick={() => mudarPrioridade(r.id)}
+              title={`Prioridade ao voltar: ${PRIORIDADES[r.prioridade || 0].nome} (clique para trocar)`}
+              aria-label={`Prioridade ao voltar: ${PRIORIDADES[r.prioridade || 0].nome}. Clique para trocar.`}
+            />
             <button type="button" className="ck-apagar" onClick={() => apagar(r.id)} aria-label={`Apagar rotina ${r.texto}`}>Apagar</button>
           </li>
         ))}
@@ -434,7 +441,7 @@ function EditarTarefa({ tarefa, onSalvar, onCancelar }) {
         type="text"
         value={texto}
         autoFocus
-        onFocus={(e) => e.target.select()}
+        onFocus={(e) => e.target.setSelectionRange(e.target.value.length, e.target.value.length)}
         onChange={(e) => setTexto(e.target.value)}
         aria-label="Nome da tarefa"
         maxLength={200}
@@ -453,8 +460,20 @@ function EditarTarefa({ tarefa, onSalvar, onCancelar }) {
           title="Horário em que a tarefa volta (00:00 = meia-noite)"
         />
       )}
-      <button type="submit" disabled={!texto.trim()}>Salvar</button>
-      <button type="button" className="secundario" onClick={onCancelar}>Cancelar</button>
+      <span className="ck-edit-acoes">
+        <button type="submit" disabled={!texto.trim()}>Salvar</button>
+        <button
+          type="button"
+          className="ck-icone"
+          onClick={onCancelar}
+          title="Cancelar (Esc)"
+          aria-label="Cancelar edição"
+        >
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" />
+          </svg>
+        </button>
+      </span>
     </form>
   );
 }
@@ -773,10 +792,19 @@ export default function App() {
 
   function mudarPrioridade(id) {
     // sem prioridade → verde → amarelo → vermelho → sem prioridade
-    setTarefas((atual) =>
-      atual.map((t) =>
-        t.id === id ? { ...t, prioridade: ((t.prioridade || 0) + 1) % 4 } : t
-      )
+    const t = tarefas.find((x) => x.id === id);
+    if (!t) return;
+    const nova = ((t.prioridade || 0) + 1) % 4;
+    setTarefas((a) => a.map((x) => (x.id === id ? { ...x, prioridade: nova } : x)));
+    // se a tarefa se repete, ela já volta da próxima vez com essa prioridade
+    if (t.rotinaId) {
+      setRotinas((a) => a.map((r) => (r.id === t.rotinaId ? { ...r, prioridade: nova } : r)));
+    }
+  }
+
+  function mudarPrioridadeRotina(id) {
+    setRotinas((a) =>
+      a.map((r) => (r.id === id ? { ...r, prioridade: ((r.prioridade || 0) + 1) % 4 } : r))
     );
   }
 
@@ -850,7 +878,7 @@ export default function App() {
       rotinaId = novoId(); // passou a repetir
       setRotinas((a) => [
         ...a,
-        { id: rotinaId, texto, cada: dias, hora, grupoId: t.grupoId || null, prioridade: 0, proxima: somarDias(iso(new Date()), dias) },
+        { id: rotinaId, texto, cada: dias, hora, grupoId: t.grupoId || null, prioridade: t.prioridade || 0, proxima: somarDias(iso(new Date()), dias) },
       ]);
     } else if (rotina) {
       setRotinas((a) => a.filter((r) => r.id !== rotina.id)); // parou de repetir
@@ -1125,7 +1153,7 @@ export default function App() {
 
     <aside className="ck-lateral">
       <Calendario eventos={eventos} adicionar={adicionarEvento} apagar={apagarEvento} />
-      <Rotinas rotinas={rotinas} apagar={apagarRotina} />
+      <Rotinas rotinas={rotinas} apagar={apagarRotina} mudarPrioridade={mudarPrioridadeRotina} />
     </aside>
     </div>
   );
