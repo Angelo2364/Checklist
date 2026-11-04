@@ -1136,3 +1136,67 @@ a.ck-ev-mapa:hover {
   background: var(--rosa);
   border-color: var(--rosa);
 }
+
+/* ---------- despesas fixas e valores ---------- */
+.ck-resumo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--linha);
+}
+
+.ck-resumo-rotulo {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--suave);
+}
+
+.ck-resumo-valor {
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.ck-resumo-sub {
+  font-size: 12px;
+  color: var(--suave);
+}
+
+.ck-valor {
+  flex: none;
+  padding: 4px 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--tinta);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
+}
+
+.ck-valor:hover {
+  background: color-mix(in srgb, var(--azul) 30%, transparent);
+  border-color: var(--azul);
+}
+
+.ck-valor.vazio {
+  font-weight: 600;
+  color: var(--suave);
+}
+
+.ck-valor-campo {
+  flex: none;
+  width: 92px;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--tinta);
+  background: var(--fundo);
+  border: 1px solid var(--azul-forte);
+  border-radius: 999px;
+  outline: none;
+}
+
+.ck-form-grupo .ck-num-v {
+  width: 108px;
+}

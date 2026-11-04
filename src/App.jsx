@@ -577,31 +577,101 @@ function Calendario({ eventos, adicionar, apagar }) {
   );
 }
 
+/* Valores em reais: aceita 1.200,50 / 1200,5 / 89.9 */
+const BRL = (n) => (n || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+function lerValor(t) {
+  let x = String(t).replace(/[^\d.,]/g, "");
+  if (x.includes(",")) x = x.replace(/\./g, "").replace(",", ".");
+  else if (/\.\d{3}(\.|$)/.test(x)) x = x.replace(/\./g, ""); // 1.200 = mil e duzentos
+  const n = parseFloat(x);
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0;
+}
+
+/* Valor da conta: clique para definir ou corrigir */
+function ValorConta({ conta, onSalvar }) {
+  const [editando, setEditando] = useState(false);
+  const [texto, setTexto] = useState("");
+  const cancelou = useRef(false);
+
+  function salvar() {
+    if (cancelou.current) {
+      cancelou.current = false;
+    } else {
+      onSalvar(lerValor(texto));
+    }
+    setEditando(false);
+  }
+
+  if (editando) {
+    return (
+      <input
+        className="ck-valor-campo"
+        type="text"
+        inputMode="decimal"
+        autoFocus
+        value={texto}
+        placeholder="0,00"
+        aria-label={`Valor de ${conta.nome}`}
+        onFocus={(e) => e.target.select()}
+        onChange={(e) => setTexto(e.target.value)}
+        onBlur={salvar}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.target.blur();
+          if (e.key === "Escape") {
+            cancelou.current = true;
+            e.target.blur();
+          }
+        }}
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className={`ck-valor${conta.valor > 0 ? "" : " vazio"}`}
+      title="Definir ou corrigir o valor"
+      onClick={() => {
+        setTexto(conta.valor ? String(conta.valor).replace(".", ",") : "");
+        setEditando(true);
+      }}
+    >
+      {conta.valor > 0 ? BRL(conta.valor) : "+ valor"}
+    </button>
+  );
+}
+
 /* Contas recorrentes: vence todo mês no mesmo dia, com parcelas opcionais */
 function vencimento(c) {
   const [a, m] = c.ciclo.split("-").map(Number);
   return new Date(a, m - 1, Math.min(c.dia, new Date(a, m, 0).getDate()));
 }
 
-function Contas({ contas, adicionar, alternar, apagar }) {
+function Contas({ contas, adicionar, alternar, apagar, definirValor }) {
   const [abrindo, setAbrindo] = useState(false);
   const [nome, setNome] = useState("");
   const [dia, setDia] = useState("");
   const [parcelas, setParcelas] = useState("");
+  const [valor, setValor] = useState("");
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
+  const total = contas.reduce((soma, c) => soma + (c.valor || 0), 0);
+  const pago = contas.filter((c) => c.pago).reduce((soma, c) => soma + (c.valor || 0), 0);
 
   function enviar(e) {
     e.preventDefault();
     if (!nome.trim()) return;
     adicionar({
       nome: nome.trim(),
+      valor: lerValor(valor),
       dia: Math.min(31, Math.max(1, Number(dia) || new Date().getDate())),
       total: Math.max(0, Math.floor(Number(parcelas) || 0)),
     });
     setNome("");
     setDia("");
     setParcelas("");
+    setValor("");
   }
 
   function situacao(c) {
@@ -615,6 +685,15 @@ function Contas({ contas, adicionar, alternar, apagar }) {
 
   return (
     <section className="ck-contas">
+      <div className="ck-resumo">
+        <span className="ck-resumo-rotulo">Despesas fixas</span>
+        <strong className="ck-resumo-valor">{BRL(total)}</strong>
+        {total > 0 && (
+          <span className="ck-resumo-sub">
+            Pago {BRL(pago)} · Falta {BRL(total - pago)}
+          </span>
+        )}
+      </div>
       {contas.length === 0 ? (
         <p className="ck-vazio-cal">Nenhuma conta ainda. Adicione abaixo.</p>
       ) : (
@@ -633,6 +712,7 @@ function Contas({ contas, adicionar, alternar, apagar }) {
                     </span>
                   </span>
                 </label>
+                <ValorConta conta={c} onSalvar={(v) => definirValor(c.id, v)} />
                 <button type="button" className="ck-apagar" onClick={() => apagar(c.id)} aria-label={`Apagar conta ${c.nome}`}>Apagar</button>
               </li>
             );
@@ -659,6 +739,7 @@ function Contas({ contas, adicionar, alternar, apagar }) {
             aria-label="Nome da conta"
             maxLength={80}
           />
+          <input type="text" inputMode="decimal" className="ck-num ck-num-v" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="Valor (R$)" aria-label="Valor da conta" title="Valor da conta em reais (opcional)" />
           <input type="number" className="ck-num" min="1" max="31" value={dia} onChange={(e) => setDia(e.target.value)} placeholder="Vence dia" aria-label="Dia do mês em que vence" title="Dia do mês em que vence (vazio = hoje)" />
           <input type="number" className="ck-num ck-num-p" min="1" max="999" value={parcelas} onChange={(e) => setParcelas(e.target.value)} placeholder="Parcelas" aria-label="Número de parcelas (opcional)" title="Número de parcelas (opcional; vazio = sem fim)" />
           <button type="submit" disabled={!nome.trim()}>Adicionar</button>
@@ -1468,6 +1549,10 @@ export default function App() {
     setContas((a) => [...a, { id: novoId(), ...c, ciclo, parcela: 1, pago: false }]);
   }
 
+  function definirValorConta(id, valor) {
+    setContas((a) => a.map((c) => (c.id === id ? { ...c, valor } : c)));
+  }
+
   function alternarConta(id) {
     setContas((a) => a.map((c) => (c.id === id ? { ...c, pago: !c.pago } : c)));
   }
@@ -1822,7 +1907,7 @@ export default function App() {
         {aba === "rotinas" ? (
           <Rotinas rotinas={rotinas} apagar={apagarRotina} mudarPrioridade={mudarPrioridadeRotina} />
         ) : (
-          <Contas contas={contas} adicionar={adicionarConta} alternar={alternarConta} apagar={apagarConta} />
+          <Contas contas={contas} adicionar={adicionarConta} alternar={alternarConta} apagar={apagarConta} definirValor={definirValorConta} />
         )}
       </section>
     </aside>
