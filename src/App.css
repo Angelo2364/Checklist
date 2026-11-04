@@ -1089,16 +1089,167 @@ a.ck-ev-mapa:hover {
   pointer-events: none;
 }
 
-/* com imagem: as colunas viram "vidro" fosco por cima dela */
-.com-fundo .ck,
-.com-fundo .ck-lateral {
-  background: color-mix(in srgb, var(--fundo) 72%, transparent);
-  -webkit-backdrop-filter: blur(16px);
-  backdrop-filter: blur(16px);
+/* modo "Inteira": o espaço que sobra nas laterais/topo é preenchido com a
+   mesma imagem bem desfocada, em vez de ficar uma faixa lisa */
+.ck-fundo-preenche {
+  position: fixed;
+  inset: -80px;
+  z-index: -2;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: blur(40px) saturate(1.2);
+  pointer-events: none;
 }
 
+/* com imagem: as colunas (checklist e lateral) viram liquid glass */
+.com-fundo .ck,
+.com-fundo .ck-lateral {
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.28) 0%,
+      rgba(255, 255, 255, 0.04) 38%,
+      rgba(255, 255, 255, 0.04) 62%,
+      rgba(255, 255, 255, 0.2) 100%
+    ),
+    color-mix(in srgb, var(--fundo) 38%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.8) brightness(1.06);
+  backdrop-filter: blur(14px) saturate(1.8) brightness(1.06);
+  border-left-color: rgba(255, 255, 255, 0.45);
+  border-right-color: rgba(255, 255, 255, 0.3);
+  box-shadow:
+    inset 1px 0 0 rgba(255, 255, 255, 0.6),    /* brilho especular esquerdo */
+    inset -1px 0 0 rgba(255, 255, 255, 0.35),  /* brilho especular direito */
+    inset 14px 0 22px -14px rgba(255, 255, 255, 0.55), /* bisel interno esq. */
+    inset -14px 0 22px -14px rgba(255, 255, 255, 0.4), /* bisel interno dir. */
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 0 48px rgba(31, 38, 135, 0.14);          /* sombra externa suave */
+}
+
+@media (prefers-color-scheme: dark) {
+  .com-fundo .ck,
+  .com-fundo .ck-lateral {
+    background:
+      linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.12) 0%,
+        rgba(255, 255, 255, 0.02) 38%,
+        rgba(255, 255, 255, 0.02) 62%,
+        rgba(255, 255, 255, 0.08) 100%
+      ),
+      color-mix(in srgb, var(--fundo) 45%, transparent);
+    border-left-color: rgba(255, 255, 255, 0.22);
+    border-right-color: rgba(255, 255, 255, 0.14);
+    box-shadow:
+      inset 1px 0 0 rgba(255, 255, 255, 0.3),
+      inset -1px 0 0 rgba(255, 255, 255, 0.18),
+      inset 14px 0 22px -14px rgba(255, 255, 255, 0.22),
+      inset -14px 0 22px -14px rgba(255, 255, 255, 0.16),
+      inset 0 1px 0 rgba(255, 255, 255, 0.25),
+      0 0 48px rgba(0, 0, 0, 0.35);
+  }
+}
+
+/* com imagem: o que tinha fundo sólido dentro das colunas fica translúcido,
+   pra o vidro aparecer por inteiro (backdrop-filter aninhado não enxerga a
+   imagem, então aqui é só transparência) */
 .com-fundo .ck-topo {
-  background: color-mix(in srgb, var(--fundo) 60%, transparent);
+  background: color-mix(in srgb, var(--fundo) 28%, transparent);
+  border-bottom-color: rgba(255, 255, 255, 0.35);
+}
+
+.com-fundo .ck-grupo-topo {
+  background: color-mix(in srgb, var(--grupo-bg) 50%, transparent);
+}
+
+.com-fundo .ck-barra-mais,
+.com-fundo .ck-nova-divisao,
+.com-fundo .ck-form-grupo {
+  background: color-mix(in srgb, var(--barra) 45%, transparent);
+}
+
+.com-fundo .ck-barra-mais:hover {
+  background: color-mix(in srgb, var(--barra-hover) 60%, transparent);
+}
+
+/* campos, seletores e atalho */
+.com-fundo .ck-nova-divisao input,
+.com-fundo .ck-form-grupo input,
+.com-fundo .ck-form-grupo textarea,
+.com-fundo .ck-form-grupo select,
+.com-fundo .ck-form-grupo .ck-num,
+.com-fundo .ck-valor-campo,
+.com-fundo .ck-atalho {
+  background: color-mix(in srgb, var(--fundo) 40%, transparent);
+}
+
+/* hovers que eram sólidos */
+.com-fundo .ck-lista li:hover,
+.com-fundo .ck-link:hover,
+.com-fundo .ck-aba:hover,
+.com-fundo .ck-arquivo:hover span,
+.com-fundo button.secundario:hover,
+.com-fundo .ck-dia:hover {
+  background: color-mix(in srgb, var(--fundo-hover) 55%, transparent);
+}
+
+/* faixas grossas de separação */
+.com-fundo .ck-grupo {
+  border-bottom-color: color-mix(in srgb, var(--fundo-hover) 45%, transparent);
+}
+
+.com-fundo .ck-abas,
+.com-fundo .ck-rotinas,
+.com-fundo .ck-lateral {
+  border-top-color: color-mix(in srgb, var(--fundo-hover) 45%, transparent);
+}
+
+/* ---------- "Adicionar tarefa" e "Adicionar sessão": uma linha só, compacta ---------- */
+.ck-barras-topo {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.ck-barras-topo > .ck-barra-mais {
+  flex: 1 1 0;
+  min-width: 0;
+  gap: 6px;
+  padding: 4px 12px;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.ck-barras-topo > .ck-barra-mais + .ck-barra-mais {
+  border-left: 1px solid var(--linha);
+}
+
+.ck-barras-topo .ck-barra-mais .ck-mais {
+  width: 20px;
+  height: 20px;
+}
+
+.ck-barras-topo .ck-barra-mais .ck-mais svg {
+  width: 11px;
+  height: 11px;
+}
+
+.ck-barras-topo .ck-atalho {
+  padding: 0 6px;
+  font-size: 11px;
+  line-height: 18px;
+}
+
+/* quando um campo está aberto, ele ocupa a linha toda */
+.ck-barras-topo > .ck-form-grupo,
+.ck-barras-topo > .ck-nova-divisao {
+  flex: 1 1 100%;
+}
+
+.ck-topo-botoes {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 /* ---------- prazo da tarefa ---------- */
@@ -1199,206 +1350,4 @@ a.ck-ev-mapa:hover {
 
 .ck-form-grupo .ck-num-v {
   width: 108px;
-}
-
-/* ==========================================================
-   LIQUID GLASS — camada visual adicional
-   Mantém as cores pastel e não altera a lógica dos componentes.
-   ========================================================== */
-:root {
-  --glass-borda: color-mix(in srgb, white 72%, var(--linha));
-  --glass-brilho: color-mix(in srgb, white 82%, transparent);
-  --glass-sombra: 0 5px 16px color-mix(in srgb, var(--tinta) 10%, transparent),
-                  inset 0 1px 0 color-mix(in srgb, white 78%, transparent);
-  --glass-blur: 16px;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --glass-borda: color-mix(in srgb, white 19%, var(--linha));
-    --glass-brilho: color-mix(in srgb, white 24%, transparent);
-    --glass-sombra: 0 6px 18px color-mix(in srgb, black 24%, transparent),
-                    inset 0 1px 0 color-mix(in srgb, white 18%, transparent);
-  }
-}
-
-/* Botões principais e secundários */
-button:not(.ck-prio):not(.ck-link):not(.ck-aba):not(.ck-grupo-titulo):not(.ck-apagar) {
-  position: relative;
-  isolation: isolate;
-  overflow: hidden;
-  border: 1px solid var(--glass-borda);
-  background-image: linear-gradient(145deg,
-    color-mix(in srgb, white 38%, transparent),
-    transparent 48%,
-    color-mix(in srgb, var(--tinta) 4%, transparent));
-  box-shadow: var(--glass-sombra);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(145%);
-  backdrop-filter: blur(var(--glass-blur)) saturate(145%);
-  transition: transform .18s ease, box-shadow .18s ease,
-              background-color .18s ease, border-color .18s ease;
-}
-
-button:not(.ck-prio):not(.ck-link):not(.ck-aba):not(.ck-grupo-titulo):not(.ck-apagar)::after {
-  content: "";
-  position: absolute;
-  inset: 1px 12% auto;
-  height: 45%;
-  border-radius: inherit;
-  background: linear-gradient(180deg, var(--glass-brilho), transparent);
-  opacity: .48;
-  pointer-events: none;
-  z-index: -1;
-}
-
-button:not(.ck-prio):not(.ck-link):not(.ck-aba):not(.ck-grupo-titulo):not(.ck-apagar):hover:not(:disabled) {
-  transform: translateY(-1px);
-  border-color: color-mix(in srgb, white 82%, var(--rosa));
-  box-shadow: 0 8px 20px color-mix(in srgb, var(--tinta) 13%, transparent),
-              inset 0 1px 0 color-mix(in srgb, white 90%, transparent),
-              inset 0 -1px 0 color-mix(in srgb, var(--tinta) 5%, transparent);
-}
-
-button:not(.ck-prio):not(.ck-link):not(.ck-aba):not(.ck-grupo-titulo):not(.ck-apagar):active:not(:disabled) {
-  transform: translateY(1px) scale(.985);
-  box-shadow: inset 0 2px 5px color-mix(in srgb, var(--tinta) 12%, transparent),
-              0 2px 6px color-mix(in srgb, var(--tinta) 8%, transparent);
-}
-
-button.secundario {
-  background-color: color-mix(in srgb, var(--fundo) 54%, transparent);
-  border-color: var(--glass-borda);
-}
-
-button:disabled {
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  box-shadow: none;
-}
-
-/* Botões pequenos de ícone */
-.ck-mais,
-.ck-icone,
-.ck-cal-nav {
-  -webkit-backdrop-filter: blur(14px) saturate(150%);
-  backdrop-filter: blur(14px) saturate(150%);
-  box-shadow: inset 0 1px 0 var(--glass-brilho),
-              0 3px 10px color-mix(in srgb, var(--tinta) 7%, transparent);
-}
-
-/* Cabeçalho e superfícies de navegação */
-.ck-topo {
-  background: color-mix(in srgb, var(--fundo) 68%, transparent);
-  border-bottom-color: var(--glass-borda);
-  box-shadow: 0 5px 18px color-mix(in srgb, var(--tinta) 5%, transparent),
-              inset 0 1px 0 var(--glass-brilho);
-  -webkit-backdrop-filter: blur(22px) saturate(155%);
-  backdrop-filter: blur(22px) saturate(155%);
-}
-
-.ck-abas {
-  background: color-mix(in srgb, var(--fundo) 58%, transparent);
-  -webkit-backdrop-filter: blur(18px) saturate(145%);
-  backdrop-filter: blur(18px) saturate(145%);
-}
-
-.ck-aba {
-  transition: color .18s ease, background-color .18s ease;
-}
-
-.ck-aba[aria-selected="true"] {
-  background: linear-gradient(180deg,
-    color-mix(in srgb, var(--rosa) 20%, transparent),
-    color-mix(in srgb, var(--rosa) 8%, transparent));
-  box-shadow: inset 0 1px 0 var(--glass-brilho);
-}
-
-.ck-grupo-topo,
-.ck-barra-mais,
-.ck-nova-divisao,
-.ck-form-grupo {
-  background-color: color-mix(in srgb, var(--barra) 72%, transparent);
-  -webkit-backdrop-filter: blur(14px) saturate(140%);
-  backdrop-filter: blur(14px) saturate(140%);
-}
-
-.ck-grupo-topo {
-  box-shadow: inset 0 1px 0 var(--glass-brilho);
-}
-
-.ck-barra-mais {
-  transition: background-color .18s ease, box-shadow .18s ease;
-}
-
-.ck-barra-mais:hover {
-  box-shadow: inset 0 1px 0 var(--glass-brilho),
-              0 3px 12px color-mix(in srgb, var(--tinta) 5%, transparent);
-}
-
-/* Calendário: destaque de vidro no dia selecionado/atual */
-.ck-dia.hoje,
-.ck-dia.sel {
-  box-shadow: inset 0 1px 0 var(--glass-brilho),
-              0 3px 10px color-mix(in srgb, var(--tinta) 9%, transparent);
-}
-
-/* Com imagem de fundo, o vidro ganha transparência e desfoque extras */
-.com-fundo .ck-topo,
-.com-fundo .ck-abas,
-.com-fundo .ck-grupo-topo,
-.com-fundo .ck-barra-mais,
-.com-fundo button:not(.ck-prio):not(.ck-link):not(.ck-aba):not(.ck-grupo-titulo):not(.ck-apagar) {
-  background-color: color-mix(in srgb, var(--fundo) 38%, transparent);
-  -webkit-backdrop-filter: blur(20px) saturate(165%);
-  backdrop-filter: blur(20px) saturate(165%);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  button:not(.ck-prio):not(.ck-link):not(.ck-aba):not(.ck-grupo-titulo):not(.ck-apagar),
-  .ck-aba,
-  .ck-barra-mais {
-    transition: none;
-  }
-}
-
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  button:not(.ck-prio):not(.ck-link):not(.ck-aba):not(.ck-grupo-titulo):not(.ck-apagar),
-  .ck-topo,
-  .ck-abas,
-  .ck-grupo-topo,
-  .ck-barra-mais,
-  .ck-nova-divisao,
-  .ck-form-grupo {
-    background-color: var(--fundo-hover);
-  }
-}
-
-
-/* ---------- Liquid Glass: somente o fundo dos painéis ---------- */
-.ck,
-.ck-lateral {
-  background: color-mix(in srgb, var(--fundo) 76%, transparent);
-  border-color: color-mix(in srgb, var(--linha) 72%, white 28%);
-  -webkit-backdrop-filter: blur(22px) saturate(150%);
-  backdrop-filter: blur(22px) saturate(150%);
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, white 58%, transparent),
-    0 10px 30px color-mix(in srgb, var(--tinta) 7%, transparent);
-}
-
-@media (prefers-color-scheme: dark) {
-  .ck,
-  .ck-lateral {
-    background: color-mix(in srgb, var(--fundo) 78%, transparent);
-    box-shadow:
-      inset 0 1px 0 color-mix(in srgb, white 13%, transparent),
-      0 10px 30px color-mix(in srgb, black 18%, transparent);
-  }
-}
-
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .ck,
-  .ck-lateral {
-    background: var(--fundo);
-  }
 }

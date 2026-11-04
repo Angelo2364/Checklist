@@ -15,7 +15,11 @@ const STORAGE_ROUTINES = "checklist:rotinas";
 const STORAGE_BILLS = "checklist:contas";
 const STORAGE_PRAZOS = "checklist:avisosPrazo";
 const STORAGE_BG = "checklist:fundo";
-const STORAGE_BLUR = "checklist:desfoque";
+const STORAGE_BLUR = "checklist:desfoqueFundo"; // chave nova: o padrão agora é 10px
+const DESFOQUE_PADRAO = 10;
+const FORMATO_BACKUP = "checklist-backup"; // marca dos arquivos exportados
+// papel de parede padrão: coloque o arquivo bg.png dentro da pasta public/
+const FUNDO_PADRAO = `${import.meta.env.BASE_URL}bg.png`;
 const STORAGE_BG_AJUSTE = "checklist:ajusteFundo";
 
 const OPCOES_REPETE = [
@@ -803,6 +807,50 @@ function salvarStorage(chave, valor) {
   }
 }
 
+// papel de parede: guardado no IndexedDB como o arquivo original (sem recomprimir),
+// porque o localStorage tem limite de ~5 MB e obrigava a reduzir/comprimir a imagem
+const DB_NOME = "checklist-db";
+const DB_LOJA = "arquivos";
+const DB_CHAVE_FUNDO = "fundo";
+
+function abrirDB() {
+  return new Promise((ok, erro) => {
+    const rq = indexedDB.open(DB_NOME, 1);
+    rq.onupgradeneeded = () => rq.result.createObjectStore(DB_LOJA);
+    rq.onsuccess = () => ok(rq.result);
+    rq.onerror = () => erro(rq.error);
+  });
+}
+
+async function dbLer(chave) {
+  const db = await abrirDB();
+  return new Promise((ok, erro) => {
+    const rq = db.transaction(DB_LOJA).objectStore(DB_LOJA).get(chave);
+    rq.onsuccess = () => ok(rq.result ?? null);
+    rq.onerror = () => erro(rq.error);
+  });
+}
+
+async function dbSalvar(chave, valor) {
+  const db = await abrirDB();
+  return new Promise((ok, erro) => {
+    const tx = db.transaction(DB_LOJA, "readwrite");
+    tx.objectStore(DB_LOJA).put(valor, chave);
+    tx.oncomplete = () => ok();
+    tx.onerror = () => erro(tx.error);
+  });
+}
+
+async function dbApagar(chave) {
+  const db = await abrirDB();
+  return new Promise((ok, erro) => {
+    const tx = db.transaction(DB_LOJA, "readwrite");
+    tx.objectStore(DB_LOJA).delete(chave);
+    tx.oncomplete = () => ok();
+    tx.onerror = () => erro(tx.error);
+  });
+}
+
 function horaAtual() {
   return new Date().toLocaleTimeString("pt-BR", {
     hour: "2-digit",
@@ -1105,10 +1153,12 @@ export default function App() {
   const [rotinas, setRotinas] = useState(() => lerStorage(STORAGE_ROUTINES, []));
   const [contas, setContas] = useState(() => lerStorage(STORAGE_BILLS, []));
   const [aba, setAba] = useState("rotinas");
-  const [fundo, setFundo] = useState(() => lerStorage(STORAGE_BG, null));
-  const [desfoque, setDesfoque] = useState(() => lerStorage(STORAGE_BLUR, 6));
+  const [fundo, setFundo] = useState(null); // URL (blob:) do papel de parede, carregado do IndexedDB
+  const [desfoque, setDesfoque] = useState(() => lerStorage(STORAGE_BLUR, DESFOQUE_PADRAO));
   const [ajusteFundo, setAjusteFundo] = useState(() => lerStorage(STORAGE_BG_AJUSTE, "preencher"));
   const [ajustes, setAjustes] = useState(false);
+  const [dadosAberto, setDadosAberto] = useState(false); // painel Exportar / Importar
+  const [msgDados, setMsgDados] = useState({ texto: "", erro: false });
   const [, setTick] = useState(0);
   const [erroFundo, setErroFundo] = useState("");
   const [editando, setEditando] = useState(null); // id da tarefa em edição
@@ -1158,8 +1208,26 @@ export default function App() {
   }, [contas]);
 
   useEffect(() => {
-    salvarStorage(STORAGE_BG, fundo);
-  }, [fundo]);
+    let url = null;
+    let cancelado = false;
+    try {
+      localStorage.removeItem(STORAGE_BG); // versão antiga: imagem reduzida e comprimida
+    } catch {
+      /* ignora */
+    }
+    dbLer(DB_CHAVE_FUNDO)
+      .then((arquivo) => {
+        if (arquivo && !cancelado) {
+          url = URL.createObjectURL(arquivo);
+          setFundo(url);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelado = true;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, []);
 
   useEffect(() => {
     salvarStorage(STORAGE_BLUR, desfoque);
@@ -1561,27 +1629,87 @@ export default function App() {
     setContas((a) => a.filter((c) => c.id !== id));
   }
 
-  // imagem de fundo: reduz para no máximo 2560px de lado para caber no armazenamento do navegador
+  // imagem de fundo: guarda o arquivo original, sem redimensionar nem recomprimir
   async function escolherFundo(e) {
     const arquivo = e.target.files && e.target.files[0];
     e.target.value = "";
     if (!arquivo) return;
     try {
-      const img = await createImageBitmap(arquivo);
-      const k = Math.min(1, 2560 / Math.max(img.width, img.height));
-      const cv = document.createElement("canvas");
-      cv.width = Math.round(img.width * k);
-      cv.height = Math.round(img.height * k);
-      cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
-      const url = cv.toDataURL("image/jpeg", 0.82);
-      if (url.length > 3500000) {
-        setErroFundo("Imagem muito pesada, tente outra menor.");
-        return;
-      }
+      const img = await createImageBitmap(arquivo); // só confere se é uma imagem válida
+      img.close();
+      await dbSalvar(DB_CHAVE_FUNDO, arquivo);
+      const url = URL.createObjectURL(arquivo);
+      if (fundo) URL.revokeObjectURL(fundo);
       setFundo(url);
       setErroFundo("");
     } catch {
-      setErroFundo("Não consegui abrir essa imagem.");
+      setErroFundo("Não consegui abrir ou salvar essa imagem.");
+    }
+  }
+
+  // exportar / importar: um arquivo .json (texto) com tudo, pra levar de um computador pro outro
+  function exportarDados() {
+    const agora = new Date();
+    const dados = {
+      formato: FORMATO_BACKUP,
+      versao: 1,
+      exportadoEm: agora.toISOString(),
+      tarefas,
+      grupos,
+      eventos,
+      rotinas,
+      contas,
+    };
+    const blob = new Blob([JSON.stringify(dados, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `tarefas-${iso(agora)}-${z2(agora.getHours())}${z2(agora.getMinutes())}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setMsgDados({ texto: `Exportado: ${tarefas.length} tarefas, ${grupos.length} sessões.`, erro: false });
+  }
+
+  async function importarDados(e) {
+    const arquivo = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!arquivo) return;
+    try {
+      const dados = JSON.parse(await arquivo.text());
+      if (!dados || dados.formato !== FORMATO_BACKUP) throw new Error("formato");
+      const lista = (v) => (Array.isArray(v) ? v.filter((x) => x && typeof x === "object") : []);
+      const t = lista(dados.tarefas);
+      const g = lista(dados.grupos);
+      const ev = lista(dados.eventos);
+      const ro = lista(dados.rotinas);
+      const co = lista(dados.contas);
+      const quando = dados.exportadoEm ? new Date(dados.exportadoEm).toLocaleString("pt-BR") : "data desconhecida";
+      const ok = window.confirm(
+        `Importar "${arquivo.name}" (exportado em ${quando})?\n\n` +
+          `Isso SUBSTITUI tudo que está aqui agora (${tarefas.length} tarefas, ${grupos.length} sessões) ` +
+          `por ${t.length} tarefas e ${g.length} sessões do arquivo.`
+      );
+      if (!ok) return;
+      setTarefas(t);
+      setGrupos(g);
+      setEventos(ev);
+      setRotinas(ro);
+      setContas(co);
+      setMsgDados({ texto: `Importado: ${t.length} tarefas, ${g.length} sessões, ${ev.length} eventos, ${ro.length} rotinas, ${co.length} contas.`, erro: false });
+    } catch {
+      setMsgDados({ texto: "Não consegui ler esse arquivo. Use um arquivo exportado por este app (.json).", erro: true });
+    }
+  }
+
+  async function removerFundo() {
+    if (fundo) URL.revokeObjectURL(fundo);
+    setFundo(null);
+    try {
+      await dbApagar(DB_CHAVE_FUNDO);
+    } catch {
+      /* ignora */
     }
   }
 
@@ -1624,11 +1752,15 @@ export default function App() {
 
   const ativo = notificar && permissao === "granted";
 
+  // imagem escolhida pelo usuário, ou o bg.png padrão
+  const fundoAtual = fundo || FUNDO_PADRAO;
+
   return (
-    <div className={`ck-layout${fundo ? " com-fundo" : ""}`}>
-    {fundo && (
-      <div className="ck-fundo" style={{ backgroundImage: `url(${fundo})`, filter: `blur(${desfoque}px)`, backgroundSize: ajusteFundo === "inteira" ? "contain" : "cover" }} aria-hidden="true" />
+    <div className="ck-layout com-fundo">
+    {ajusteFundo === "inteira" && (
+      <div className="ck-fundo-preenche" style={{ backgroundImage: `url(${fundoAtual})` }} aria-hidden="true" />
     )}
+    <div className="ck-fundo" style={{ backgroundImage: `url(${fundoAtual})`, filter: `blur(${desfoque}px)`, backgroundSize: ajusteFundo === "inteira" ? "contain" : "cover" }} aria-hidden="true" />
     <main className="ck">
       <header className="ck-topo">
         <div className="ck-topo-linha">
@@ -1642,6 +1774,20 @@ export default function App() {
               }`}
         </span>
           </div>
+          <div className="ck-topo-botoes">
+          <button
+            type="button"
+            className="ck-icone"
+            onClick={() => setDadosAberto((v) => !v)}
+            aria-expanded={dadosAberto}
+            title="Exportar / importar tarefas"
+            aria-label="Exportar ou importar tarefas"
+          >
+            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round">
+              <path d="M5 13V3M5 3L2.5 5.5M5 3l2.5 2.5" />
+              <path d="M11 3v10M11 13l-2.5-2.5M11 13l2.5-2.5" />
+            </svg>
+          </button>
           <button
             type="button"
             className="ck-icone"
@@ -1656,36 +1802,47 @@ export default function App() {
               <path d="M2.5 12l3.8-3.6 2.7 2.4 2-1.8 2.5 2.2" />
             </svg>
           </button>
+          </div>
         </div>
         {ajustes && (
           <div className="ck-ajustes">
             <label className="ck-arquivo">
               <input type="file" accept="image/*" onChange={escolherFundo} />
-              <span>{fundo ? "Trocar imagem" : "Escolher imagem de fundo"}</span>
+              <span>Trocar imagem</span>
             </label>
+            <label className="ck-desfoque">
+              Desfoque
+              <input type="range" min="0" max="20" value={desfoque} onChange={(e) => setDesfoque(Number(e.target.value))} />
+              <span>{desfoque}px</span>
+            </label>
+            <span className="ck-ajuste" role="group" aria-label="Ajuste da imagem">
+              {[["preencher", "Preencher", "Cobre a tela toda (corta as bordas se a proporção for diferente)"], ["inteira", "Inteira", "Mostra a imagem inteira, sem cortar"]].map(([v, nome, dica]) => (
+                <button key={v} type="button" className={`secundario ck-ajuste-btn${ajusteFundo === v ? " ativo" : ""}`} aria-pressed={ajusteFundo === v} title={dica} onClick={() => setAjusteFundo(v)}>
+                  {nome}
+                </button>
+              ))}
+            </span>
             {fundo && (
-              <>
-                <label className="ck-desfoque">
-                  Desfoque
-                  <input type="range" min="0" max="20" value={desfoque} onChange={(e) => setDesfoque(Number(e.target.value))} />
-                  <span>{desfoque}px</span>
-                </label>
-                <span className="ck-ajuste" role="group" aria-label="Ajuste da imagem">
-                  {[["preencher", "Preencher", "Cobre a tela toda (corta as bordas se a proporção for diferente)"], ["inteira", "Inteira", "Mostra a imagem inteira, sem cortar"]].map(([v, nome, dica]) => (
-                    <button key={v} type="button" className={`secundario ck-ajuste-btn${ajusteFundo === v ? " ativo" : ""}`} aria-pressed={ajusteFundo === v} title={dica} onClick={() => setAjusteFundo(v)}>
-                      {nome}
-                    </button>
-                  ))}
-                </span>
-                <button type="button" className="secundario" onClick={() => setFundo(null)}>Remover</button>
-              </>
+              <button type="button" className="secundario" onClick={removerFundo}>Voltar ao padrão</button>
             )}
             {erroFundo && <p className="ck-erro">{erroFundo}</p>}
             <small>A imagem fica salva só neste navegador.</small>
           </div>
         )}
+        {dadosAberto && (
+          <div className="ck-ajustes">
+            <button type="button" className="secundario" onClick={exportarDados}>Exportar</button>
+            <label className="ck-arquivo">
+              <input type="file" accept=".json,application/json" onChange={importarDados} />
+              <span>Importar</span>
+            </label>
+            {msgDados.texto && <p className={msgDados.erro ? "ck-erro" : undefined} style={msgDados.erro ? undefined : { flex: "1 1 100%", margin: 0, fontSize: 12, color: "var(--suave)" }}>{msgDados.texto}</p>}
+            <small>Gera um arquivo de texto (.json) com tarefas, sessões, eventos, rotinas e contas. Importar substitui o que estiver aqui.</small>
+          </div>
+        )}
       </header>
 
+      <div className="ck-barras-topo">
       {criandoSolta ? (
         <NovaTarefa
           idCampo="campo-tarefa"
@@ -1741,21 +1898,7 @@ export default function App() {
           onClick={() => setCriandoGrupo(true)}
         />
       )}
-
-      {grupos.length > 0 && soltas.length > 0 && (
-        <h2 className="ck-secao">Sem sessão</h2>
-      )}
-
-      {soltas.length > 0 && (
-        <ListaTarefas
-          tarefas={soltas}
-          alternar={alternar}
-          apagar={apagar}
-          mudarPrioridade={mudarPrioridade}
-          ordem={ordem}
-          edicao={edicao}
-        />
-      )}
+      </div>
 
       {tarefas.length === 0 && grupos.length === 0 && (
         <p className="ck-vazio">
@@ -1835,6 +1978,21 @@ export default function App() {
           </section>
         );
       })}
+
+      {grupos.length > 0 && soltas.length > 0 && (
+        <h2 className="ck-secao">Sem sessão</h2>
+      )}
+
+      {soltas.length > 0 && (
+        <ListaTarefas
+          tarefas={soltas}
+          alternar={alternar}
+          apagar={apagar}
+          mudarPrioridade={mudarPrioridade}
+          ordem={ordem}
+          edicao={edicao}
+        />
+      )}
 
       {feitas > 0 && (
         <button type="button" className="ck-link" onClick={limparFeitas}>
