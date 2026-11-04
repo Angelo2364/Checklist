@@ -1252,6 +1252,33 @@ a.ck-ev-mapa:hover {
   gap: 4px;
 }
 
+/* ---------- barra de rolagem sutil (segue as cores da página) ---------- */
+html,
+.ck-lateral {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--tinta) 30%, transparent) transparent;
+}
+
+@supports not (scrollbar-color: auto) {
+  html::-webkit-scrollbar,
+  .ck-lateral::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  html::-webkit-scrollbar-track,
+  .ck-lateral::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  html::-webkit-scrollbar-thumb,
+  .ck-lateral::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--tinta) 30%, transparent);
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background-clip: padding-box;
+  }
+}
+
 /* ---------- prazo da tarefa ---------- */
 .ck-prazo {
   flex: none;
