@@ -12,6 +12,11 @@ const ATALHO_SESSAO = "d";
 
 const STORAGE_EVENTS = "checklist:eventos";
 const STORAGE_ROUTINES = "checklist:rotinas";
+const STORAGE_BILLS = "checklist:contas";
+const STORAGE_PRAZOS = "checklist:avisosPrazo";
+const STORAGE_BG = "checklist:fundo";
+const STORAGE_BLUR = "checklist:desfoque";
+const STORAGE_BG_AJUSTE = "checklist:ajusteFundo";
 
 const OPCOES_REPETE = [
   [0, "Não repete"],
@@ -35,6 +40,39 @@ const rotuloRepete = (n) =>
   n === 1 ? "todo dia" : n === 7 ? "toda semana" : `a cada ${n} dias`;
 const rotuloRotina = (n, hora) =>
   rotuloRepete(n) + (hora && hora !== "00:00" ? ` às ${hora}` : "");
+
+// prazo da tarefa: "até hoje 17:00" e se já passou
+function rotuloPrazo(t, agora = new Date()) {
+  if (!t.limite) return null;
+  const hoje = iso(agora);
+  const dia =
+    t.limite === hoje ? "hoje" : t.limite === somarDias(hoje, 1) ? "amanhã" : t.limite.split("-").reverse().slice(0, 2).join("/");
+  const fim = new Date(`${t.limite}T${t.limiteHora || "23:59"}`);
+  return { texto: `até ${dia}${t.limiteHora ? ` ${t.limiteHora}` : ""}`, atrasada: !t.feita && fim < agora };
+}
+
+// só tarefas com data E horário recebem os avisos de prazo
+const prazoDe = (t) => (t.limite && t.limiteHora ? new Date(`${t.limite}T${t.limiteHora}`) : null);
+
+// três bips, para o aviso mais urgente (o navegador pode bloquear som se você ainda não clicou na página)
+function apitar() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [0, 0.35, 0.7].forEach((d) => {
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.frequency.value = 880;
+      g.gain.value = 0.15;
+      o.connect(g);
+      g.connect(ctx.destination);
+      o.start(ctx.currentTime + d);
+      o.stop(ctx.currentTime + d + 0.2);
+    });
+    setTimeout(() => ctx.close(), 1500);
+  } catch {
+    /* sem som */
+  }
+}
 
 // meia hora do relógio em que estamos: "2026-10-07 21:30"
 function slotAtual() {
@@ -219,6 +257,177 @@ function Hora24({ value, onChange, rotulo, opcional }) {
   );
 }
 
+/* Dia e mês digitados (sem ano): o ano é o próximo em que a data ainda não passou */
+function dataDe(dd, mm) {
+  const d = Number(dd);
+  const m = Number(mm);
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  for (let a = hoje.getFullYear(); a <= hoje.getFullYear() + 4; a++) {
+    const x = new Date(a, m - 1, d);
+    if (x.getMonth() === m - 1 && x.getDate() === d && x >= hoje) return iso(x); // 31/04 não existe → vazio
+  }
+  return "";
+}
+
+function DiaMes({ value, onChange }) {
+  const [d, setD] = useState(value ? value.slice(8, 10) : "");
+  const [m, setM] = useState(value ? value.slice(5, 7) : "");
+  const refD = useRef(null);
+  const refM = useRef(null);
+  const irParaMes = useRef(false);
+
+  // se dia e mês não mudaram, mantém a data como está (não "pula" para o ano que vem ao editar)
+  const calcular = (dd, mm) => {
+    if (!dd || !mm) return "";
+    if (value && Number(value.slice(8, 10)) === Number(dd) && Number(value.slice(5, 7)) === Number(mm)) return value;
+    return dataDe(dd, mm);
+  };
+
+  useEffect(() => {
+    if (value !== calcular(d, m)) {
+      setD(value ? value.slice(8, 10) : "");
+      setM(value ? value.slice(5, 7) : "");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  useEffect(() => {
+    if (irParaMes.current) {
+      irParaMes.current = false;
+      const el = refM.current;
+      el.focus();
+      el.setSelectionRange(el.value.length, el.value.length);
+    }
+  });
+
+  const limpar = (texto, max) => {
+    let x = texto.replace(/\D/g, "").slice(0, 2);
+    if (x.length === 2 && Number(x) > max) x = String(max);
+    return x;
+  };
+
+  function digitarDia(e) {
+    const bruto = e.target.value.replace(/\D/g, "").slice(0, 2);
+    // 32 a 39 não existem: o 2º dígito já é o começo do mês (35 vira dia 03, mês 5_)
+    if (bruto.length === 2 && bruto[0] === "3" && Number(bruto[1]) > 1) {
+      const mes = "0" + bruto[1];
+      setD("03");
+      setM(mes);
+      onChange(calcular("03", mes));
+      irParaMes.current = true;
+      return;
+    }
+    let t = limpar(e.target.value, 31);
+    if (t.length === 1 && Number(t) > 3) t = "0" + t; // 4 a 9 só podem ser o dia inteiro
+    setD(t);
+    onChange(calcular(t, m));
+    if (t.length === 2) refM.current.focus();
+  }
+
+  function digitarMes(e) {
+    let t = limpar(e.target.value, 12);
+    if (t.length === 1 && Number(t) > 1) t = "0" + t;
+    setM(t);
+    onChange(calcular(d, t));
+  }
+
+  function sair(e, campo) {
+    const t = e.target.value;
+    if (!t) return;
+    const pronto = t.padStart(2, "0");
+    if (campo === "d") {
+      setD(pronto);
+      onChange(calcular(pronto, m));
+    } else {
+      setM(pronto);
+      onChange(calcular(d, pronto));
+    }
+  }
+
+  const mexer = (delta, min, max, atual) => {
+    const n = Number(atual) || (delta > 0 ? min - 1 : max + 1);
+    return z2(((n - min + delta + (max - min + 1)) % (max - min + 1)) + min);
+  };
+
+  const selecionar = {
+    onFocus: (e) => e.target.select(),
+    onMouseUp: (e) => e.preventDefault(),
+  };
+
+  return (
+    <span className="ck-hora24" role="group" aria-label="Data limite: dia e mês (opcional)" title="Data limite: dia/mês (opcional). O ano é o próximo em que a data ainda não passou.">
+      <span className="ck-prazo-rotulo">Prazo</span>
+      <input
+        ref={refD}
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        maxLength={2}
+        value={d}
+        placeholder="dd"
+        aria-label="Dia limite"
+        onChange={digitarDia}
+        onBlur={(e) => sair(e, "d")}
+        {...selecionar}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+            e.preventDefault();
+            const n = mexer(e.key === "ArrowUp" ? 1 : -1, 1, 31, d);
+            setD(n);
+            onChange(calcular(n, m));
+          } else if (e.key === "/") {
+            e.preventDefault();
+            if (d) setD(d.padStart(2, "0"));
+            refM.current.focus();
+          }
+        }}
+      />
+      <span aria-hidden="true">/</span>
+      <input
+        ref={refM}
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        maxLength={2}
+        value={m}
+        placeholder="mm"
+        aria-label="Mês limite"
+        onChange={digitarMes}
+        onBlur={(e) => sair(e, "m")}
+        {...selecionar}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+            e.preventDefault();
+            const n = mexer(e.key === "ArrowUp" ? 1 : -1, 1, 12, m);
+            setM(n);
+            onChange(calcular(d, n));
+          } else if (e.key === "Backspace" && e.target.value === "") {
+            e.preventDefault();
+            refD.current.focus();
+          }
+        }}
+      />
+    </span>
+  );
+}
+
+/* Data e horário limite (opcionais) */
+function CampoPrazo({ limite, hora, onLimite, onHora }) {
+  return (
+    <>
+      <DiaMes
+        value={limite}
+        onChange={(v) => {
+          onLimite(v);
+          if (!v) onHora("");
+        }}
+      />
+      {limite && <Hora24 value={hora} onChange={onHora} opcional rotulo="Horário limite (opcional)" />}
+    </>
+  );
+}
+
 /* Calendário do mês com eventos */
 function Calendario({ eventos, adicionar, apagar }) {
   const hojeISO = iso(new Date());
@@ -368,12 +577,110 @@ function Calendario({ eventos, adicionar, apagar }) {
   );
 }
 
+/* Contas recorrentes: vence todo mês no mesmo dia, com parcelas opcionais */
+function vencimento(c) {
+  const [a, m] = c.ciclo.split("-").map(Number);
+  return new Date(a, m - 1, Math.min(c.dia, new Date(a, m, 0).getDate()));
+}
+
+function Contas({ contas, adicionar, alternar, apagar }) {
+  const [abrindo, setAbrindo] = useState(false);
+  const [nome, setNome] = useState("");
+  const [dia, setDia] = useState("");
+  const [parcelas, setParcelas] = useState("");
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+
+  function enviar(e) {
+    e.preventDefault();
+    if (!nome.trim()) return;
+    adicionar({
+      nome: nome.trim(),
+      dia: Math.min(31, Math.max(1, Number(dia) || new Date().getDate())),
+      total: Math.max(0, Math.floor(Number(parcelas) || 0)),
+    });
+    setNome("");
+    setDia("");
+    setParcelas("");
+  }
+
+  function situacao(c) {
+    const dias = Math.round((vencimento(c) - hoje) / 86400000);
+    if (c.total > 0 && c.parcela >= c.total && c.pago) return ["Quitada ✓", ""];
+    if (c.pago) return ["Paga ✓", ""];
+    if (dias < 0) return [`Atrasada há ${-dias} dia${-dias > 1 ? "s" : ""}`, "ck-atraso"];
+    if (dias === 0) return ["Vence hoje", "ck-atraso"];
+    return [`Vence em ${dias} dia${dias > 1 ? "s" : ""}`, ""];
+  }
+
+  return (
+    <section className="ck-contas">
+      {contas.length === 0 ? (
+        <p className="ck-vazio-cal">Nenhuma conta ainda. Adicione abaixo.</p>
+      ) : (
+        <ul className="ck-lista">
+          {contas.map((c) => {
+            const [texto, classe] = situacao(c);
+            return (
+              <li key={c.id} className={c.pago ? "feita" : ""}>
+                <label>
+                  <input type="checkbox" checked={c.pago} onChange={() => alternar(c.id)} />
+                  <span className="ck-caixa" aria-hidden="true" />
+                  <span className="ck-conta-corpo">
+                    <span className="ck-texto">{c.nome}</span>
+                    <span className={`ck-rot-info ${classe}`}>
+                      dia {c.dia}{c.total > 0 ? ` · parcela ${c.parcela}/${c.total}` : ""} · {texto}
+                    </span>
+                  </span>
+                </label>
+                <button type="button" className="ck-apagar" onClick={() => apagar(c.id)} aria-label={`Apagar conta ${c.nome}`}>Apagar</button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {abrindo ? (
+        <form
+          className="ck-form-grupo"
+          onSubmit={enviar}
+          onBlur={(e) => {
+            if (!e.currentTarget.contains(e.relatedTarget) && !nome.trim()) setAbrindo(false);
+          }}
+          onKeyDown={(e) => e.key === "Escape" && setAbrindo(false)}
+        >
+          <input
+            type="text"
+            className="ck-campo-largo"
+            autoFocus
+            value={nome}
+            onChange={(e) => setNome(e.target.value)}
+            placeholder="Nome da conta (ex: Internet)"
+            aria-label="Nome da conta"
+            maxLength={80}
+          />
+          <input type="number" className="ck-num" min="1" max="31" value={dia} onChange={(e) => setDia(e.target.value)} placeholder="Vence dia" aria-label="Dia do mês em que vence" title="Dia do mês em que vence (vazio = hoje)" />
+          <input type="number" className="ck-num ck-num-p" min="1" max="999" value={parcelas} onChange={(e) => setParcelas(e.target.value)} placeholder="Parcelas" aria-label="Número de parcelas (opcional)" title="Número de parcelas (opcional; vazio = sem fim)" />
+          <button type="submit" disabled={!nome.trim()}>Adicionar</button>
+        </form>
+      ) : (
+        <BarraMais rotulo="Adicionar conta" onClick={() => setAbrindo(true)} />
+      )}
+    </section>
+  );
+}
+
 /* Lista das tarefas que se repetem */
 function Rotinas({ rotinas, apagar, mudarPrioridade }) {
-  if (rotinas.length === 0) return null;
+  if (rotinas.length === 0) {
+    return (
+      <section className="ck-rotinas">
+        <p className="ck-vazio-cal">Nenhuma tarefa recorrente. Ao criar uma tarefa, escolha "Repetir".</p>
+      </section>
+    );
+  }
   return (
     <section className="ck-rotinas">
-      <h3>Rotinas</h3>
       <ul>
         {rotinas.map((r) => (
           <li key={r.id}>
@@ -473,13 +780,17 @@ function NovaTarefa({ onAdd, placeholder, onFechar, idCampo }) {
   const [texto, setTexto] = useState("");
   const [repete, setRepete] = useState("0");
   const [hora, setHora] = useState("00:00");
+  const [limite, setLimite] = useState("");
+  const [limiteHora, setLimiteHora] = useState("");
 
   function enviar(e) {
     e.preventDefault();
     const limpo = texto.trim();
     if (!limpo) return;
-    onAdd(limpo, Number(repete), hora || "00:00");
+    onAdd(limpo, Number(repete), hora || "00:00", { limite, limiteHora });
     setTexto("");
+    setLimite("");
+    setLimiteHora("");
   }
 
   return (
@@ -517,6 +828,7 @@ function NovaTarefa({ onAdd, placeholder, onFechar, idCampo }) {
       {repete !== "0" && (
         <Hora24 value={hora} onChange={setHora} rotulo="Horário em que a tarefa volta" />
       )}
+      <CampoPrazo limite={limite} hora={limiteHora} onLimite={setLimite} onHora={setLimiteHora} />
       <button type="submit" disabled={!texto.trim()}>
         Adicionar
       </button>
@@ -584,13 +896,15 @@ function EditarTarefa({ tarefa, onSalvar, onCancelar }) {
   const [texto, setTexto] = useState(tarefa.texto);
   const [repete, setRepete] = useState(String(tarefa.repeteDias || 0));
   const [hora, setHora] = useState(tarefa.repeteHora || "00:00");
+  const [limite, setLimite] = useState(tarefa.limite || "");
+  const [limiteHora, setLimiteHora] = useState(tarefa.limiteHora || "");
 
   return (
     <form
       className="ck-form-grupo"
       onSubmit={(e) => {
         e.preventDefault();
-        if (texto.trim()) onSalvar(texto.trim(), Number(repete), hora || "00:00");
+        if (texto.trim()) onSalvar(texto.trim(), Number(repete), hora || "00:00", { limite, limiteHora });
       }}
       onKeyDown={(e) => e.key === "Escape" && onCancelar()}
     >
@@ -611,6 +925,7 @@ function EditarTarefa({ tarefa, onSalvar, onCancelar }) {
       {repete !== "0" && (
         <Hora24 value={hora} onChange={setHora} rotulo="Horário em que a tarefa volta" />
       )}
+      <CampoPrazo limite={limite} hora={limiteHora} onLimite={setLimite} onHora={setLimiteHora} />
       <span className="ck-edit-acoes">
         <button type="submit" disabled={!texto.trim()}>Salvar</button>
         <button
@@ -635,7 +950,7 @@ function ListaTarefas({ tarefas, alternar, apagar, mudarPrioridade, ordem, edica
     <ul className="ck-lista">
       {tarefas.map((t) => edicao.id === t.id ? (
         <li key={t.id} className="editando">
-          <EditarTarefa tarefa={t} onSalvar={(texto, dias, hora) => edicao.salvar(t.id, texto, dias, hora)} onCancelar={edicao.cancelar} />
+          <EditarTarefa tarefa={t} onSalvar={(texto, dias, hora, prazo) => edicao.salvar(t.id, texto, dias, hora, prazo)} onCancelar={edicao.cancelar} />
         </li>
       ) : (
         <li
@@ -661,6 +976,14 @@ function ListaTarefas({ tarefas, alternar, apagar, mudarPrioridade, ordem, edica
             {t.repeteDias > 0 && (
               <span className="ck-repete" title="Volta sozinha, mesmo se você apagar">↻ {rotuloRotina(t.repeteDias, t.repeteHora)}</span>
             )}
+            {t.limite && (() => {
+              const pz = rotuloPrazo(t);
+              return (
+                <span className={`ck-prazo${pz.atrasada ? " ck-atraso" : ""}`} title="Prazo">
+                  ⏰ {pz.atrasada ? "atrasada · " : ""}{pz.texto}
+                </span>
+              );
+            })()}
           </label>
           <button
             type="button"
@@ -699,6 +1022,14 @@ export default function App() {
   const [grupos, setGrupos] = useState(() => lerStorage(STORAGE_GROUPS, []));
   const [eventos, setEventos] = useState(() => lerStorage(STORAGE_EVENTS, []));
   const [rotinas, setRotinas] = useState(() => lerStorage(STORAGE_ROUTINES, []));
+  const [contas, setContas] = useState(() => lerStorage(STORAGE_BILLS, []));
+  const [aba, setAba] = useState("rotinas");
+  const [fundo, setFundo] = useState(() => lerStorage(STORAGE_BG, null));
+  const [desfoque, setDesfoque] = useState(() => lerStorage(STORAGE_BLUR, 6));
+  const [ajusteFundo, setAjusteFundo] = useState(() => lerStorage(STORAGE_BG_AJUSTE, "preencher"));
+  const [ajustes, setAjustes] = useState(false);
+  const [, setTick] = useState(0);
+  const [erroFundo, setErroFundo] = useState("");
   const [editando, setEditando] = useState(null); // id da tarefa em edição
   const [arrastando, setArrastando] = useState(null); // {tipo, id, grupo}
   const [sobre, setSobre] = useState(null);
@@ -718,10 +1049,12 @@ export default function App() {
   const gruposRef = useRef([]);
   const eventosRef = useRef([]);
   const rotinasRef = useRef([]);
+  const contasRef = useRef([]);
   tarefasRef.current = tarefas;
   gruposRef.current = grupos;
   eventosRef.current = eventos;
   rotinasRef.current = rotinas;
+  contasRef.current = contas;
 
   useEffect(() => {
     salvarStorage(STORAGE_TASKS, tarefas);
@@ -739,9 +1072,52 @@ export default function App() {
     salvarStorage(STORAGE_ROUTINES, rotinas);
   }, [rotinas]);
 
+  useEffect(() => {
+    salvarStorage(STORAGE_BILLS, contas);
+  }, [contas]);
+
+  useEffect(() => {
+    salvarStorage(STORAGE_BG, fundo);
+  }, [fundo]);
+
+  useEffect(() => {
+    salvarStorage(STORAGE_BLUR, desfoque);
+  }, [desfoque]);
+
+  useEffect(() => {
+    salvarStorage(STORAGE_BG_AJUSTE, ajusteFundo);
+  }, [ajusteFundo]);
+
+  // Contas: virou o mês e a conta foi paga → começa o ciclo novo (próxima parcela, a pagar)
+  useEffect(() => {
+    function virar() {
+      const mes = iso(new Date()).slice(0, 7);
+      const quitada = (c) => c.total > 0 && c.parcela >= c.total;
+      const precisa = (c) => c.pago && c.ciclo < mes && !quitada(c);
+      if (!contasRef.current.some(precisa)) return;
+      const n = (x) => Number(x.slice(0, 4)) * 12 + Number(x.slice(5, 7));
+      setContas((a) =>
+        a.map((c) => {
+          if (!precisa(c)) return c;
+          const parcela = c.parcela + n(mes) - n(c.ciclo);
+          return { ...c, ciclo: mes, parcela: c.total > 0 ? Math.min(c.total, parcela) : parcela, pago: false };
+        })
+      );
+    }
+
+    virar();
+    const id = setInterval(virar, 60 * 1000);
+    document.addEventListener("visibilitychange", virar);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", virar);
+    };
+  }, []);
+
   // Rotinas: quando chega o dia, a tarefa volta (mesmo se você apagou a anterior)
   useEffect(() => {
     function gerar() {
+      setTick((n) => n + 1); // redesenha: prazos e contas mudam com o relógio
       const agora = new Date();
       const hoje = iso(agora);
       const hm = `${z2(agora.getHours())}:${z2(agora.getMinutes())}`;
@@ -825,6 +1201,45 @@ export default function App() {
   const feitas = tarefas.length - pendentes.length;
   const meias = pendentes.filter((t) => t.meio).length;
 
+  // avisos extras perto do prazo: 45 min antes (lembrete) e 15 min antes (chamadão)
+  function verificarPrazos() {
+    if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+    const agora = new Date();
+    const vistos = lerStorage(STORAGE_PRAZOS, {});
+    let mudou = false;
+
+    tarefasRef.current.forEach((t) => {
+      const fim = !t.feita && prazoDe(t);
+      if (!fim) return;
+      const faltam = (fim - agora) / 60000;
+
+      [[45, false], [15, true]].forEach(([marca, grande]) => {
+        const chave = `${t.id}|${t.limite} ${t.limiteHora}|${marca}`;
+        // só vale nos 5 minutos seguintes à marca, para não mostrar aviso velho
+        if (vistos[chave] || faltam > marca || faltam <= marca - 5) return;
+        vistos[chave] = Date.now();
+        mudou = true;
+
+        const min = Math.ceil(faltam);
+        const quando = t.limite === iso(agora) ? "" : ` de ${t.limite.split("-").reverse().slice(0, 2).join("/")}`;
+        new Notification(grande ? `🚨 FALTAM ${min} MIN! · ${horaAtual()}` : `⏰ Prazo chegando · ${horaAtual()}`, {
+          body: `${PRIORIDADES[t.prioridade || 0].marca}${t.texto}\nPrazo às ${t.limiteHora}${quando} · faltam ${min} min`,
+          tag: `prazo-${t.id}-${marca}`,
+          renotify: true,
+          requireInteraction: grande, // o chamadão fica na tela até você fechar
+          vibrate: grande ? [300, 150, 300, 150, 600] : undefined,
+        });
+        if (grande) apitar();
+      });
+    });
+
+    if (mudou) {
+      const corte = Date.now() - 2 * 24 * 3600 * 1000;
+      Object.keys(vistos).forEach((k) => vistos[k] < corte && delete vistos[k]);
+      salvarStorage(STORAGE_PRAZOS, vistos);
+    }
+  }
+
   function enviarNotificacao() {
     if (typeof Notification === "undefined") return;
     if (Notification.permission !== "granted") return;
@@ -841,12 +1256,15 @@ export default function App() {
 
     // todas as pendentes juntas, das mais urgentes para as menos urgentes
     const nomeGrupo = new Map(gruposRef.current.map((g) => [g.id, g.nome]));
+    // atrasadas primeiro, depois por prioridade
+    const peso = (t) => (rotuloPrazo(t, agora)?.atrasada ? 10 : 0) + (t.prioridade || 0);
     [...todas]
-      .sort((a, b) => (b.prioridade || 0) - (a.prioridade || 0))
+      .sort((a, b) => peso(b) - peso(a))
       .forEach((t) => {
         const sessao = nomeGrupo.get(t.grupoId);
+        const pz = rotuloPrazo(t, agora);
         linhas.push(
-          `• ${PRIORIDADES[t.prioridade || 0].marca}${t.texto}${t.meio ? " (meio feita)" : ""}${sessao ? ` · ${sessao}` : ""}`
+          `• ${PRIORIDADES[t.prioridade || 0].marca}${t.texto}${t.meio ? " (meio feita)" : ""}${pz ? ` — ${pz.atrasada ? "⚠ atrasada" : pz.texto}` : ""}${sessao ? ` · ${sessao}` : ""}`
         );
       });
 
@@ -869,6 +1287,7 @@ export default function App() {
     if (!notificar || permissao !== "granted") return;
 
     const checar = () => {
+      verificarPrazos();
       const slot = slotAtual();
       if (lerStorage(STORAGE_LAST, "") === slot) return; // essa meia hora já foi avisada
       salvarStorage(STORAGE_LAST, slot);
@@ -901,7 +1320,7 @@ export default function App() {
   }
 
   /* tarefas */
-  function adicionarTarefa(texto, grupoId = null, repetirDias = 0, hora = "00:00") {
+  function adicionarTarefa(texto, grupoId = null, repetirDias = 0, hora = "00:00", prazo = {}) {
     let rotinaId;
     if (repetirDias > 0) {
       rotinaId = novoId();
@@ -913,7 +1332,8 @@ export default function App() {
     }
     setTarefas((atual) => [
       ...atual,
-      { id: novoId(), texto, feita: false, grupoId, rotinaId, repeteDias: repetirDias, repeteHora: hora },
+      { id: novoId(), texto, feita: false, grupoId, rotinaId, repeteDias: repetirDias, repeteHora: hora,
+        limite: prazo.limite || "", limiteHora: prazo.limite ? prazo.limiteHora || "" : "" },
     ]);
   }
 
@@ -1010,7 +1430,7 @@ export default function App() {
   };
 
   /* editar: nome, repetição e horário de uma tarefa que já existe */
-  function salvarEdicao(id, texto, dias, hora) {
+  function salvarEdicao(id, texto, dias, hora, prazo = {}) {
     const t = tarefas.find((x) => x.id === id);
     if (!t) return;
     const rotina = rotinas.find((r) => r.id === t.rotinaId);
@@ -1036,12 +1456,49 @@ export default function App() {
     }
 
     setTarefas((a) =>
-      a.map((x) => (x.id === id ? { ...x, texto, repeteDias: dias, repeteHora: dias > 0 ? hora : undefined, rotinaId } : x))
+      a.map((x) => (x.id === id ? { ...x, texto, repeteDias: dias, repeteHora: dias > 0 ? hora : undefined, rotinaId, limite: prazo.limite || "", limiteHora: prazo.limite ? prazo.limiteHora || "" : "" } : x))
     );
     setEditando(null);
   }
 
   const edicao = { id: editando, abrir: setEditando, cancelar: () => setEditando(null), salvar: salvarEdicao };
+
+  function adicionarConta(c) {
+    const ciclo = iso(new Date()).slice(0, 7);
+    setContas((a) => [...a, { id: novoId(), ...c, ciclo, parcela: 1, pago: false }]);
+  }
+
+  function alternarConta(id) {
+    setContas((a) => a.map((c) => (c.id === id ? { ...c, pago: !c.pago } : c)));
+  }
+
+  function apagarConta(id) {
+    setContas((a) => a.filter((c) => c.id !== id));
+  }
+
+  // imagem de fundo: reduz para no máximo 2560px de lado para caber no armazenamento do navegador
+  async function escolherFundo(e) {
+    const arquivo = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!arquivo) return;
+    try {
+      const img = await createImageBitmap(arquivo);
+      const k = Math.min(1, 2560 / Math.max(img.width, img.height));
+      const cv = document.createElement("canvas");
+      cv.width = Math.round(img.width * k);
+      cv.height = Math.round(img.height * k);
+      cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height);
+      const url = cv.toDataURL("image/jpeg", 0.82);
+      if (url.length > 3500000) {
+        setErroFundo("Imagem muito pesada, tente outra menor.");
+        return;
+      }
+      setFundo(url);
+      setErroFundo("");
+    } catch {
+      setErroFundo("Não consegui abrir essa imagem.");
+    }
+  }
 
   function limparFeitas() {
     setTarefas((atual) => atual.filter((t) => !t.feita));
@@ -1083,10 +1540,15 @@ export default function App() {
   const ativo = notificar && permissao === "granted";
 
   return (
-    <div className="ck-layout">
+    <div className={`ck-layout${fundo ? " com-fundo" : ""}`}>
+    {fundo && (
+      <div className="ck-fundo" style={{ backgroundImage: `url(${fundo})`, filter: `blur(${desfoque}px)`, backgroundSize: ajusteFundo === "inteira" ? "contain" : "cover" }} aria-hidden="true" />
+    )}
     <main className="ck">
       <header className="ck-topo">
-        <h1>Tarefas</h1>
+        <div className="ck-topo-linha">
+          <div className="ck-topo-titulo">
+            <h1>Tarefas</h1>
         <span className="ck-contagem">
           {tarefas.length === 0
             ? "Nenhuma tarefa"
@@ -1094,13 +1556,56 @@ export default function App() {
                 meias > 0 ? ` · ${meias} pela metade` : ""
               }`}
         </span>
+          </div>
+          <button
+            type="button"
+            className="ck-icone"
+            onClick={() => setAjustes((v) => !v)}
+            aria-expanded={ajustes}
+            title="Imagem de fundo"
+            aria-label="Imagem de fundo"
+          >
+            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round">
+              <rect x="1.8" y="2.8" width="12.4" height="10.4" rx="2" />
+              <circle cx="5.4" cy="6.2" r="1.2" />
+              <path d="M2.5 12l3.8-3.6 2.7 2.4 2-1.8 2.5 2.2" />
+            </svg>
+          </button>
+        </div>
+        {ajustes && (
+          <div className="ck-ajustes">
+            <label className="ck-arquivo">
+              <input type="file" accept="image/*" onChange={escolherFundo} />
+              <span>{fundo ? "Trocar imagem" : "Escolher imagem de fundo"}</span>
+            </label>
+            {fundo && (
+              <>
+                <label className="ck-desfoque">
+                  Desfoque
+                  <input type="range" min="0" max="20" value={desfoque} onChange={(e) => setDesfoque(Number(e.target.value))} />
+                  <span>{desfoque}px</span>
+                </label>
+                <span className="ck-ajuste" role="group" aria-label="Ajuste da imagem">
+                  {[["preencher", "Preencher", "Cobre a tela toda (corta as bordas se a proporção for diferente)"], ["inteira", "Inteira", "Mostra a imagem inteira, sem cortar"]].map(([v, nome, dica]) => (
+                    <button key={v} type="button" className={`secundario ck-ajuste-btn${ajusteFundo === v ? " ativo" : ""}`} aria-pressed={ajusteFundo === v} title={dica} onClick={() => setAjusteFundo(v)}>
+                      {nome}
+                    </button>
+                  ))}
+                </span>
+                <button type="button" className="secundario" onClick={() => setFundo(null)}>Remover</button>
+              </>
+            )}
+            {erroFundo && <p className="ck-erro">{erroFundo}</p>}
+            <small>A imagem fica salva só neste navegador.</small>
+          </div>
+        )}
       </header>
 
       {criandoSolta ? (
         <NovaTarefa
           idCampo="campo-tarefa"
           placeholder="Nova tarefa"
-          onAdd={(texto, rep, hora) => adicionarTarefa(texto, null, rep, hora)}
+          onAdd={(texto, rep, hora, prazo) => adicionarTarefa(texto, null, rep, hora, prazo)}
           onFechar={() => setCriandoSolta(false)}
         />
       ) : (
@@ -1224,7 +1729,7 @@ export default function App() {
                 {grupoAdd === g.id && (
                   <NovaTarefa
                     placeholder={`Nova tarefa em ${g.nome}`}
-                    onAdd={(texto, rep, hora) => adicionarTarefa(texto, g.id, rep, hora)}
+                    onAdd={(texto, rep, hora, prazo) => adicionarTarefa(texto, g.id, rep, hora, prazo)}
                     onFechar={() => setGrupoAdd(null)}
                   />
                 )}
@@ -1304,7 +1809,22 @@ export default function App() {
 
     <aside className="ck-lateral">
       <Calendario eventos={eventos} adicionar={adicionarEvento} apagar={apagarEvento} />
-      <Rotinas rotinas={rotinas} apagar={apagarRotina} mudarPrioridade={mudarPrioridadeRotina} />
+      <section className="ck-painel">
+        <div className="ck-abas" role="tablist">
+          <button type="button" role="tab" className="ck-aba" aria-selected={aba === "rotinas"} onClick={() => setAba("rotinas")}>
+            Rotinas
+          </button>
+          <button type="button" role="tab" className="ck-aba" aria-selected={aba === "contas"} onClick={() => setAba("contas")}>
+            Contas
+            {contas.some((c) => !c.pago) && <span className="ck-aba-n">{contas.filter((c) => !c.pago).length}</span>}
+          </button>
+        </div>
+        {aba === "rotinas" ? (
+          <Rotinas rotinas={rotinas} apagar={apagarRotina} mudarPrioridade={mudarPrioridadeRotina} />
+        ) : (
+          <Contas contas={contas} adicionar={adicionarConta} alternar={alternarConta} apagar={apagarConta} />
+        )}
+      </section>
     </aside>
     </div>
   );

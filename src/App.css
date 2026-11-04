@@ -917,3 +917,222 @@ a.ck-ev-mapa:hover {
   text-align: center;
   font-size: 13px;
 }
+
+/* ---------- abas Rotinas / Contas ---------- */
+.ck-abas {
+  display: flex;
+  border-top: 8px solid var(--fundo-hover);
+  border-bottom: 1px solid var(--linha);
+}
+
+.ck-aba {
+  flex: 1;
+  padding: 12px 8px;
+  font-weight: 700;
+  color: var(--suave);
+  background: transparent;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+}
+
+.ck-aba:hover {
+  color: var(--tinta);
+  background: var(--fundo-hover);
+  border-color: transparent;
+}
+
+.ck-aba[aria-selected="true"],
+.ck-aba[aria-selected="true"]:hover {
+  color: var(--tinta);
+  border-bottom-color: var(--rosa);
+}
+
+.ck-aba-n {
+  margin-left: 6px;
+  padding: 1px 7px;
+  font-size: 12px;
+  color: var(--sobre-pastel);
+  background: var(--amarelo);
+  border-radius: 999px;
+}
+
+.ck-painel .ck-rotinas {
+  border-top: 0;
+}
+
+.ck-contas {
+  padding-bottom: 12px;
+}
+
+.ck-contas .ck-vazio-cal {
+  padding: 12px 16px 0;
+}
+
+.ck-contas .ck-barra-mais,
+.ck-contas .ck-form-grupo {
+  margin: 8px 16px 0;
+  width: auto;
+  border: 1px solid var(--linha);
+  border-radius: 12px;
+}
+
+.ck-conta-corpo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ck-atraso {
+  color: var(--perigo);
+  font-weight: 600;
+}
+
+.ck-form-grupo .ck-num {
+  flex: none;
+  width: 92px;
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--tinta);
+  background: var(--fundo);
+  border: 1px solid var(--linha);
+  border-radius: 999px;
+}
+
+.ck-form-grupo .ck-num-p {
+  width: 88px;
+}
+
+/* ---------- cabeçalho com ajustes e imagem de fundo ---------- */
+.ck-topo-linha {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ck-topo-titulo {
+  display: flex;
+  flex-direction: column;
+}
+
+.ck-ajustes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0 4px;
+}
+
+.ck-ajustes small,
+.ck-erro {
+  flex: 1 1 100%;
+  margin: 0;
+  font-size: 12px;
+  color: var(--suave);
+}
+
+.ck-erro {
+  color: var(--perigo);
+}
+
+.ck-arquivo {
+  position: relative;
+  cursor: pointer;
+}
+
+.ck-arquivo input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.ck-arquivo span {
+  display: inline-block;
+  padding: 7px 16px;
+  font-weight: 700;
+  border: 1px solid var(--linha);
+  border-radius: 999px;
+}
+
+.ck-arquivo:hover span {
+  background: var(--fundo-hover);
+}
+
+.ck-arquivo:focus-within span {
+  outline: 2px solid var(--azul-forte);
+  outline-offset: 2px;
+}
+
+.ck-desfoque {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--suave);
+}
+
+.ck-desfoque input {
+  width: 110px;
+  accent-color: var(--rosa-hover);
+}
+
+.ck-fundo {
+  position: fixed;
+  inset: -40px; /* sobra para o desfoque não mostrar borda */
+  z-index: -1;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+
+/* com imagem: as colunas viram "vidro" fosco por cima dela */
+.com-fundo .ck,
+.com-fundo .ck-lateral {
+  background: color-mix(in srgb, var(--fundo) 72%, transparent);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+
+.com-fundo .ck-topo {
+  background: color-mix(in srgb, var(--fundo) 60%, transparent);
+}
+
+/* ---------- prazo da tarefa ---------- */
+.ck-prazo {
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--suave);
+}
+
+.ck-prazo.ck-atraso {
+  color: var(--perigo);
+}
+
+
+.ck-prazo-rotulo {
+  margin-right: 3px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ck-ajuste {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.ck-ajuste-btn {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.ck-ajuste-btn.ativo,
+.ck-ajuste-btn.ativo:hover {
+  color: var(--sobre-pastel);
+  background: var(--rosa);
+  border-color: var(--rosa);
+}

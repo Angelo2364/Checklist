@@ -7,8 +7,11 @@ Lista de tarefas em React com sessões, prioridades por cor e lembretes no compu
 - **Tarefas:** adicionar, editar (lápis: nome e repetição), marcar e apagar. O círculo tem três estados a cada clique: pendente, meio feita (círculo pela metade) e feita.
 - **Sessões:** agrupar tarefas (por exemplo "Afazeres do RPG"). Também dá para ter tarefas soltas, fora de qualquer sessão. Cada sessão pode ser recolhida e mostra quantas tarefas já foram feitas.
 - **Tarefas que se repetem:** ao criar a tarefa, escolha "Repetir" (todo dia, toda semana, a cada N dias). Mesmo que você apague ou conclua, ela volta quando chegar o dia. Dá para escolher o horário em que ela volta (por exemplo 18:00); sem escolher, volta à meia-noite. Quando volta, você também recebe uma notificação. A prioridade (bolinha) também vale para a tarefa que volta: mude a cor na própria tarefa ou na lista de rotinas, e ela volta sempre com aquela cor. Para parar, apague a rotina na coluna da direita ou edite a tarefa e escolha "Não repete".
+- **Contas recorrentes:** na coluna da direita, a aba "Contas" (ao lado de "Rotinas") guarda contas que vencem todo mês. Você define o dia do vencimento e, se quiser, o número de parcelas. Marque quando pagar; ao virar o mês, uma conta paga volta como "a pagar" (e avança a parcela, até quitar). Contas vencidas e não pagas aparecem como atrasadas.
+- **Imagem de fundo:** o botão de imagem no topo permite escolher uma foto do computador e ajustar o desfoque e o ajuste ("Preencher" cobre a tela e pode cortar as bordas; "Inteira" mostra a imagem toda). Qualquer tamanho serve: ela é reduzida automaticamente para no máximo 2560 px de lado e fica salva no navegador.
 - **Calendário:** coluna lateral com o mês, eventos com horário (formato 24 horas, digitado ou com as setas ↑ ↓), endereço (link para o Google Maps) e descrição opcionais e um botão "Google" que abre o evento já preenchido no Google Agenda. Os eventos de hoje também entram na notificação.
 - **Reordenar:** a alça com bolinhas (⋮⋮) à esquerda de cada tarefa e sessão permite arrastar para mudar a ordem. Também dá para focar na alça (Tab) e usar as setas ↑ ↓. A tarefa só se move dentro da própria sessão, e ao mover uma sessão as tarefas dela vão juntas.
+- **Prazo:** ao criar ou editar uma tarefa, digite o dia e o mês (sem ano; vale o próximo em que a data ainda não passou) e, se quiser, um horário limite. A tarefa mostra "⏰ hoje 17:00" (e fica vermelha quando atrasa). Com horário, os lembretes ficam mais insistentes perto do prazo: além do aviso normal das horas cheias e meias, chega um aviso 45 minutos antes e um "chamadão" 15 minutos antes (fica na tela até você fechar, vibra e toca bips). Os avisos de prazo só funcionam com os lembretes ativados.
 - **Prioridade:** a bolinha à direita de cada tarefa troca de cor a cada clique: sem prioridade, verde (tranquila), amarelo (média) e vermelho (urgente).
 - **Lembretes:** toda hora cheia e meia hora do relógio (21:00, 21:30, 22:00...) chega uma notificação com as tarefas que ainda faltam, com as mais urgentes primeiro, de todas as sessões juntas (o nome da sessão aparece ao lado de cada tarefa).
 - **Atalhos de teclado:** `Ctrl + F` abre o campo de nova tarefa e `Ctrl + D` abre o de nova sessão, já com o cursor pronto para digitar.
@@ -75,6 +78,9 @@ Tudo é salvo no `localStorage` do navegador, com estas chaves:
 | `checklist:divisoes` | Lista de sessões |
 | `checklist:eventos` | Eventos do calendário |
 | `checklist:rotinas` | Tarefas que se repetem |
+| `checklist:contas` | Contas recorrentes |
+| `checklist:fundo` / `checklist:desfoque` | Imagem de fundo e desfoque |
+| `checklist:avisosPrazo` | Avisos de prazo já enviados |
 | `checklist:notificar` | Se os lembretes estão ativados |
 | `checklist:ultimaNotificacao` | Última meia hora do relógio já avisada |
 
