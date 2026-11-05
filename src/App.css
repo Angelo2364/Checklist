@@ -1,5 +1,6 @@
 /* ---------- cores: rosa, azul e amarelo em tons pastel ---------- */
 :root {
+  color-scheme: dark; /* controles nativos escuros e sem "escurecer à força" do navegador */
   --fora: #fdeef4;
   --fundo: #fffbfd;
   --fundo-hover: #fff1f7;
@@ -23,19 +24,19 @@
   --prio-vermelho: #ff6b7f;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --fora: #1b1828;
-    --fundo: #252036;
-    --fundo-hover: #2e2842;
-    --tinta: #f4eeff;
-    --suave: #a69fc0;
-    --linha: #3b3556;
-    --grupo-bg: #3a3524;
-    --azul-forte: #7cc0f2;
-    --perigo: #ff7a8e;
-  }
+/* tema sempre escuro */
+:root {
+  --fora: #1b1828;
+  --fundo: #252036;
+  --fundo-hover: #2e2842;
+  --tinta: #f4eeff;
+  --suave: #a69fc0;
+  --linha: #3b3556;
+  --grupo-bg: #3a3524;
+  --azul-forte: #7cc0f2;
+  --perigo: #ff7a8e;
 }
+
 
 * {
   box-sizing: border-box;
@@ -1127,29 +1128,29 @@ a.ck-ev-mapa:hover {
     0 0 48px rgba(31, 38, 135, 0.14);          /* sombra externa suave */
 }
 
-@media (prefers-color-scheme: dark) {
-  .com-fundo .ck,
-  .com-fundo .ck-lateral {
-    background:
-      linear-gradient(
-        135deg,
-        rgba(255, 255, 255, 0.12) 0%,
-        rgba(255, 255, 255, 0.02) 38%,
-        rgba(255, 255, 255, 0.02) 62%,
-        rgba(255, 255, 255, 0.08) 100%
-      ),
-      color-mix(in srgb, var(--fundo) 45%, transparent);
-    border-left-color: rgba(255, 255, 255, 0.22);
-    border-right-color: rgba(255, 255, 255, 0.14);
-    box-shadow:
-      inset 1px 0 0 rgba(255, 255, 255, 0.3),
-      inset -1px 0 0 rgba(255, 255, 255, 0.18),
-      inset 14px 0 22px -14px rgba(255, 255, 255, 0.22),
-      inset -14px 0 22px -14px rgba(255, 255, 255, 0.16),
-      inset 0 1px 0 rgba(255, 255, 255, 0.25),
-      0 0 48px rgba(0, 0, 0, 0.35);
-  }
+/* tema sempre escuro */
+.com-fundo .ck,
+.com-fundo .ck-lateral {
+  background:
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.12) 0%,
+      rgba(255, 255, 255, 0.02) 38%,
+      rgba(255, 255, 255, 0.02) 62%,
+      rgba(255, 255, 255, 0.08) 100%
+    ),
+    color-mix(in srgb, var(--fundo) 45%, transparent);
+  border-left-color: rgba(255, 255, 255, 0.22);
+  border-right-color: rgba(255, 255, 255, 0.14);
+  box-shadow:
+    inset 1px 0 0 rgba(255, 255, 255, 0.3),
+    inset -1px 0 0 rgba(255, 255, 255, 0.18),
+    inset 14px 0 22px -14px rgba(255, 255, 255, 0.22),
+    inset -14px 0 22px -14px rgba(255, 255, 255, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25),
+    0 0 48px rgba(0, 0, 0, 0.35);
 }
+
 
 /* com imagem: o que tinha fundo sólido dentro das colunas fica translúcido,
    pra o vidro aparecer por inteiro (backdrop-filter aninhado não enxerga a
@@ -1277,6 +1278,173 @@ html,
     border-radius: 999px;
     background-clip: padding-box;
   }
+}
+
+/* ---------- login, carregando, sincronização ---------- */
+.ck-carregando {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 20px;
+  color: var(--suave);
+  text-align: center;
+}
+
+.ck-carregando p {
+  margin: 0;
+}
+
+.ck-login {
+  position: relative;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  overflow: hidden;
+}
+
+.ck-login-fundo {
+  position: fixed;
+  inset: -40px;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+  filter: blur(10px);
+}
+
+.ck-login-card {
+  position: relative;
+  z-index: 1;
+  width: min(380px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 28px;
+  border-radius: 22px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.02) 40%, rgba(255, 255, 255, 0.08) 100%),
+    color-mix(in srgb, var(--fundo) 45%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.8) brightness(1.06);
+  backdrop-filter: blur(14px) saturate(1.8) brightness(1.06);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow:
+    inset 1px 1px 0 rgba(255, 255, 255, 0.3),
+    inset -1px -1px 0 rgba(255, 255, 255, 0.14),
+    0 0 48px rgba(0, 0, 0, 0.35);
+}
+
+.ck-login-card h1 {
+  margin: 0;
+  font-size: 26px;
+}
+
+.ck-login-sub {
+  margin: -6px 0 4px;
+  color: var(--suave);
+  font-size: 14px;
+}
+
+.ck-login-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--suave);
+}
+
+.ck-login-card input {
+  padding: 10px 12px;
+  border: 1px solid var(--linha);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--fundo) 40%, transparent);
+  color: var(--tinta);
+  font: inherit;
+  font-size: 15px;
+}
+
+.ck-login-card input:focus {
+  outline: 2px solid var(--azul-forte);
+  outline-offset: 1px;
+}
+
+.ck-login-btn {
+  margin-top: 4px;
+  padding: 11px 16px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--rosa);
+  color: var(--sobre-pastel);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ck-login-btn:hover {
+  background: var(--rosa-hover);
+}
+
+.ck-login-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.ck-login-erro,
+.ck-login-info {
+  margin: 0;
+  font-size: 13px;
+}
+
+.ck-login-erro {
+  color: var(--perigo);
+}
+
+.ck-login-info {
+  color: var(--azul-forte);
+}
+
+.ck-sync {
+  margin-right: 4px;
+  font-size: 12px;
+  color: var(--suave);
+  white-space: nowrap;
+}
+
+.ck-sync-erro,
+.ck-sync-conflito {
+  color: var(--perigo);
+}
+
+.ck-conta {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--suave);
+}
+
+.ck-conflito {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--amarelo);
+  background: color-mix(in srgb, var(--amarelo) 16%, transparent);
+  font-size: 13px;
+}
+
+.ck-conflito p {
+  margin: 0;
+}
+
+.ck-conflito div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 /* ---------- prazo da tarefa ---------- */

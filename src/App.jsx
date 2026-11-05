@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import "./App.css";
+import { supabase } from "./services/supabase";
+import { carregarDados, criarDados, salvarDados } from "./services/dados";
+import Login, { NovaSenha } from "./Login";
 
 const STORAGE_TASKS = "checklist:tarefas";
 const STORAGE_GROUPS = "checklist:divisoes";
@@ -18,6 +21,13 @@ const STORAGE_BG = "checklist:fundo";
 const STORAGE_BLUR = "checklist:desfoqueFundo"; // chave nova: o padrão agora é 10px
 const DESFOQUE_PADRAO = 10;
 const FORMATO_BACKUP = "checklist-backup"; // marca dos arquivos exportados
+const STORAGE_DONO = "checklist:donoLocal"; // id do usuário a quem pertence o cache local
+
+// o que vai pra nuvem (mesma forma do arquivo exportado, sem o cabeçalho)
+const listaObjs = (v) => (Array.isArray(v) ? v.filter((x) => x && typeof x === "object") : []);
+const empacotar = (tarefas, grupos, eventos, rotinas, contas) => ({ tarefas, grupos, eventos, rotinas, contas });
+const empacotarNuvem = (d) =>
+  empacotar(listaObjs(d?.tarefas), listaObjs(d?.grupos), listaObjs(d?.eventos), listaObjs(d?.rotinas), listaObjs(d?.contas));
 // papel de parede padrão: coloque o arquivo bg.png dentro da pasta public/
 const FUNDO_PADRAO = `${import.meta.env.BASE_URL}bg.png`;
 const STORAGE_BG_AJUSTE = "checklist:ajusteFundo";
@@ -1146,7 +1156,7 @@ function ListaTarefas({ tarefas, alternar, apagar, mudarPrioridade, ordem, edica
   );
 }
 
-export default function App() {
+function Checklist({ usuario }) {
   const [tarefas, setTarefas] = useState(() => lerStorage(STORAGE_TASKS, []));
   const [grupos, setGrupos] = useState(() => lerStorage(STORAGE_GROUPS, []));
   const [eventos, setEventos] = useState(() => lerStorage(STORAGE_EVENTS, []));
@@ -1186,6 +1196,179 @@ export default function App() {
   eventosRef.current = eventos;
   rotinasRef.current = rotinas;
   contasRef.current = contas;
+
+  // ---------- sincronização com o Supabase ----------
+  const [sync, setSync] = useState("carregando"); // carregando | salvo | salvando | erro | conflito | erro-carregar
+  const [nuvemPronta, setNuvemPronta] = useState(false);
+  const [tentativa, setTentativa] = useState(0);
+  const versaoNuvem = useRef(null); // updated_at da última versão que este aparelho viu ou salvou
+  const jsonSalvo = useRef(""); // conteúdo da última versão sincronizada
+  const salvandoAgora = useRef(false);
+  const bloqueado = useRef(false); // true enquanto há conflito pendente
+
+  const jsonAtual = JSON.stringify(empacotar(tarefas, grupos, eventos, rotinas, contas));
+  const jsonAtualRef = useRef(jsonAtual);
+  jsonAtualRef.current = jsonAtual;
+
+  function aplicarDados(d) {
+    const l = empacotarNuvem(d);
+    setTarefas(l.tarefas);
+    setGrupos(l.grupos);
+    setEventos(l.eventos);
+    setRotinas(l.rotinas);
+    setContas(l.contas);
+    return JSON.stringify(l);
+  }
+
+  // carga inicial: a nuvem manda; conta nova sobe o que já existir neste aparelho
+  useEffect(() => {
+    let cancelado = false;
+    setSync("carregando");
+    (async () => {
+      try {
+        const nuvem = await carregarDados(usuario.id);
+        if (cancelado) return;
+        if (nuvem) {
+          jsonSalvo.current = aplicarDados(nuvem.data);
+          versaoNuvem.current = nuvem.updated_at;
+        } else {
+          // cache local de outra conta nunca sobe pra esta
+          const dono = lerStorage(STORAGE_DONO, null);
+          const inicial = dono && dono !== usuario.id
+            ? empacotar([], [], [], [], [])
+            : empacotar(tarefasRef.current, gruposRef.current, eventosRef.current, rotinasRef.current, contasRef.current);
+          jsonSalvo.current = aplicarDados(inicial);
+          try {
+            versaoNuvem.current = await criarDados(usuario.id, inicial);
+          } catch (err) {
+            if (err?.code !== "23505") throw err;
+            // outro aparelho criou a linha agora há pouco: usa a dele
+            const outra = await carregarDados(usuario.id);
+            jsonSalvo.current = aplicarDados(outra.data);
+            versaoNuvem.current = outra.updated_at;
+          }
+        }
+        if (cancelado) return;
+        salvarStorage(STORAGE_DONO, usuario.id);
+        bloqueado.current = false;
+        setNuvemPronta(true);
+        setSync("salvo");
+      } catch {
+        if (!cancelado) setSync("erro-carregar");
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usuario.id, tentativa]);
+
+  async function salvarNaNuvem(forcar = false) {
+    while (salvandoAgora.current) await new Promise((r) => setTimeout(r, 200));
+    if (bloqueado.current && !forcar) return;
+    const dados = empacotar(tarefasRef.current, gruposRef.current, eventosRef.current, rotinasRef.current, contasRef.current);
+    const json = JSON.stringify(dados);
+    if (json === jsonSalvo.current && !forcar) return;
+    salvandoAgora.current = true;
+    setSync("salvando");
+    try {
+      const nova = await salvarDados(usuario.id, dados, forcar ? null : versaoNuvem.current);
+      if (nova === null) {
+        // alguém salvou depois da última vez que este aparelho sincronizou
+        bloqueado.current = true;
+        setSync("conflito");
+        return;
+      }
+      versaoNuvem.current = nova;
+      jsonSalvo.current = json;
+      bloqueado.current = false;
+      setSync(jsonAtualRef.current === json ? "salvo" : "salvando");
+    } catch {
+      setSync("erro");
+      setTimeout(() => salvarNaNuvem(), 15000); // sem conexão: tenta de novo
+    } finally {
+      salvandoAgora.current = false;
+    }
+  }
+
+  // salva sozinho ~1,5 s depois da última alteração
+  useEffect(() => {
+    if (!nuvemPronta || bloqueado.current) return;
+    if (jsonAtual === jsonSalvo.current) return;
+    const t = setTimeout(() => salvarNaNuvem(), 1500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jsonAtual, nuvemPronta]);
+
+  // ao voltar pra aba: se outro aparelho salvou algo mais novo, puxa (ou avisa do conflito)
+  useEffect(() => {
+    if (!nuvemPronta) return;
+    async function conferir() {
+      if (document.visibilityState !== "visible" || bloqueado.current || salvandoAgora.current) return;
+      try {
+        const nuvem = await carregarDados(usuario.id);
+        if (!nuvem || nuvem.updated_at === versaoNuvem.current) return;
+        const alteradoAqui = jsonAtualRef.current !== jsonSalvo.current;
+        if (alteradoAqui) {
+          bloqueado.current = true;
+          setSync("conflito");
+          return;
+        }
+        jsonSalvo.current = aplicarDados(nuvem.data);
+        versaoNuvem.current = nuvem.updated_at;
+        setSync("salvo");
+      } catch {
+        /* sem conexão: segue com o que tem */
+      }
+    }
+    document.addEventListener("visibilitychange", conferir);
+    window.addEventListener("focus", conferir);
+    return () => {
+      document.removeEventListener("visibilitychange", conferir);
+      window.removeEventListener("focus", conferir);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nuvemPronta, usuario.id]);
+
+  async function usarDaNuvem() {
+    try {
+      const nuvem = await carregarDados(usuario.id);
+      if (nuvem) {
+        jsonSalvo.current = aplicarDados(nuvem.data);
+        versaoNuvem.current = nuvem.updated_at;
+      }
+      bloqueado.current = false;
+      setSync("salvo");
+    } catch {
+      setSync("erro");
+    }
+  }
+
+  async function manterDesteAparelho() {
+    bloqueado.current = false;
+    await salvarNaNuvem(true);
+  }
+
+  async function sair() {
+    if (jsonAtualRef.current !== jsonSalvo.current) {
+      await salvarNaNuvem();
+      if (
+        jsonAtualRef.current !== jsonSalvo.current &&
+        !window.confirm("Há alterações que ainda não foram salvas na nuvem. Sair mesmo assim e perdê-las?")
+      ) {
+        return;
+      }
+    }
+    // limpa o cache local pra não deixar suas tarefas num computador compartilhado
+    [STORAGE_TASKS, STORAGE_GROUPS, STORAGE_EVENTS, STORAGE_ROUTINES, STORAGE_BILLS, STORAGE_DONO, STORAGE_PRAZOS, STORAGE_LAST].forEach((k) => {
+      try {
+        localStorage.removeItem(k);
+      } catch {
+        /* ignora */
+      }
+    });
+    await supabase.auth.signOut();
+  }
 
   useEffect(() => {
     salvarStorage(STORAGE_TASKS, tarefas);
@@ -1752,6 +1935,23 @@ export default function App() {
 
   const ativo = notificar && permissao === "granted";
 
+  // enquanto a nuvem não responde, não mostra nem deixa editar (evita sobrescrever com dados velhos)
+  if (!nuvemPronta) {
+    return (
+      <div className="ck-carregando">
+        {sync === "erro-carregar" ? (
+          <>
+            <p>Não consegui carregar suas tarefas. Confira a conexão.</p>
+            <button type="button" className="secundario" onClick={() => setTentativa((n) => n + 1)}>Tentar de novo</button>
+            <button type="button" className="ck-link" onClick={() => supabase.auth.signOut()}>Sair</button>
+          </>
+        ) : (
+          <p>Carregando…</p>
+        )}
+      </div>
+    );
+  }
+
   // imagem escolhida pelo usuário, ou o bg.png padrão
   const fundoAtual = fundo || FUNDO_PADRAO;
 
@@ -1775,13 +1975,16 @@ export default function App() {
         </span>
           </div>
           <div className="ck-topo-botoes">
+          <span className={`ck-sync ck-sync-${sync}`} role="status" title="Sincronização com a nuvem">
+            {{ salvando: "Salvando…", salvo: "Salvo", erro: "Sem conexão", conflito: "Conflito" }[sync] || ""}
+          </span>
           <button
             type="button"
             className="ck-icone"
             onClick={() => setDadosAberto((v) => !v)}
             aria-expanded={dadosAberto}
-            title="Exportar / importar tarefas"
-            aria-label="Exportar ou importar tarefas"
+            title="Conta e backup"
+            aria-label="Conta, exportar e importar"
           >
             <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round">
               <path d="M5 13V3M5 3L2.5 5.5M5 3l2.5 2.5" />
@@ -1800,6 +2003,18 @@ export default function App() {
               <rect x="1.8" y="2.8" width="12.4" height="10.4" rx="2" />
               <circle cx="5.4" cy="6.2" r="1.2" />
               <path d="M2.5 12l3.8-3.6 2.7 2.4 2-1.8 2.5 2.2" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="ck-icone"
+            onClick={sair}
+            title={`Sair da conta (${usuario.email})`}
+            aria-label="Sair da conta"
+          >
+            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round">
+              <path d="M6.5 2.5H4a1.5 1.5 0 0 0-1.5 1.5v8A1.5 1.5 0 0 0 4 13.5h2.5" />
+              <path d="M10 5l3 3-3 3M13 8H6.5" />
             </svg>
           </button>
           </div>
@@ -1829,15 +2044,26 @@ export default function App() {
             <small>A imagem fica salva só neste navegador.</small>
           </div>
         )}
+        {sync === "conflito" && (
+          <div className="ck-conflito" role="alert">
+            <p>Essas tarefas foram alteradas em outro lugar. Qual versão você quer manter?</p>
+            <div>
+              <button type="button" className="secundario" onClick={usarDaNuvem}>Usar a da nuvem</button>
+              <button type="button" className="secundario" onClick={manterDesteAparelho}>Manter a deste aparelho</button>
+            </div>
+          </div>
+        )}
         {dadosAberto && (
           <div className="ck-ajustes">
+            <span className="ck-conta">{usuario.email}</span>
+            <button type="button" className="secundario" onClick={sair}>Sair</button>
             <button type="button" className="secundario" onClick={exportarDados}>Exportar</button>
             <label className="ck-arquivo">
               <input type="file" accept=".json,application/json" onChange={importarDados} />
               <span>Importar</span>
             </label>
             {msgDados.texto && <p className={msgDados.erro ? "ck-erro" : undefined} style={msgDados.erro ? undefined : { flex: "1 1 100%", margin: 0, fontSize: 12, color: "var(--suave)" }}>{msgDados.texto}</p>}
-            <small>Gera um arquivo de texto (.json) com tarefas, sessões, eventos, rotinas e contas. Importar substitui o que estiver aqui.</small>
+            <small>Suas tarefas já ficam salvas na nuvem; exportar gera um backup (.json). Importar substitui o que estiver aqui e também vai pra nuvem.</small>
           </div>
         )}
       </header>
@@ -2071,4 +2297,38 @@ export default function App() {
     </aside>
     </div>
   );
+}
+
+// o link do email de "esqueci a senha" volta pro site com type=recovery na URL
+const VEIO_DE_RECUPERACAO =
+  typeof window !== "undefined" && /type=recovery/.test(window.location.hash + window.location.search);
+
+// Porta de entrada: sem sessão mostra o login; com sessão mostra o checklist.
+export default function App() {
+  const [sessao, setSessao] = useState(undefined); // undefined = ainda verificando
+  const [recuperando, setRecuperando] = useState(VEIO_DE_RECUPERACAO);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => setSessao(data.session ?? null));
+    const { data } = supabase.auth.onAuthStateChange((evento, nova) => {
+      if (evento === "PASSWORD_RECOVERY") setRecuperando(true);
+      if (evento === "SIGNED_OUT") setRecuperando(false);
+      setSessao(nova ?? null);
+    });
+    return () => data.subscription.unsubscribe();
+  }, []);
+
+  if (sessao === undefined) return <div className="ck-carregando"><p>Carregando…</p></div>;
+  if (!sessao) return <Login />;
+  if (recuperando) {
+    return (
+      <NovaSenha
+        onConcluir={() => {
+          setRecuperando(false);
+          window.history.replaceState(null, "", window.location.pathname); // tira o token da URL
+        }}
+      />
+    );
+  }
+  return <Checklist key={sessao.user.id} usuario={sessao.user} />;
 }
