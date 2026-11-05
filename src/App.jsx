@@ -1965,7 +1965,7 @@ function Checklist({ usuario }) {
       <header className="ck-topo">
         <div className="ck-topo-linha">
           <div className="ck-topo-titulo">
-            <h1>Tarefas</h1>
+            <h1>Crysalis</h1>
         <span className="ck-contagem">
           {tarefas.length === 0
             ? "Nenhuma tarefa"

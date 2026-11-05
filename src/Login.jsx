@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "./services/supabase";
+import logo from "/Logo.svg";
 
 const FUNDO = `${import.meta.env.BASE_URL}bg.png`;
 
@@ -87,7 +88,7 @@ export default function Login() {
   }
 
   const titulos = {
-    entrar: "Entre para ver suas tarefas",
+    entrar: "Organize seus dias. Cresça no seu tempo.",
     criar: "Crie sua conta",
     esqueci: "Informe seu email para receber o link de nova senha",
   };
@@ -95,7 +96,9 @@ export default function Login() {
 
   return (
     <Moldura onSubmit={enviar}>
-      <h1>Tarefas</h1>
+ <img src={logo} alt="Logo do Crysalis" className="ck-login-logo" />
+
+      <h1>Crysalis</h1>
       <p className="ck-login-sub">{titulos[modo]}</p>
 
       <label>

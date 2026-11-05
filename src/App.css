@@ -1339,12 +1339,16 @@ html,
 .ck-login-card h1 {
   margin: 0;
   font-size: 26px;
+  text-align: center;
+
 }
 
 .ck-login-sub {
   margin: -6px 0 4px;
   color: var(--suave);
   font-size: 14px;
+    text-align: center;
+
 }
 
 .ck-login-card label {
@@ -1545,4 +1549,12 @@ html,
 
 .ck-form-grupo .ck-num-v {
   width: 108px;
+}
+
+.ck-login-logo {
+  display: block;
+  width: 160px;
+  height: 160px;
+  object-fit: contain;
+  margin: 0 auto -20px;
 }
