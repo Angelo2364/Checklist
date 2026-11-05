@@ -24,7 +24,7 @@
   --prio-vermelho: #ff6b7f;
 }
 
-/* tema sempre escuro */
+/* tema escuro (padrão) */
 :root {
   --fora: #1b1828;
   --fundo: #252036;
@@ -35,6 +35,20 @@
   --grupo-bg: #3a3524;
   --azul-forte: #7cc0f2;
   --perigo: #ff7a8e;
+}
+
+/* tema claro: opcional (ajustes > Tema claro), com letras pretas */
+:root[data-tema="claro"] {
+  color-scheme: light;
+  --fora: #fdeef4;
+  --fundo: #fffbfd;
+  --fundo-hover: #fff1f7;
+  --tinta: #14111c;
+  --suave: #5b5473;
+  --linha: #ecc9db;
+  --grupo-bg: #fff4c9;
+  --azul-forte: #2f78b8;
+  --perigo: #d63a54;
 }
 
 
@@ -682,6 +696,7 @@ button.secundario:hover {
 .ck-ev-hora {
   flex: none;
   min-width: 48px;
+  white-space: nowrap;
   font-size: 12px;
   font-weight: 700;
   color: var(--azul-forte);
@@ -1114,7 +1129,7 @@ a.ck-ev-mapa:hover {
       rgba(255, 255, 255, 0.04) 62%,
       rgba(255, 255, 255, 0.2) 100%
     ),
-    color-mix(in srgb, var(--fundo) 38%, transparent);
+    color-mix(in srgb, var(--fundo) 62%, transparent);
   -webkit-backdrop-filter: blur(14px) saturate(1.8) brightness(1.06);
   backdrop-filter: blur(14px) saturate(1.8) brightness(1.06);
   border-left-color: rgba(255, 255, 255, 0.45);
@@ -1128,9 +1143,9 @@ a.ck-ev-mapa:hover {
     0 0 48px rgba(31, 38, 135, 0.14);          /* sombra externa suave */
 }
 
-/* tema sempre escuro */
-.com-fundo .ck,
-.com-fundo .ck-lateral {
+/* vidro escuro (tema escuro) */
+:root:not([data-tema="claro"]) .com-fundo .ck,
+:root:not([data-tema="claro"]) .com-fundo .ck-lateral {
   background:
     linear-gradient(
       135deg,
@@ -1449,6 +1464,41 @@ html,
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+:root[data-tema="claro"] .ck-login-card {
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0.1) 100%),
+    color-mix(in srgb, var(--fundo) 70%, transparent);
+}
+
+/* ---------- linha da tarefa: repetição e prazo descem se faltar espaço ---------- */
+.ck-corpo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 12px;
+}
+
+.ck-corpo .ck-texto {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.ck-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 10px;
+}
+
+.ck-ev-horas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
 }
 
 /* ---------- prazo da tarefa ---------- */

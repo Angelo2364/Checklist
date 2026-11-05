@@ -20,6 +20,7 @@ const STORAGE_PRAZOS = "checklist:avisosPrazo";
 const STORAGE_BG = "checklist:fundo";
 const STORAGE_BLUR = "checklist:desfoqueFundo"; // chave nova: o padrão agora é 10px
 const DESFOQUE_PADRAO = 10;
+const STORAGE_TEMA = "checklist:tema"; // "escuro" (padrão) | "claro"
 const FORMATO_BACKUP = "checklist-backup"; // marca dos arquivos exportados
 const STORAGE_DONO = "checklist:donoLocal"; // id do usuário a quem pertence o cache local
 
@@ -100,7 +101,12 @@ function linkGoogle(e) {
   let datas;
   if (e.hora) {
     const ini = new Date(`${e.data}T${e.hora}`);
-    datas = `${f(ini)}/${f(new Date(ini.getTime() + 3600000))}`;
+    let fim = new Date(ini.getTime() + 3600000); // sem término: 1 hora
+    if (e.horaFim) {
+      fim = new Date(`${e.data}T${e.horaFim}`);
+      if (fim <= ini) fim = new Date(fim.getTime() + 86400000); // terminou depois da meia-noite
+    }
+    datas = `${f(ini)}/${f(fim)}`;
   } else {
     datas = `${e.data.replaceAll("-", "")}/${somarDias(e.data, 1).replaceAll("-", "")}`;
   }
@@ -450,6 +456,7 @@ function Calendario({ eventos, adicionar, apagar }) {
   const [abrindo, setAbrindo] = useState(false);
   const [titulo, setTitulo] = useState("");
   const [hora, setHora] = useState("");
+  const [horaFim, setHoraFim] = useState("");
   const [endereco, setEndereco] = useState("");
   const [descricao, setDescricao] = useState("");
 
@@ -469,11 +476,13 @@ function Calendario({ eventos, adicionar, apagar }) {
       titulo: titulo.trim(),
       data: sel,
       hora,
+      horaFim: hora ? horaFim : "",
       endereco: endereco.trim(),
       descricao: descricao.trim(),
     });
     setTitulo("");
     setHora("");
+    setHoraFim("");
     setEndereco("");
     setDescricao("");
   }
@@ -519,7 +528,7 @@ function Calendario({ eventos, adicionar, apagar }) {
         <ul className="ck-eventos">
           {doDia.map((e) => (
             <li key={e.id}>
-              <span className="ck-ev-hora">{e.hora || "dia todo"}</span>
+              <span className="ck-ev-hora">{e.hora ? (e.horaFim ? `${e.hora}–${e.horaFim}` : e.hora) : "dia todo"}</span>
               <span className="ck-ev-titulo">
                 {e.titulo}
                 {e.endereco && (
@@ -561,7 +570,18 @@ function Calendario({ eventos, adicionar, apagar }) {
             aria-label="Título do evento"
             maxLength={100}
           />
-          <Hora24 value={hora} onChange={setHora} opcional rotulo="Horário do evento (opcional)" />
+          <div className="ck-ev-horas">
+            <Hora24
+              value={hora}
+              onChange={(v) => {
+                setHora(v);
+                if (!v) setHoraFim("");
+              }}
+              opcional
+              rotulo="Começa às (opcional)"
+            />
+            {hora && <Hora24 value={horaFim} onChange={setHoraFim} opcional rotulo="Termina às (opcional)" />}
+          </div>
           <input
             type="text"
             className="ck-campo-largo"
@@ -815,6 +835,12 @@ function salvarStorage(chave, valor) {
   } catch {
     /* storage cheio ou bloqueado: ignora */
   }
+}
+
+// aplica o tema salvo antes de desenhar a tela (evita piscar)
+if (typeof document !== "undefined") {
+  const salvo = lerStorage(STORAGE_TEMA, "escuro");
+  document.documentElement.dataset.tema = salvo === "claro" ? "claro" : "escuro";
 }
 
 // papel de parede: guardado no IndexedDB como o arquivo original (sem recomprimir),
@@ -1111,18 +1137,24 @@ function ListaTarefas({ tarefas, alternar, apagar, mudarPrioridade, ordem, edica
               onChange={() => alternar(t.id)}
             />
             <span className="ck-caixa" aria-hidden="true" />
-            <span className="ck-texto">{t.texto}</span>
-            {t.repeteDias > 0 && (
-              <span className="ck-repete" title="Volta sozinha, mesmo se você apagar">↻ {rotuloRotina(t.repeteDias, t.repeteHora)}</span>
-            )}
-            {t.limite && (() => {
-              const pz = rotuloPrazo(t);
-              return (
-                <span className={`ck-prazo${pz.atrasada ? " ck-atraso" : ""}`} title="Prazo">
-                  ⏰ {pz.atrasada ? "atrasada · " : ""}{pz.texto}
+            <span className="ck-corpo">
+              <span className="ck-texto">{t.texto}</span>
+              {(t.repeteDias > 0 || t.limite) && (
+                <span className="ck-meta">
+                  {t.repeteDias > 0 && (
+                    <span className="ck-repete" title="Volta sozinha, mesmo se você apagar">↻ {rotuloRotina(t.repeteDias, t.repeteHora)}</span>
+                  )}
+                  {t.limite && (() => {
+                    const pz = rotuloPrazo(t);
+                    return (
+                      <span className={`ck-prazo${pz.atrasada ? " ck-atraso" : ""}`} title="Prazo">
+                        ⏰ {pz.atrasada ? "atrasada · " : ""}{pz.texto}
+                      </span>
+                    );
+                  })()}
                 </span>
-              );
-            })()}
+              )}
+            </span>
           </label>
           <button
             type="button"
@@ -1167,6 +1199,11 @@ function Checklist({ usuario }) {
   const [desfoque, setDesfoque] = useState(() => lerStorage(STORAGE_BLUR, DESFOQUE_PADRAO));
   const [ajusteFundo, setAjusteFundo] = useState(() => lerStorage(STORAGE_BG_AJUSTE, "preencher"));
   const [ajustes, setAjustes] = useState(false);
+  const [tema, setTema] = useState(() => (lerStorage(STORAGE_TEMA, "escuro") === "claro" ? "claro" : "escuro"));
+  useEffect(() => {
+    document.documentElement.dataset.tema = tema;
+    salvarStorage(STORAGE_TEMA, tema);
+  }, [tema]);
   const [dadosAberto, setDadosAberto] = useState(false); // painel Exportar / Importar
   const [msgDados, setMsgDados] = useState({ texto: "", erro: false });
   const [, setTick] = useState(0);
@@ -2021,6 +2058,13 @@ function Checklist({ usuario }) {
         </div>
         {ajustes && (
           <div className="ck-ajustes">
+            <span className="ck-ajuste" role="group" aria-label="Tema">
+              {[["escuro", "Tema escuro"], ["claro", "Tema claro"]].map(([v, nome]) => (
+                <button key={v} type="button" className={`secundario ck-ajuste-btn${tema === v ? " ativo" : ""}`} aria-pressed={tema === v} onClick={() => setTema(v)}>
+                  {nome}
+                </button>
+              ))}
+            </span>
             <label className="ck-arquivo">
               <input type="file" accept="image/*" onChange={escolherFundo} />
               <span>Trocar imagem</span>
