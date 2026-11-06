@@ -17,7 +17,6 @@ self.addEventListener("push", (event) => {
       requireInteraction: !!d.requireInteraction,
       vibrate: d.vibrate || undefined,
       icon: "/pwa-192.png",
-      badge: "/pwa-192.png",
     })
   );
 });

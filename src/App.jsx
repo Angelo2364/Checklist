@@ -955,14 +955,14 @@ async function mostrarNotificacao(titulo, opcoes = {}) {
         (await navigator.serviceWorker.getRegistration()) ||
         (await navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`));
       await navigator.serviceWorker.ready;
-      await reg.showNotification(titulo, opcoes);
+      await reg.showNotification(titulo, { icon: `${import.meta.env.BASE_URL}pwa-192.png`, ...opcoes });
       return;
     }
   } catch {
     /* cai no jeito antigo abaixo */
   }
   try {
-    new Notification(titulo, opcoes);
+    new Notification(titulo, { icon: `${import.meta.env.BASE_URL}pwa-192.png`, ...opcoes });
   } catch {
     /* sem suporte */
   }
