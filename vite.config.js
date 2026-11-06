@@ -1,8 +1,8 @@
-
 import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import babel from '@rolldown/plugin-babel'
 import { defineConfig } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
+
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -11,10 +11,15 @@ export default defineConfig({
     babel({ presets: [reactCompilerPreset()] }),
     VitePWA({
       registerType: 'autoUpdate',
+      // anexa ao service worker gerado a parte que recebe os avisos push
+      // (o arquivo fica em public/push-sw.js)
+      workbox: {
+        importScripts: ['push-sw.js'],
+      },
       manifest: {
         name: 'Crysalis',
         short_name: 'Crysalis',
-        description: 'Organize seus dias. Floresça no seu tempo.',
+        description: 'Organize seus dias. Cresça no seu tempo.',
         theme_color: '#ffffff',
         background_color: '#ffffff',
         display: 'standalone',
