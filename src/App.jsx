@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import "./App.css";
 import { supabase } from "./services/supabase";
 import { carregarDados, criarDados, salvarDados } from "./services/dados";
+import { pushSuportado, ativarPush, atualizarPush, desativarPush } from "./services/push";
 import Login, { NovaSenha } from "./Login";
 
 const STORAGE_TASKS = "checklist:tarefas";
@@ -20,6 +21,12 @@ const STORAGE_PRAZOS = "checklist:avisosPrazo";
 const STORAGE_BG = "checklist:fundo";
 const STORAGE_BLUR = "checklist:desfoqueFundo"; // chave nova: o padrão agora é 10px
 const DESFOQUE_PADRAO = 10;
+const NOME_RODAPE = "Moony"; // aparece no rodapé; ao passar o mouse mostra o nome secreto
+const NOME_SECRETO = "Luna";
+const EMAIL_CONTATO = "Sayaokaua@gmail.com";
+const STORAGE_INTERVALO = "checklist:intervaloAviso"; // minutos entre os lembretes
+const INTERVALOS_AVISO = [15, 30, 60, 120, 180];
+const rotuloIntervalo = (m) => (m < 60 ? `${m} minutos` : m === 60 ? "1 hora" : `${m / 60} horas`);
 const STORAGE_TEMA = "checklist:tema"; // "escuro" (padrão) | "claro"
 const FORMATO_BACKUP = "checklist-backup"; // marca dos arquivos exportados
 const STORAGE_DONO = "checklist:donoLocal"; // id do usuário a quem pertence o cache local
@@ -90,9 +97,17 @@ function apitar() {
 }
 
 // meia hora do relógio em que estamos: "2026-10-07 21:30"
-function slotAtual() {
+function slotAtual(intervalo = 30) {
   const a = new Date();
-  return `${iso(a)} ${z2(a.getHours())}:${a.getMinutes() < 30 ? "00" : "30"}`;
+  const total = a.getHours() * 60 + a.getMinutes();
+  const ini = Math.floor(total / intervalo) * intervalo;
+  return `${iso(a)} ${z2(Math.floor(ini / 60))}:${z2(ini % 60)}`;
+}
+
+// minutos desde o começo do intervalo atual (0 a intervalo-1)
+function minutosNoSlot(intervalo = 30) {
+  const a = new Date();
+  return (a.getHours() * 60 + a.getMinutes()) % intervalo;
 }
 
 // link que abre o evento já preenchido no Google Agenda
@@ -449,7 +464,7 @@ function CampoPrazo({ limite, hora, onLimite, onHora }) {
 }
 
 /* Calendário do mês com eventos */
-function Calendario({ eventos, adicionar, apagar }) {
+function Calendario({ eventos, adicionar, editar, apagar }) {
   const hojeISO = iso(new Date());
   const [mes, setMes] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [sel, setSel] = useState(hojeISO);
@@ -459,6 +474,8 @@ function Calendario({ eventos, adicionar, apagar }) {
   const [horaFim, setHoraFim] = useState("");
   const [endereco, setEndereco] = useState("");
   const [descricao, setDescricao] = useState("");
+  const [editandoId, setEditandoId] = useState(null); // evento sendo editado
+  const [dataEdit, setDataEdit] = useState("");
 
   const ano = mes.getFullYear();
   const m = mes.getMonth();
@@ -469,22 +486,50 @@ function Calendario({ eventos, adicionar, apagar }) {
     .filter((e) => e.data === sel)
     .sort((a, b) => (a.hora || "").localeCompare(b.hora || ""));
 
-  function enviar(e) {
-    e.preventDefault();
-    if (!titulo.trim()) return;
-    adicionar({
-      titulo: titulo.trim(),
-      data: sel,
-      hora,
-      horaFim: hora ? horaFim : "",
-      endereco: endereco.trim(),
-      descricao: descricao.trim(),
-    });
+  function limparCampos() {
     setTitulo("");
     setHora("");
     setHoraFim("");
     setEndereco("");
     setDescricao("");
+  }
+
+  function cancelar() {
+    setAbrindo(false);
+    setEditandoId(null);
+    limparCampos();
+  }
+
+  function comecarEdicao(ev) {
+    setEditandoId(ev.id);
+    setDataEdit(ev.data);
+    setTitulo(ev.titulo || "");
+    setHora(ev.hora || "");
+    setHoraFim(ev.horaFim || "");
+    setEndereco(ev.endereco || "");
+    setDescricao(ev.descricao || "");
+    setAbrindo(true);
+  }
+
+  function enviar(e) {
+    e.preventDefault();
+    if (!titulo.trim()) return;
+    const campos = {
+      titulo: titulo.trim(),
+      hora,
+      horaFim: hora ? horaFim : "",
+      endereco: endereco.trim(),
+      descricao: descricao.trim(),
+    };
+    if (editandoId) {
+      const novaData = dataEdit || sel;
+      editar(editandoId, { ...campos, data: novaData });
+      setSel(novaData);
+      cancelar();
+      return;
+    }
+    adicionar({ ...campos, data: sel });
+    limparCampos();
   }
 
   return (
@@ -544,6 +589,11 @@ function Calendario({ eventos, adicionar, apagar }) {
                 )}
                 {e.descricao && <span className="ck-ev-info ck-ev-desc">{e.descricao}</span>}
               </span>
+              <button type="button" className="ck-icone" onClick={() => comecarEdicao(e)} title="Editar evento" aria-label={`Editar ${e.titulo}`}>
+                <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" />
+                </svg>
+              </button>
               <a className="ck-apagar" href={linkGoogle(e)} target="_blank" rel="noreferrer" title="Abrir no Google Agenda">Google</a>
               <button type="button" className="ck-apagar" onClick={() => apagar(e.id)} aria-label={`Apagar ${e.titulo}`}>Apagar</button>
             </li>
@@ -556,7 +606,7 @@ function Calendario({ eventos, adicionar, apagar }) {
           className="ck-form-grupo"
           onSubmit={enviar}
           onBlur={(e) => {
-            if (!e.currentTarget.contains(e.relatedTarget) && !titulo.trim()) setAbrindo(false);
+            if (!editandoId && !e.currentTarget.contains(e.relatedTarget) && !titulo.trim()) setAbrindo(false);
           }}
         >
           <input
@@ -565,7 +615,7 @@ function Calendario({ eventos, adicionar, apagar }) {
             autoFocus
             value={titulo}
             onChange={(e) => setTitulo(e.target.value)}
-            onKeyDown={(e) => e.key === "Escape" && setAbrindo(false)}
+            onKeyDown={(e) => e.key === "Escape" && cancelar()}
             placeholder="Novo evento"
             aria-label="Título do evento"
             maxLength={100}
@@ -587,7 +637,7 @@ function Calendario({ eventos, adicionar, apagar }) {
             className="ck-campo-largo"
             value={endereco}
             onChange={(e) => setEndereco(e.target.value)}
-            onKeyDown={(e) => e.key === "Escape" && setAbrindo(false)}
+            onKeyDown={(e) => e.key === "Escape" && cancelar()}
             placeholder="Endereço (opcional)"
             aria-label="Endereço"
             maxLength={200}
@@ -596,13 +646,22 @@ function Calendario({ eventos, adicionar, apagar }) {
             className="ck-campo-largo"
             value={descricao}
             onChange={(e) => setDescricao(e.target.value)}
-            onKeyDown={(e) => e.key === "Escape" && setAbrindo(false)}
+            onKeyDown={(e) => e.key === "Escape" && cancelar()}
             placeholder="Descrição (opcional)"
             aria-label="Descrição"
             rows={2}
             maxLength={500}
           />
-          <button type="submit" disabled={!titulo.trim()}>Adicionar</button>
+          {editandoId && (
+            <label className="ck-campo-largo ck-ev-dia">
+              Dia do evento
+              <input type="date" value={dataEdit} onChange={(e) => setDataEdit(e.target.value)} required />
+            </label>
+          )}
+          <button type="submit" disabled={!titulo.trim()}>{editandoId ? "Salvar" : "Adicionar"}</button>
+          {editandoId && (
+            <button type="button" className="secundario" onClick={cancelar}>Cancelar</button>
+          )}
         </form>
       ) : (
         <BarraMais rotulo="Adicionar evento" onClick={() => setAbrindo(true)} />
@@ -887,6 +946,52 @@ async function dbApagar(chave) {
   });
 }
 
+// Notificação que funciona no celular: o Android não aceita `new Notification()`,
+// só `registration.showNotification()` através de um Service Worker.
+async function mostrarNotificacao(titulo, opcoes = {}) {
+  try {
+    if ("serviceWorker" in navigator) {
+      const reg =
+        (await navigator.serviceWorker.getRegistration()) ||
+        (await navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`));
+      await navigator.serviceWorker.ready;
+      await reg.showNotification(titulo, opcoes);
+      return;
+    }
+  } catch {
+    /* cai no jeito antigo abaixo */
+  }
+  try {
+    new Notification(titulo, opcoes);
+  } catch {
+    /* sem suporte */
+  }
+}
+
+// Email do rodapé: clicar copia o endereço (nem todo computador tem programa de email configurado,
+// e nesses o mailto: não faz nada)
+function Contato() {
+  const [copiado, setCopiado] = useState(false);
+
+  async function copiar(e) {
+    e.preventDefault();
+    try {
+      await navigator.clipboard.writeText(EMAIL_CONTATO);
+    } catch {
+      window.location.href = `mailto:${EMAIL_CONTATO}`; // sem permissão pra copiar: tenta abrir o programa de email
+      return;
+    }
+    setCopiado(true);
+    setTimeout(() => setCopiado(false), 2000);
+  }
+
+  return (
+    <a href={`mailto:${EMAIL_CONTATO}`} onClick={copiar} title="Clique para copiar o email">
+      {copiado ? "email copiado ✓" : EMAIL_CONTATO}
+    </a>
+  );
+}
+
 function horaAtual() {
   return new Date().toLocaleTimeString("pt-BR", {
     hour: "2-digit",
@@ -947,15 +1052,17 @@ function NovaTarefa({ onAdd, placeholder, onFechar, idCampo }) {
   const [hora, setHora] = useState("00:00");
   const [limite, setLimite] = useState("");
   const [limiteHora, setLimiteHora] = useState("");
+  const [descricao, setDescricao] = useState("");
 
   function enviar(e) {
     e.preventDefault();
     const limpo = texto.trim();
     if (!limpo) return;
-    onAdd(limpo, Number(repete), hora || "00:00", { limite, limiteHora });
+    onAdd(limpo, Number(repete), hora || "00:00", { limite, limiteHora, descricao });
     setTexto("");
     setLimite("");
     setLimiteHora("");
+    setDescricao("");
   }
 
   return (
@@ -994,6 +1101,16 @@ function NovaTarefa({ onAdd, placeholder, onFechar, idCampo }) {
         <Hora24 value={hora} onChange={setHora} rotulo="Horário em que a tarefa volta" />
       )}
       <CampoPrazo limite={limite} hora={limiteHora} onLimite={setLimite} onHora={setLimiteHora} />
+      <textarea
+        className="ck-campo-largo"
+        value={descricao}
+        onChange={(e) => setDescricao(e.target.value)}
+        onKeyDown={(e) => e.key === "Escape" && onFechar && onFechar()}
+        placeholder="Observações (opcional)"
+        aria-label="Observações da tarefa"
+        rows={2}
+        maxLength={1000}
+      />
       <button type="submit" disabled={!texto.trim()}>
         Adicionar
       </button>
@@ -1063,13 +1180,14 @@ function EditarTarefa({ tarefa, onSalvar, onCancelar }) {
   const [hora, setHora] = useState(tarefa.repeteHora || "00:00");
   const [limite, setLimite] = useState(tarefa.limite || "");
   const [limiteHora, setLimiteHora] = useState(tarefa.limiteHora || "");
+  const [descricao, setDescricao] = useState(tarefa.descricao || "");
 
   return (
     <form
       className="ck-form-grupo"
       onSubmit={(e) => {
         e.preventDefault();
-        if (texto.trim()) onSalvar(texto.trim(), Number(repete), hora || "00:00", { limite, limiteHora });
+        if (texto.trim()) onSalvar(texto.trim(), Number(repete), hora || "00:00", { limite, limiteHora, descricao });
       }}
       onKeyDown={(e) => e.key === "Escape" && onCancelar()}
     >
@@ -1091,6 +1209,15 @@ function EditarTarefa({ tarefa, onSalvar, onCancelar }) {
         <Hora24 value={hora} onChange={setHora} rotulo="Horário em que a tarefa volta" />
       )}
       <CampoPrazo limite={limite} hora={limiteHora} onLimite={setLimite} onHora={setLimiteHora} />
+      <textarea
+        className="ck-campo-largo"
+        value={descricao}
+        onChange={(e) => setDescricao(e.target.value)}
+        placeholder="Observações (opcional)"
+        aria-label="Observações da tarefa"
+        rows={2}
+        maxLength={1000}
+      />
       <span className="ck-edit-acoes">
         <button type="submit" disabled={!texto.trim()}>Salvar</button>
         <button
@@ -1154,6 +1281,7 @@ function ListaTarefas({ tarefas, alternar, apagar, mudarPrioridade, ordem, edica
                   })()}
                 </span>
               )}
+              {t.descricao && <span className="ck-descricao">{t.descricao}</span>}
             </span>
           </label>
           <button
@@ -1199,6 +1327,12 @@ function Checklist({ usuario }) {
   const [desfoque, setDesfoque] = useState(() => lerStorage(STORAGE_BLUR, DESFOQUE_PADRAO));
   const [ajusteFundo, setAjusteFundo] = useState(() => lerStorage(STORAGE_BG_AJUSTE, "preencher"));
   const [ajustes, setAjustes] = useState(false);
+  const [pushAtivo, setPushAtivo] = useState(false); // este aparelho recebe avisos do servidor (app fechado)
+  const [avisoPush, setAvisoPush] = useState("");
+  const [intervaloAviso, setIntervaloAviso] = useState(() => {
+    const v = lerStorage(STORAGE_INTERVALO, 30);
+    return INTERVALOS_AVISO.includes(v) ? v : 30;
+  });
   const [tema, setTema] = useState(() => (lerStorage(STORAGE_TEMA, "escuro") === "claro" ? "claro" : "escuro"));
   useEffect(() => {
     document.documentElement.dataset.tema = tema;
@@ -1396,6 +1530,11 @@ function Checklist({ usuario }) {
         return;
       }
     }
+    try {
+      await desativarPush(); // este aparelho para de receber avisos desta conta
+    } catch {
+      /* ignora */
+    }
     // limpa o cache local pra não deixar suas tarefas num computador compartilhado
     [STORAGE_TASKS, STORAGE_GROUPS, STORAGE_EVENTS, STORAGE_ROUTINES, STORAGE_BILLS, STORAGE_DONO, STORAGE_PRAZOS, STORAGE_LAST].forEach((k) => {
       try {
@@ -1506,7 +1645,7 @@ function Checklist({ usuario }) {
         Notification.permission === "granted" &&
         lerStorage(STORAGE_NOTIFY, false)
       ) {
-        new Notification(`Tarefa de volta · ${horaAtual()}`, {
+        mostrarNotificacao(`Tarefa de volta · ${horaAtual()}`, {
           body: voltam.map((r) => `• ${r.texto}`).join("\n"),
           tag: "checklist-rotina",
           renotify: true,
@@ -1521,6 +1660,7 @@ function Checklist({ usuario }) {
             id: novoId(), texto: r.texto, feita: false, meio: false,
             grupoId: r.grupoId, prioridade: r.prioridade || 0,
             rotinaId: r.id, repeteDias: r.cada, repeteHora: r.hora || "00:00",
+            descricao: r.descricao || "",
           })),
       ]);
       setRotinas((atual) =>
@@ -1591,7 +1731,7 @@ function Checklist({ usuario }) {
 
         const min = Math.ceil(faltam);
         const quando = t.limite === iso(agora) ? "" : ` de ${t.limite.split("-").reverse().slice(0, 2).join("/")}`;
-        new Notification(grande ? `🚨 FALTAM ${min} MIN! · ${horaAtual()}` : `⏰ Prazo chegando · ${horaAtual()}`, {
+        mostrarNotificacao(grande ? `🚨 FALTAM ${min} MIN! · ${horaAtual()}` : `⏰ Prazo chegando · ${horaAtual()}`, {
           body: `${PRIORIDADES[t.prioridade || 0].marca}${t.texto}\nPrazo às ${t.limiteHora}${quando} · faltam ${min} min`,
           tag: `prazo-${t.id}-${marca}`,
           renotify: true,
@@ -1644,24 +1784,24 @@ function Checklist({ usuario }) {
       );
     }
 
-    new Notification(`Checklist · ${horaAtual()}`, {
+    mostrarNotificacao(`Checklist · ${horaAtual()}`, {
       body: `${todas.length ? `Faltam ${todas.length}:\n` : ""}${linhas.join("\n")}`,
       tag: "checklist-pendentes", // substitui a notificação anterior
       renotify: true, // sem isso, a substituta chega em silêncio
     });
   }
 
-  // Confere a cada 30s se entrou uma nova meia hora do relógio (21:00, 21:30...)
+  // Confere a cada 30s se entrou um novo intervalo do relógio (ex.: 21:00, 21:30... ou de 2 em 2 horas)
   useEffect(() => {
-    if (!notificar || permissao !== "granted") return;
+    if (!notificar || permissao !== "granted" || pushAtivo) return; // com push ativo, o servidor avisa
 
     const checar = () => {
       verificarPrazos();
-      const slot = slotAtual();
-      if (lerStorage(STORAGE_LAST, "") === slot) return; // essa meia hora já foi avisada
+      const slot = slotAtual(intervaloAviso);
+      if (lerStorage(STORAGE_LAST, "") === slot) return; // esse intervalo já foi avisado
       salvarStorage(STORAGE_LAST, slot);
-      // só avisa nos primeiros 5 min da meia hora, para não mostrar aviso velho
-      if (new Date().getMinutes() % 30 < 5) enviarNotificacao();
+      // só avisa nos primeiros 5 min do intervalo, para não mostrar aviso velho
+      if (minutosNoSlot(intervaloAviso) < 5) enviarNotificacao();
     };
 
     checar();
@@ -1673,7 +1813,34 @@ function Checklist({ usuario }) {
       document.removeEventListener("visibilitychange", checar);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notificar, permissao]);
+  }, [notificar, permissao, intervaloAviso, pushAtivo]);
+
+  function mudarIntervalo(minutos) {
+    setIntervaloAviso(minutos);
+    salvarStorage(STORAGE_INTERVALO, minutos);
+    salvarStorage(STORAGE_LAST, slotAtual(minutos)); // recomeça a contar a partir de agora
+    if (pushAtivo) atualizarPush(minutos).catch(() => setAvisoPush("Não consegui atualizar o intervalo no servidor."));
+  }
+
+  // mantém este aparelho inscrito no push (também refaz a inscrição se trocar de conta)
+  useEffect(() => {
+    if (!notificar || permissao !== "granted" || !pushSuportado()) return;
+    ativarPush(usuario.id, intervaloAviso, false)
+      .then(() => setPushAtivo(true))
+      .catch(() => setPushAtivo(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notificar, permissao, usuario.id]);
+
+  async function desativarLembretes() {
+    setNotificar(false);
+    setPushAtivo(false);
+    setAvisoPush("");
+    try {
+      await desativarPush();
+    } catch {
+      /* ignora */
+    }
+  }
 
   async function ativarNotificacoes() {
     if (typeof Notification === "undefined") return;
@@ -1683,8 +1850,20 @@ function Checklist({ usuario }) {
     setPermissao(p);
 
     if (p === "granted") {
-      salvarStorage(STORAGE_LAST, slotAtual()); // começa a avisar na próxima meia hora
+      salvarStorage(STORAGE_LAST, slotAtual(intervaloAviso)); // começa a avisar no próximo intervalo
       setNotificar(true);
+      if (pushSuportado()) {
+        try {
+          await ativarPush(usuario.id, intervaloAviso, true);
+          setPushAtivo(true);
+          setAvisoPush("");
+        } catch {
+          setPushAtivo(false);
+          setAvisoPush("Não consegui ativar os avisos com o app fechado. Eles só chegam com o app aberto.");
+        }
+      } else {
+        setAvisoPush("Este navegador não suporta avisos com o app fechado. Eles só chegam com o app aberto.");
+      }
     }
   }
 
@@ -1696,18 +1875,23 @@ function Checklist({ usuario }) {
       setRotinas((atual) => [
         ...atual,
         { id: rotinaId, texto, cada: repetirDias, hora, grupoId, prioridade: 0,
-          proxima: somarDias(iso(new Date()), repetirDias) },
+          proxima: somarDias(iso(new Date()), repetirDias), descricao: (prazo.descricao || "").trim() },
       ]);
     }
     setTarefas((atual) => [
       ...atual,
       { id: novoId(), texto, feita: false, grupoId, rotinaId, repeteDias: repetirDias, repeteHora: hora,
-        limite: prazo.limite || "", limiteHora: prazo.limite ? prazo.limiteHora || "" : "" },
+        limite: prazo.limite || "", limiteHora: prazo.limite ? prazo.limiteHora || "" : "",
+        descricao: (prazo.descricao || "").trim() },
     ]);
   }
 
   function adicionarEvento(ev) {
     setEventos((atual) => [...atual, { id: novoId(), ...ev }]);
+  }
+
+  function editarEvento(id, campos) {
+    setEventos((atual) => atual.map((e) => (e.id === id ? { ...e, ...campos } : e)));
   }
 
   function apagarEvento(id) {
@@ -1810,7 +1994,7 @@ function Checklist({ usuario }) {
       setRotinas((a) =>
         a.map((r) =>
           r.id === rotina.id
-            ? { ...r, texto, cada: dias, hora, proxima: dias === r.cada ? r.proxima : somarDias(iso(new Date()), dias) }
+            ? { ...r, texto, cada: dias, hora, descricao: (prazo.descricao || "").trim(), proxima: dias === r.cada ? r.proxima : somarDias(iso(new Date()), dias) }
             : r
         )
       );
@@ -1818,14 +2002,14 @@ function Checklist({ usuario }) {
       rotinaId = novoId(); // passou a repetir
       setRotinas((a) => [
         ...a,
-        { id: rotinaId, texto, cada: dias, hora, grupoId: t.grupoId || null, prioridade: t.prioridade || 0, proxima: somarDias(iso(new Date()), dias) },
+        { id: rotinaId, texto, cada: dias, hora, descricao: (prazo.descricao || "").trim(), grupoId: t.grupoId || null, prioridade: t.prioridade || 0, proxima: somarDias(iso(new Date()), dias) },
       ]);
     } else if (rotina) {
       setRotinas((a) => a.filter((r) => r.id !== rotina.id)); // parou de repetir
     }
 
     setTarefas((a) =>
-      a.map((x) => (x.id === id ? { ...x, texto, repeteDias: dias, repeteHora: dias > 0 ? hora : undefined, rotinaId, limite: prazo.limite || "", limiteHora: prazo.limite ? prazo.limiteHora || "" : "" } : x))
+      a.map((x) => (x.id === id ? { ...x, texto, repeteDias: dias, repeteHora: dias > 0 ? hora : undefined, rotinaId, limite: prazo.limite || "", limiteHora: prazo.limite ? prazo.limiteHora || "" : "", descricao: (prazo.descricao || "").trim() } : x))
     );
     setEditando(null);
   }
@@ -2286,13 +2470,25 @@ function Checklist({ usuario }) {
           <>
             <p>
               {ativo
-                ? "Lembrete ativo: toda hora cheia e meia hora (21:00, 21:30, 22:00...) você recebe as tarefas que faltam."
-                : "Receba as tarefas pendentes toda hora cheia e meia hora (21:00, 21:30...)."}
+                ? "Lembrete ativo: você recebe as tarefas que faltam"
+                : "Receba as tarefas pendentes"}{" "}
+              a cada{" "}
+              <select
+                className="ck-intervalo"
+                value={intervaloAviso}
+                onChange={(e) => mudarIntervalo(Number(e.target.value))}
+                aria-label="Intervalo entre os lembretes"
+              >
+                {INTERVALOS_AVISO.map((m) => (
+                  <option key={m} value={m}>{rotuloIntervalo(m)}</option>
+                ))}
+              </select>
+              {" "}(em horários redondos do relógio).
             </p>
             <div className="ck-acoes">
               {ativo ? (
                 <>
-                  <button type="button" onClick={() => setNotificar(false)}>
+                  <button type="button" onClick={desativarLembretes}>
                     Desativar lembretes
                   </button>
                   <button
@@ -2311,17 +2507,28 @@ function Checklist({ usuario }) {
             </div>
             {ativo && (
               <small>
-                Deixe esta aba aberta (pode ficar em segundo plano) para os
-                lembretes continuarem chegando.
+                {pushAtivo
+                  ? "Os lembretes chegam neste aparelho mesmo com o app fechado."
+                  : "Deixe esta aba aberta (pode ficar em segundo plano) para os lembretes continuarem chegando."}
               </small>
             )}
+            {avisoPush && <small className="ck-erro">{avisoPush}</small>}
           </>
         )}
       </section>
+
+      <footer className="ck-rodape">
+        <span>
+          feito por{" "}
+          <span className="ck-nome-rodape" data-secreto={NOME_SECRETO} tabIndex={0}>{NOME_RODAPE}</span>
+        </span>
+        <span aria-hidden="true"> · </span>
+        <Contato />
+      </footer>
     </main>
 
     <aside className="ck-lateral">
-      <Calendario eventos={eventos} adicionar={adicionarEvento} apagar={apagarEvento} />
+      <Calendario eventos={eventos} adicionar={adicionarEvento} editar={editarEvento} apagar={apagarEvento} />
       <section className="ck-painel">
         <div className="ck-abas" role="tablist">
           <button type="button" role="tab" className="ck-aba" aria-selected={aba === "rotinas"} onClick={() => setAba("rotinas")}>
