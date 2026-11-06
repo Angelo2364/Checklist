@@ -10,6 +10,15 @@ export const pushSuportado = () =>
   "Notification" in window &&
   !!CHAVE_PUBLICA;
 
+// por que o push não está disponível neste aparelho (texto pronto pra mostrar na tela)
+export function motivoSemPush() {
+  if (!CHAVE_PUBLICA) return "Falta a chave VITE_VAPID_PUBLIC_KEY neste site (confira as variáveis da Vercel e refaça o deploy).";
+  if (typeof window === "undefined" || !("serviceWorker" in navigator) || !("PushManager" in window)) {
+    return "Este navegador não suporta push (no iPhone, instale o site na Tela de Início).";
+  }
+  return "";
+}
+
 function chaveParaBytes(base64) {
   const preenchida = (base64 + "=".repeat((4 - (base64.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/");
   const bruto = atob(preenchida);

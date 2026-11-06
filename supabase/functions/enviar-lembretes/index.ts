@@ -188,7 +188,7 @@ Deno.serve(async (req) => {
       // só avisa nos primeiros 5 min do intervalo, para não mandar aviso velho
       if (forcar || ag.minutosDia % intervalo < 5) {
         const resumo = montarResumo(dados, ag);
-        if (resumo && (await enviar(sub, resumo, { TTL: 1200 }))) enviados++;
+        if (resumo && (await enviar(sub, resumo, { TTL: 1200, urgency: "high" }))) enviados++;
       }
     }
 

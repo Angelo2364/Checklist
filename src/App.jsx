@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import "./App.css";
 import { supabase } from "./services/supabase";
 import { carregarDados, criarDados, salvarDados } from "./services/dados";
-import { pushSuportado, ativarPush, atualizarPush, desativarPush } from "./services/push";
+import { pushSuportado, motivoSemPush, ativarPush, atualizarPush, desativarPush } from "./services/push";
 import Login, { NovaSenha } from "./Login";
 
 const STORAGE_TASKS = "checklist:tarefas";
@@ -23,7 +23,7 @@ const STORAGE_BLUR = "checklist:desfoqueFundo"; // chave nova: o padrão agora �
 const DESFOQUE_PADRAO = 10;
 const NOME_RODAPE = "Moony"; // aparece no rodapé; ao passar o mouse mostra o nome secreto
 const NOME_SECRETO = "Luna";
-const EMAIL_CONTATO = "Sayaokaua@gmail.com";
+const EMAIL_CONTATO = "sayaokaua@gmail.com";
 const STORAGE_INTERVALO = "checklist:intervaloAviso"; // minutos entre os lembretes
 const INTERVALOS_AVISO = [15, 30, 60, 120, 180];
 const rotuloIntervalo = (m) => (m < 60 ? `${m} minutos` : m === 60 ? "1 hora" : `${m / 60} horas`);
@@ -1824,10 +1824,22 @@ function Checklist({ usuario }) {
 
   // mantém este aparelho inscrito no push (também refaz a inscrição se trocar de conta)
   useEffect(() => {
-    if (!notificar || permissao !== "granted" || !pushSuportado()) return;
+    if (!notificar || permissao !== "granted") return;
+    if (!pushSuportado()) {
+      setPushAtivo(false);
+      setAvisoPush(`${motivoSemPush()} Os lembretes só chegam com o app aberto.`);
+      return;
+    }
     ativarPush(usuario.id, intervaloAviso, false)
-      .then(() => setPushAtivo(true))
-      .catch(() => setPushAtivo(false));
+      .then(() => {
+        setPushAtivo(true);
+        setAvisoPush("");
+      })
+      .catch((err) => {
+        console.error("push:", err);
+        setPushAtivo(false);
+        setAvisoPush(`Não consegui ativar o push (${err?.message || "erro desconhecido"}). Os lembretes só chegam com o app aberto.`);
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notificar, permissao, usuario.id]);
 
@@ -1857,12 +1869,13 @@ function Checklist({ usuario }) {
           await ativarPush(usuario.id, intervaloAviso, true);
           setPushAtivo(true);
           setAvisoPush("");
-        } catch {
+        } catch (err) {
+          console.error("push:", err);
           setPushAtivo(false);
-          setAvisoPush("Não consegui ativar os avisos com o app fechado. Eles só chegam com o app aberto.");
+          setAvisoPush(`Não consegui ativar o push (${err?.message || "erro desconhecido"}). Os lembretes só chegam com o app aberto.`);
         }
       } else {
-        setAvisoPush("Este navegador não suporta avisos com o app fechado. Eles só chegam com o app aberto.");
+        setAvisoPush(`${motivoSemPush()} Os lembretes só chegam com o app aberto.`);
       }
     }
   }
