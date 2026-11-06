@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">Crysalis</string>
-    <string name="title_activity_main">Crysalis</string>
-    <string name="package_name">me.crysalis.app</string>
-    <string name="custom_url_scheme">me.crysalis.app</string>
-</resources>
