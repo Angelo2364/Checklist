@@ -456,11 +456,12 @@ button.secundario:hover {
 }
 
 .ck-grupo-nome {
-  overflow: hidden;
+  flex: 1 1 auto;
+  min-width: 0;
   font-size: 17px;
   font-weight: 800;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .ck-grupo-qtd {
@@ -799,7 +800,9 @@ a.ck-apagar:hover {
 }
 
 .ck-lista li.alvo,
-.ck-grupo.alvo {
+.ck-grupo.alvo,
+.ck-anotacao.alvo,
+.ck-secao.alvo {
   outline: 2px dashed var(--azul-forte);
   outline-offset: -2px;
 }
@@ -1226,6 +1229,29 @@ a.ck-ev-mapa:hover {
   display: flex;
   flex-wrap: wrap;
 }
+
+.ck-abas-principais {
+  border-top: 0;
+  margin-top: 0;
+  border-radius: 0;
+}
+
+.ck-anotacoes { padding-bottom: 16px; }
+.ck-anotacoes .ck-nova-divisao { flex: 1 1 100%; }
+.ck-form-anotacao { flex-wrap: wrap; margin: 10px 12px; }
+.ck-form-anotacao input[type="date"],
+.ck-form-anotacao select { padding: 8px 10px; border: 1px solid var(--linha); border-radius: 12px; color: var(--tinta); background: var(--fundo); font: inherit; }
+.ck-anotacao { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 12px 16px 12px 0; border-bottom: 1px solid var(--linha); }
+.ck-anotacao > .ck-alca { flex: 0 0 26px; align-self: stretch; width: 26px; margin: 0 0 0 8px; }
+.ck-anotacao-corpo { flex: 1 1 auto; min-width: 0; }
+.ck-anotacao-corpo > div { display: flex; align-items: baseline; justify-content: flex-start; gap: 10px; min-width: 0; }
+.ck-anotacao-corpo strong { flex: 0 1 auto; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+.ck-anotacao time { flex: none; color: var(--suave); font-size: 12px; white-space: nowrap; }
+.ck-anotacao p { margin: 4px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ck-anotacao .ck-icone, .ck-anotacao .ck-apagar { flex: none; }
+.ck-descricao-toggle { flex: none; display: grid; place-items: center; width: 26px; height: 30px; padding: 0; color: var(--suave); background: transparent; border: 0; border-radius: 8px; }
+.ck-descricao-toggle:hover { color: var(--azul-forte); background: var(--fundo-hover); }
+.ck-descricao-toggle .ck-seta { transition: transform 0.15s; }
 
 .ck-barras-topo > .ck-barra-mais {
   flex: 1 1 0;

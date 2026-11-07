@@ -7,6 +7,8 @@ import Login, { NovaSenha } from "./Login";
 
 const STORAGE_TASKS = "checklist:tarefas";
 const STORAGE_GROUPS = "checklist:divisoes";
+const STORAGE_NOTES = "checklist:anotacoes";
+const STORAGE_NOTE_GROUPS = "checklist:sessoesAnotacoes";
 const STORAGE_LAST = "checklist:ultimaNotificacao";
 const STORAGE_NOTIFY = "checklist:notificar";
 
@@ -33,9 +35,9 @@ const STORAGE_DONO = "checklist:donoLocal"; // id do usuário a quem pertence o 
 
 // o que vai pra nuvem (mesma forma do arquivo exportado, sem o cabeçalho)
 const listaObjs = (v) => (Array.isArray(v) ? v.filter((x) => x && typeof x === "object") : []);
-const empacotar = (tarefas, grupos, eventos, rotinas, contas) => ({ tarefas, grupos, eventos, rotinas, contas });
+const empacotar = (tarefas, grupos, eventos, rotinas, contas, anotacoes = [], sessoesAnotacoes = []) => ({ tarefas, grupos, eventos, rotinas, contas, anotacoes, sessoesAnotacoes });
 const empacotarNuvem = (d) =>
-  empacotar(listaObjs(d?.tarefas), listaObjs(d?.grupos), listaObjs(d?.eventos), listaObjs(d?.rotinas), listaObjs(d?.contas));
+  empacotar(listaObjs(d?.tarefas), listaObjs(d?.grupos), listaObjs(d?.eventos), listaObjs(d?.rotinas), listaObjs(d?.contas), listaObjs(d?.anotacoes), listaObjs(d?.sessoesAnotacoes));
 // papel de parede padrão: coloque o arquivo bg.png dentro da pasta public/
 const FUNDO_PADRAO = `${import.meta.env.BASE_URL}bg.png`;
 const STORAGE_BG_AJUSTE = "checklist:ajusteFundo";
@@ -1070,8 +1072,7 @@ function NovaTarefa({ onAdd, placeholder, onFechar, idCampo }) {
       className="ck-form-grupo"
       onSubmit={enviar}
       onBlur={(e) => {
-        // saiu do formulário e não digitou nada: fecha
-        if (!e.currentTarget.contains(e.relatedTarget) && !texto.trim()) {
+        if (!e.currentTarget.contains(e.relatedTarget)) {
           onFechar && onFechar();
         }
       }}
@@ -1140,7 +1141,7 @@ function Alca({ id, tipo, grupo, ordem, imagem }) {
       onKeyDown={(e) => {
         if (e.key === "ArrowUp" || e.key === "ArrowDown") {
           e.preventDefault();
-          ordem.moverPor(tipo, id, e.key === "ArrowUp" ? -1 : 1);
+          ordem.moverPor(tipo, id, e.key === "ArrowUp" ? -1 : 1, grupo);
         }
       }}
     >
@@ -1155,7 +1156,9 @@ function Alca({ id, tipo, grupo, ordem, imagem }) {
 function alvoProps(ordem, tipo, id, grupo) {
   const ok = () => {
     const a = ordem.arrastando;
-    return a && a.tipo === tipo && a.id !== id && a.grupo === grupo;
+    if (!a || a.id === id) return false;
+    if (a.tipo === tipo) return true;
+    return (tipo === "grupo" && a.tipo === "tarefa") || (tipo === "sessaoAnotacao" && a.tipo === "anotacao") || (tipo === "destinoTarefas" && a.tipo === "tarefa") || (tipo === "destinoAnotacoes" && a.tipo === "anotacao");
   };
   return {
     onDragOver: (e) => {
@@ -1167,7 +1170,8 @@ function alvoProps(ordem, tipo, id, grupo) {
     onDrop: (e) => {
       if (!ok()) return;
       e.preventDefault();
-      ordem.mover(tipo, ordem.arrastando.id, id);
+      const destino = tipo === "grupo" || tipo === "sessaoAnotacao" ? id : tipo === "destinoTarefas" || tipo === "destinoAnotacoes" ? null : grupo;
+      ordem.mover(ordem.arrastando.tipo, ordem.arrastando.id, id, destino);
       ordem.fim();
     },
   };
@@ -1237,7 +1241,12 @@ function EditarTarefa({ tarefa, onSalvar, onCancelar }) {
 }
 
 /* Lista de tarefas (usada fora e dentro das sessões) */
+function ToggleDescricao({ fechada, onClick }) {
+  return <button type="button" className="ck-descricao-toggle" aria-label={fechada ? "Mostrar descrição" : "Ocultar descrição"} title={fechada ? "Mostrar descrição" : "Ocultar descrição"} aria-expanded={!fechada} onClick={onClick}><span className={`ck-seta ${fechada ? "" : "aberta"}`}>›</span></button>;
+}
+
 function ListaTarefas({ tarefas, alternar, apagar, mudarPrioridade, ordem, edicao }) {
+  const [descricoesFechadas, setDescricoesFechadas] = useState({});
   return (
     <ul className="ck-lista">
       {tarefas.map((t) => edicao.id === t.id ? (
@@ -1281,9 +1290,10 @@ function ListaTarefas({ tarefas, alternar, apagar, mudarPrioridade, ordem, edica
                   })()}
                 </span>
               )}
-              {t.descricao && <span className="ck-descricao">{t.descricao}</span>}
+              {t.descricao && !descricoesFechadas[t.id] && <span className="ck-descricao">{t.descricao}</span>}
             </span>
           </label>
+          {t.descricao && <ToggleDescricao fechada={descricoesFechadas[t.id]} onClick={() => setDescricoesFechadas((atual) => ({ ...atual, [t.id]: !atual[t.id] }))} />}
           <button
             type="button"
             className={`ck-prio p${t.prioridade || 0}`}
@@ -1316,12 +1326,36 @@ function ListaTarefas({ tarefas, alternar, apagar, mudarPrioridade, ordem, edica
   );
 }
 
+function FormularioAnotacao({ form, sessoes, onSalvar, onChange, onCancelar }) {
+  return (
+    <form className="ck-form-grupo ck-form-anotacao" onSubmit={onSalvar} onBlur={(e) => { if (!form.id && !e.currentTarget.contains(e.relatedTarget)) onCancelar(); }}>
+      <input id="campo-titulo-anotacao" autoFocus type="text" maxLength={100} placeholder="Título" aria-label="Título da anotação" value={form.titulo} onChange={(e) => onChange((atual) => ({ ...atual, titulo: e.target.value }))} required />
+      <input type="date" aria-label="Data da anotação" value={form.data} onChange={(e) => onChange((atual) => ({ ...atual, data: e.target.value }))} required />
+      <select aria-label="Sessão da anotação" value={form.sessaoId || ""} onChange={(e) => onChange((atual) => ({ ...atual, sessaoId: e.target.value || null }))}>
+        <option value="">Sem sessão</option>{sessoes.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
+      </select>
+      <textarea className="ck-campo-largo" rows={4} placeholder="Anotação (opcional)" aria-label="Anotação (opcional)" value={form.texto} onChange={(e) => onChange((atual) => ({ ...atual, texto: e.target.value }))} />
+      <button type="submit" disabled={!form.titulo.trim()}>Salvar</button>
+      <button type="button" className="secundario" onClick={onCancelar}>Cancelar</button>
+    </form>
+  );
+}
+
 function Checklist({ usuario }) {
   const [tarefas, setTarefas] = useState(() => lerStorage(STORAGE_TASKS, []));
   const [grupos, setGrupos] = useState(() => lerStorage(STORAGE_GROUPS, []));
   const [eventos, setEventos] = useState(() => lerStorage(STORAGE_EVENTS, []));
   const [rotinas, setRotinas] = useState(() => lerStorage(STORAGE_ROUTINES, []));
   const [contas, setContas] = useState(() => lerStorage(STORAGE_BILLS, []));
+  const [anotacoes, setAnotacoes] = useState(() => lerStorage(STORAGE_NOTES, []));
+  const [sessoesAnotacoes, setSessoesAnotacoes] = useState(() => lerStorage(STORAGE_NOTE_GROUPS, []));
+  const [pagina, setPagina] = useState("tarefas");
+  const paginaRef = useRef(pagina);
+  paginaRef.current = pagina;
+  const [nomeSessaoAnotacao, setNomeSessaoAnotacao] = useState("");
+  const [criandoSessaoAnotacao, setCriandoSessaoAnotacao] = useState(false);
+  const [formAnotacao, setFormAnotacao] = useState(null);
+  const [descricoesAnotacaoFechadas, setDescricoesAnotacaoFechadas] = useState({});
   const [aba, setAba] = useState("rotinas");
   const [fundo, setFundo] = useState(null); // URL (blob:) do papel de parede, carregado do IndexedDB
   const [desfoque, setDesfoque] = useState(() => lerStorage(STORAGE_BLUR, DESFOQUE_PADRAO));
@@ -1362,11 +1396,15 @@ function Checklist({ usuario }) {
   const eventosRef = useRef([]);
   const rotinasRef = useRef([]);
   const contasRef = useRef([]);
+  const anotacoesRef = useRef([]);
+  const sessoesAnotacoesRef = useRef([]);
   tarefasRef.current = tarefas;
   gruposRef.current = grupos;
   eventosRef.current = eventos;
   rotinasRef.current = rotinas;
   contasRef.current = contas;
+  anotacoesRef.current = anotacoes;
+  sessoesAnotacoesRef.current = sessoesAnotacoes;
 
   // ---------- sincronização com o Supabase ----------
   const [sync, setSync] = useState("carregando"); // carregando | salvo | salvando | erro | conflito | erro-carregar
@@ -1377,7 +1415,7 @@ function Checklist({ usuario }) {
   const salvandoAgora = useRef(false);
   const bloqueado = useRef(false); // true enquanto há conflito pendente
 
-  const jsonAtual = JSON.stringify(empacotar(tarefas, grupos, eventos, rotinas, contas));
+  const jsonAtual = JSON.stringify(empacotar(tarefas, grupos, eventos, rotinas, contas, anotacoes, sessoesAnotacoes));
   const jsonAtualRef = useRef(jsonAtual);
   jsonAtualRef.current = jsonAtual;
 
@@ -1388,6 +1426,8 @@ function Checklist({ usuario }) {
     setEventos(l.eventos);
     setRotinas(l.rotinas);
     setContas(l.contas);
+    setAnotacoes(l.anotacoes);
+    setSessoesAnotacoes(l.sessoesAnotacoes);
     return JSON.stringify(l);
   }
 
@@ -1406,8 +1446,8 @@ function Checklist({ usuario }) {
           // cache local de outra conta nunca sobe pra esta
           const dono = lerStorage(STORAGE_DONO, null);
           const inicial = dono && dono !== usuario.id
-            ? empacotar([], [], [], [], [])
-            : empacotar(tarefasRef.current, gruposRef.current, eventosRef.current, rotinasRef.current, contasRef.current);
+            ? empacotar([], [], [], [], [], [], [])
+            : empacotar(tarefasRef.current, gruposRef.current, eventosRef.current, rotinasRef.current, contasRef.current, anotacoesRef.current, sessoesAnotacoesRef.current);
           jsonSalvo.current = aplicarDados(inicial);
           try {
             versaoNuvem.current = await criarDados(usuario.id, inicial);
@@ -1437,7 +1477,7 @@ function Checklist({ usuario }) {
   async function salvarNaNuvem(forcar = false) {
     while (salvandoAgora.current) await new Promise((r) => setTimeout(r, 200));
     if (bloqueado.current && !forcar) return;
-    const dados = empacotar(tarefasRef.current, gruposRef.current, eventosRef.current, rotinasRef.current, contasRef.current);
+    const dados = empacotar(tarefasRef.current, gruposRef.current, eventosRef.current, rotinasRef.current, contasRef.current, anotacoesRef.current, sessoesAnotacoesRef.current);
     const json = JSON.stringify(dados);
     if (json === jsonSalvo.current && !forcar) return;
     salvandoAgora.current = true;
@@ -1536,7 +1576,7 @@ function Checklist({ usuario }) {
       /* ignora */
     }
     // limpa o cache local pra não deixar suas tarefas num computador compartilhado
-    [STORAGE_TASKS, STORAGE_GROUPS, STORAGE_EVENTS, STORAGE_ROUTINES, STORAGE_BILLS, STORAGE_DONO, STORAGE_PRAZOS, STORAGE_LAST].forEach((k) => {
+    [STORAGE_TASKS, STORAGE_GROUPS, STORAGE_EVENTS, STORAGE_ROUTINES, STORAGE_BILLS, STORAGE_NOTES, STORAGE_NOTE_GROUPS, STORAGE_DONO, STORAGE_PRAZOS, STORAGE_LAST].forEach((k) => {
       try {
         localStorage.removeItem(k);
       } catch {
@@ -1565,6 +1605,8 @@ function Checklist({ usuario }) {
   useEffect(() => {
     salvarStorage(STORAGE_BILLS, contas);
   }, [contas]);
+  useEffect(() => { salvarStorage(STORAGE_NOTES, anotacoes); }, [anotacoes]);
+  useEffect(() => { salvarStorage(STORAGE_NOTE_GROUPS, sessoesAnotacoes); }, [sessoesAnotacoes]);
 
   useEffect(() => {
     let url = null;
@@ -1687,7 +1729,15 @@ function Checklist({ usuario }) {
       if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
       const tecla = e.key.toLowerCase();
 
-      if (tecla === ATALHO_TAREFA) {
+      if (paginaRef.current === "anotacoes" && tecla === ATALHO_TAREFA) {
+        e.preventDefault();
+        abrirNovaAnotacao();
+        requestAnimationFrame(() => document.getElementById("campo-titulo-anotacao")?.focus());
+      } else if (paginaRef.current === "anotacoes" && tecla === ATALHO_SESSAO) {
+        e.preventDefault();
+        setCriandoSessaoAnotacao(true);
+        requestAnimationFrame(() => document.getElementById("campo-sessao-anotacao")?.focus());
+      } else if (tecla === ATALHO_TAREFA) {
         e.preventDefault(); // impede a busca do navegador
         setCriandoSolta(true);
         // se o campo já estava aberto, só devolve o foco a ele
@@ -1962,14 +2012,36 @@ function Checklist({ usuario }) {
     });
   }
 
-  function mover(tipo, idA, idB) {
-    moverItem(tipo === "grupo" ? setGrupos : setTarefas, idA, idB);
+  function mover(tipo, idA, idB, destinoGrupo = undefined) {
+    if (tipo === "grupo") moverItem(setGrupos, idA, idB);
+    else if (tipo === "sessaoAnotacao") moverItem(setSessoesAnotacoes, idA, idB);
+    else if (tipo === "anotacao") {
+      if (destinoGrupo !== undefined) {
+        const origem = anotacoes.find((x) => x.id === idA);
+        if ((origem?.sessaoId || null) === destinoGrupo) moverItem(setAnotacoes, idA, idB);
+        else setAnotacoes((xs) => xs.map((x) => x.id === idA ? { ...x, sessaoId: destinoGrupo } : x));
+      }
+      else moverItem(setAnotacoes, idA, idB);
+    } else {
+      if (destinoGrupo !== undefined) {
+        const origem = tarefas.find((x) => x.id === idA);
+        if ((origem?.grupoId || null) === destinoGrupo) moverItem(setTarefas, idA, idB);
+        else setTarefas((xs) => xs.map((x) => x.id === idA ? { ...x, grupoId: destinoGrupo } : x));
+      }
+      else moverItem(setTarefas, idA, idB);
+    }
   }
 
-  function moverPor(tipo, id, delta) {
+  function moverPor(tipo, id, delta, grupo = null) {
     let irmaos;
     if (tipo === "grupo") {
       irmaos = grupos;
+    } else if (tipo === "sessaoAnotacao") {
+      irmaos = sessoesAnotacoes;
+    } else if (tipo === "anotacao") {
+      const nota = anotacoes.find((x) => x.id === id);
+      if (!nota) return;
+      irmaos = anotacoes.filter((x) => (x.sessaoId || null) === (grupo || nota.sessaoId || null));
     } else {
       const t = tarefas.find((x) => x.id === id);
       if (!t) return;
@@ -2034,6 +2106,29 @@ function Checklist({ usuario }) {
     setContas((a) => [...a, { id: novoId(), ...c, ciclo, parcela: 1, pago: false }]);
   }
 
+  function salvarAnotacao(e) {
+    e.preventDefault();
+    const titulo = formAnotacao?.titulo?.trim();
+    const texto = formAnotacao?.texto?.trim();
+    if (!titulo) return;
+    const item = { id: formAnotacao.id || novoId(), titulo, texto: texto || "", data: formAnotacao.data || iso(new Date()), sessaoId: formAnotacao.sessaoId || null };
+    setAnotacoes((atual) => formAnotacao.id ? atual.map((a) => a.id === item.id ? item : a) : [...atual, item]);
+    setFormAnotacao(null);
+  }
+
+  function abrirNovaAnotacao(sessaoId = null) {
+    setFormAnotacao({ titulo: "", texto: "", data: iso(new Date()), sessaoId });
+  }
+
+  function criarSessaoAnotacao(e) {
+    e.preventDefault();
+    const nome = nomeSessaoAnotacao.trim();
+    if (!nome) return;
+    setSessoesAnotacoes((a) => [...a, { id: novoId(), nome, aberta: true }]);
+    setNomeSessaoAnotacao("");
+    setCriandoSessaoAnotacao(false);
+  }
+
   function definirValorConta(id, valor) {
     setContas((a) => a.map((c) => (c.id === id ? { ...c, valor } : c)));
   }
@@ -2076,6 +2171,8 @@ function Checklist({ usuario }) {
       eventos,
       rotinas,
       contas,
+      anotacoes,
+      sessoesAnotacoes,
     };
     const blob = new Blob([JSON.stringify(dados, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -2102,6 +2199,8 @@ function Checklist({ usuario }) {
       const ev = lista(dados.eventos);
       const ro = lista(dados.rotinas);
       const co = lista(dados.contas);
+      const an = lista(dados.anotacoes);
+      const san = lista(dados.sessoesAnotacoes);
       const quando = dados.exportadoEm ? new Date(dados.exportadoEm).toLocaleString("pt-BR") : "data desconhecida";
       const ok = window.confirm(
         `Importar "${arquivo.name}" (exportado em ${quando})?\n\n` +
@@ -2114,6 +2213,8 @@ function Checklist({ usuario }) {
       setEventos(ev);
       setRotinas(ro);
       setContas(co);
+      setAnotacoes(an);
+      setSessoesAnotacoes(san);
       setMsgDados({ texto: `Importado: ${t.length} tarefas, ${g.length} sessões, ${ev.length} eventos, ${ro.length} rotinas, ${co.length} contas.`, erro: false });
     } catch {
       setMsgDados({ texto: "Não consegui ler esse arquivo. Use um arquivo exportado por este app (.json).", erro: true });
@@ -2142,6 +2243,18 @@ function Checklist({ usuario }) {
     setGrupos((atual) => [...atual, { id: novoId(), nome: limpo, aberta: true }]);
     setNomeGrupo("");
     setCriandoGrupo(false);
+  }
+
+  function renomearGrupo(grupo) {
+    const nome = window.prompt("Editar nome da sessão", grupo.nome);
+    if (nome === null || !nome.trim()) return;
+    setGrupos((itens) => itens.map((g) => g.id === grupo.id ? { ...g, nome: nome.trim() } : g));
+  }
+
+  function renomearSessaoAnotacao(sessao) {
+    const nome = window.prompt("Editar nome da sessão", sessao.nome);
+    if (nome === null || !nome.trim()) return;
+    setSessoesAnotacoes((itens) => itens.map((s) => s.id === sessao.id ? { ...s, nome: nome.trim() } : s));
   }
 
   function abrirAddTarefa(grupo) {
@@ -2309,6 +2422,11 @@ function Checklist({ usuario }) {
         )}
       </header>
 
+      <div className="ck-abas ck-abas-principais" role="tablist" aria-label="Área principal">
+        <button type="button" role="tab" className="ck-aba" aria-selected={pagina === "tarefas"} onClick={() => setPagina("tarefas")}>Checklist</button>
+        <button type="button" role="tab" className="ck-aba" aria-selected={pagina === "anotacoes"} onClick={() => setPagina("anotacoes")}>Anotações</button>
+      </div>
+      {pagina === "tarefas" ? <>
       <div className="ck-barras-topo">
       {criandoSolta ? (
         <NovaTarefa
@@ -2330,11 +2448,9 @@ function Checklist({ usuario }) {
           className="ck-nova-divisao"
           onSubmit={criarGrupo}
           onBlur={(e) => {
-            if (
-              !e.currentTarget.contains(e.relatedTarget) &&
-              !nomeGrupo.trim()
-            ) {
+            if (!e.currentTarget.contains(e.relatedTarget)) {
               setCriandoGrupo(false);
+              setNomeGrupo("");
             }
           }}
         >
@@ -2381,7 +2497,7 @@ function Checklist({ usuario }) {
         return (
           <section
             key={g.id}
-            className={`ck-grupo${arrastando?.id === g.id ? " arrastando" : ""}${sobre === g.id && arrastando?.tipo === "grupo" ? " alvo" : ""}`}
+            className={`ck-grupo${arrastando?.id === g.id ? " arrastando" : ""}${sobre === g.id && (arrastando?.tipo === "grupo" || arrastando?.tipo === "tarefa") ? " alvo" : ""}`}
             {...alvoProps(ordem, "grupo", g.id, null)}
           >
             <div className="ck-grupo-topo">
@@ -2409,6 +2525,7 @@ function Checklist({ usuario }) {
               >
                 <IconeMais />
               </button>
+              <button type="button" className="ck-icone" title="Editar sessão" aria-label={`Editar sessão ${g.nome}`} onClick={() => renomearGrupo(g)}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" /></svg></button>
               <button
                 type="button"
                 className="ck-apagar"
@@ -2446,8 +2563,8 @@ function Checklist({ usuario }) {
         );
       })}
 
-      {grupos.length > 0 && soltas.length > 0 && (
-        <h2 className="ck-secao">Sem sessão</h2>
+      {grupos.length > 0 && (soltas.length > 0 || arrastando?.tipo === "tarefa") && (
+        <h2 className={`ck-secao${ordem.sobre === "__sem_sessao__" && ordem.arrastando?.tipo === "tarefa" ? " alvo" : ""}`} {...alvoProps(ordem, "destinoTarefas", "__sem_sessao__", null)}>Sem sessão</h2>
       )}
 
       {soltas.length > 0 && (
@@ -2529,6 +2646,32 @@ function Checklist({ usuario }) {
           </>
         )}
       </section>
+      </> : <section className="ck-anotacoes">
+        <div className="ck-barras-topo">
+          {formAnotacao && !formAnotacao.id && (!formAnotacao.sessaoId || !sessoesAnotacoes.some((s) => s.id === formAnotacao.sessaoId)) ? <FormularioAnotacao form={formAnotacao} sessoes={sessoesAnotacoes} onSalvar={salvarAnotacao} onChange={setFormAnotacao} onCancelar={() => setFormAnotacao(null)} /> : <BarraMais rotulo="Adicionar anotação" atalho={ATALHO_TAREFA} onClick={() => abrirNovaAnotacao()} />}
+          {criandoSessaoAnotacao ? <form className="ck-nova-divisao" onSubmit={criarSessaoAnotacao} onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) { setCriandoSessaoAnotacao(false); setNomeSessaoAnotacao(""); } }}>
+            <input id="campo-sessao-anotacao" autoFocus value={nomeSessaoAnotacao} onChange={(e) => setNomeSessaoAnotacao(e.target.value)} placeholder="Nome da sessão (ex: Ideias)" aria-label="Nome da sessão de anotações" maxLength={60} onKeyDown={(e) => { if (e.key === "Escape") { setCriandoSessaoAnotacao(false); setNomeSessaoAnotacao(""); } }} />
+            <button type="submit" disabled={!nomeSessaoAnotacao.trim()}>Criar</button>
+          </form> : <BarraMais rotulo="Adicionar sessão" atalho={ATALHO_SESSAO} onClick={() => setCriandoSessaoAnotacao(true)} />}
+        </div>
+        {formAnotacao?.id && (!formAnotacao.sessaoId || !sessoesAnotacoes.some((s) => s.id === formAnotacao.sessaoId)) && <FormularioAnotacao form={formAnotacao} sessoes={sessoesAnotacoes} onSalvar={salvarAnotacao} onChange={setFormAnotacao} onCancelar={() => setFormAnotacao(null)} />}
+        {sessoesAnotacoes.map((s) => <section className={`ck-grupo${ordem.sobre === s.id && ["anotacao", "tarefa"].includes(ordem.arrastando?.tipo) ? " alvo" : ""}`} key={s.id} {...alvoProps(ordem, "sessaoAnotacao", s.id, null)}>
+          <div className="ck-grupo-topo">
+            <Alca id={s.id} tipo="sessaoAnotacao" grupo={null} ordem={ordem} imagem=".ck-grupo-topo" />
+            <button type="button" className="ck-grupo-titulo" aria-expanded={s.aberta !== false} onClick={() => setSessoesAnotacoes((atual) => atual.map((x) => x.id === s.id ? { ...x, aberta: x.aberta === false } : x))}><span className={`ck-seta ${s.aberta !== false ? "aberta" : ""}`}>›</span><span className="ck-grupo-nome">{s.nome}</span><span className="ck-grupo-qtd">{anotacoes.filter((a) => a.sessaoId === s.id).length}</span></button>
+            <button type="button" className="ck-mais" onClick={() => abrirNovaAnotacao(s.id)} title={`Nova anotação em ${s.nome}`} aria-label={`Nova anotação em ${s.nome}`}><IconeMais /></button>
+            <button type="button" className="ck-icone" title="Editar sessão" aria-label={`Editar sessão ${s.nome}`} onClick={() => renomearSessaoAnotacao(s)}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" /></svg></button>
+            <button type="button" className="ck-apagar" onClick={() => { if (window.confirm(`Apagar a sessão "${s.nome}"? As anotações vão para Sem sessão.`)) { setSessoesAnotacoes((xs) => xs.filter((x) => x.id !== s.id)); setAnotacoes((xs) => xs.map((a) => a.sessaoId === s.id ? { ...a, sessaoId: null } : a)); } }}>Apagar sessão</button>
+          </div>
+          {formAnotacao?.sessaoId === s.id && <FormularioAnotacao form={formAnotacao} sessoes={sessoesAnotacoes} onSalvar={salvarAnotacao} onChange={setFormAnotacao} onCancelar={() => setFormAnotacao(null)} />}
+          {s.aberta !== false && anotacoes.filter((a) => a.sessaoId === s.id).map((a) => <article className={`ck-anotacao${ordem.sobre === a.id && ordem.arrastando?.tipo === "anotacao" ? " alvo" : ""}`} key={a.id} {...alvoProps(ordem, "anotacao", a.id, s.id)}>
+            <Alca id={a.id} tipo="anotacao" grupo={s.id} ordem={ordem} imagem=".ck-anotacao" />
+            <div className="ck-anotacao-corpo"><div><strong>{a.titulo}</strong><time>{new Date(`${a.data}T00:00`).toLocaleDateString("pt-BR")}</time></div>{a.texto && !descricoesAnotacaoFechadas[a.id] && <p>{a.texto}</p>}</div>{a.texto && <ToggleDescricao fechada={descricoesAnotacaoFechadas[a.id]} onClick={() => setDescricoesAnotacaoFechadas((atual) => ({ ...atual, [a.id]: !atual[a.id] }))} />}<button type="button" className="ck-icone" title="Editar anotação" aria-label={`Editar ${a.titulo}`} onClick={() => setFormAnotacao({ ...a })}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" /></svg></button><button type="button" className="ck-apagar" onClick={() => setAnotacoes((xs) => xs.filter((x) => x.id !== a.id))}>Apagar</button>
+          </article>)}
+        </section>)}
+        {(anotacoes.some((a) => !a.sessaoId || !sessoesAnotacoes.some((s) => s.id === a.sessaoId)) || arrastando?.tipo === "anotacao") && <section className="ck-grupo"><h2 className={`ck-secao${ordem.sobre === "__sem_sessao__" && ordem.arrastando?.tipo === "anotacao" ? " alvo" : ""}`} {...alvoProps(ordem, "destinoAnotacoes", "__sem_sessao__", null)}>Sem sessão</h2>{anotacoes.filter((a) => !a.sessaoId || !sessoesAnotacoes.some((s) => s.id === a.sessaoId)).map((a) => <article className={`ck-anotacao${ordem.sobre === a.id && ordem.arrastando?.tipo === "anotacao" ? " alvo" : ""}`} key={a.id} {...alvoProps(ordem, "anotacao", a.id, null)}><Alca id={a.id} tipo="anotacao" grupo={null} ordem={ordem} imagem=".ck-anotacao" /><div className="ck-anotacao-corpo"><div><strong>{a.titulo}</strong><time>{new Date(`${a.data}T00:00`).toLocaleDateString("pt-BR")}</time></div>{a.texto && !descricoesAnotacaoFechadas[a.id] && <p>{a.texto}</p>}</div>{a.texto && <ToggleDescricao fechada={descricoesAnotacaoFechadas[a.id]} onClick={() => setDescricoesAnotacaoFechadas((atual) => ({ ...atual, [a.id]: !atual[a.id] }))} />}<button type="button" className="ck-icone" title="Editar anotação" aria-label={`Editar ${a.titulo}`} onClick={() => setFormAnotacao({ ...a })}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" /></svg></button><button type="button" className="ck-apagar" onClick={() => setAnotacoes((xs) => xs.filter((x) => x.id !== a.id))}>Apagar</button></article>)}</section>}
+        {!formAnotacao && anotacoes.length === 0 && sessoesAnotacoes.length === 0 && <p className="ck-vazio">Adicione uma anotação ou crie uma sessão.</p>}
+      </section>}
 
       <footer className="ck-rodape">
         <span>
@@ -2537,6 +2680,8 @@ function Checklist({ usuario }) {
         </span>
         <span aria-hidden="true"> · </span>
         <Contato />
+                <span aria-hidden="true"> · </span>
+                <span aria-hidden="true"> V0.5 </span>
       </footer>
     </main>
 
