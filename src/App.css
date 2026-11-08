@@ -562,11 +562,13 @@ button.secundario:hover {
 .ck-lateral {
   flex: none;
   width: 340px;
+  box-sizing: border-box;
   position: sticky;
   top: 0;
   min-height: 100vh;
   max-height: 100vh;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   background: var(--fundo);
   border-right: 1px solid var(--linha);
 }
@@ -1235,6 +1237,16 @@ a.ck-ev-mapa:hover {
   margin-top: 0;
   border-radius: 0;
 }
+
+.ck-configuracoes { min-height: 320px; padding: 16px; }
+.ck-config-titulo { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.ck-config-titulo h2, .ck-config-ajustes h2 { margin: 0; font-size: 18px; }
+.ck-config-ajustes { padding: 0; border-top: 0; }
+.ck-conta-config { padding: 16px 0; }
+.ck-conta-config h3 { margin: 0 0 8px; }
+.ck-conta-config > .ck-conta { display: block; margin: 0 0 12px; }
+.ck-conta-config .ck-ajustes { padding: 0; }
+.ck-sair-conta { margin-top: 18px; }
 
 .ck-anotacoes { padding-bottom: 16px; }
 .ck-anotacoes .ck-nova-divisao { flex: 1 1 100%; }

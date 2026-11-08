@@ -55,6 +55,18 @@ const OPCOES_REPETE = [
 const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
 
 const z2 = (n) => String(n).padStart(2, "0");
+function enviarAoEnter(e) {
+  if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+    e.preventDefault();
+    e.currentTarget.form?.requestSubmit();
+  }
+}
+function fecharAoClicarFora(e, fechar) {
+  const formulario = e.currentTarget;
+  window.setTimeout(() => {
+    if (!formulario.contains(document.activeElement)) fechar();
+  }, 50);
+}
 const iso = (d) => `${d.getFullYear()}-${z2(d.getMonth() + 1)}-${z2(d.getDate())}`;
 function somarDias(dataISO, n) {
   const [a, m, d] = dataISO.split("-").map(Number);
@@ -1071,11 +1083,7 @@ function NovaTarefa({ onAdd, placeholder, onFechar, idCampo }) {
     <form
       className="ck-form-grupo"
       onSubmit={enviar}
-      onBlur={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget)) {
-          onFechar && onFechar();
-        }
-      }}
+      onBlur={(e) => fecharAoClicarFora(e, () => onFechar && onFechar())}
     >
       <input
         id={idCampo}
@@ -1106,7 +1114,7 @@ function NovaTarefa({ onAdd, placeholder, onFechar, idCampo }) {
         className="ck-campo-largo"
         value={descricao}
         onChange={(e) => setDescricao(e.target.value)}
-        onKeyDown={(e) => e.key === "Escape" && onFechar && onFechar()}
+        onKeyDown={(e) => { if (e.key === "Escape") onFechar && onFechar(); else enviarAoEnter(e); }}
         placeholder="Observações (opcional)"
         aria-label="Observações da tarefa"
         rows={2}
@@ -1219,6 +1227,7 @@ function EditarTarefa({ tarefa, onSalvar, onCancelar }) {
         className="ck-campo-largo"
         value={descricao}
         onChange={(e) => setDescricao(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Escape") onCancelar(); else enviarAoEnter(e); }}
         placeholder="Observações (opcional)"
         aria-label="Observações da tarefa"
         rows={2}
@@ -1330,17 +1339,34 @@ function ListaTarefas({ tarefas, alternar, apagar, mudarPrioridade, ordem, edica
 
 function FormularioAnotacao({ form, sessoes, onSalvar, onChange, onCancelar }) {
   return (
-    <form className="ck-form-grupo ck-form-anotacao" onSubmit={onSalvar} onBlur={(e) => { if (!form.id && !e.currentTarget.contains(e.relatedTarget)) onCancelar(); }}>
+    <form className="ck-form-grupo ck-form-anotacao" onSubmit={onSalvar} onBlur={(e) => { if (!form.id) fecharAoClicarFora(e, onCancelar); }}>
       <input id="campo-titulo-anotacao" autoFocus type="text" maxLength={100} placeholder="Título" aria-label="Título da anotação" value={form.titulo} onChange={(e) => onChange((atual) => ({ ...atual, titulo: e.target.value }))} required />
       <input type="date" aria-label="Data da anotação" value={form.data} onChange={(e) => onChange((atual) => ({ ...atual, data: e.target.value }))} required />
       <select aria-label="Sessão da anotação" value={form.sessaoId || ""} onChange={(e) => onChange((atual) => ({ ...atual, sessaoId: e.target.value || null }))}>
         <option value="">Sem sessão</option>{sessoes.map((s) => <option key={s.id} value={s.id}>{s.nome}</option>)}
       </select>
-      <textarea className="ck-campo-largo" rows={4} placeholder="Anotação (opcional)" aria-label="Anotação (opcional)" value={form.texto} onChange={(e) => onChange((atual) => ({ ...atual, texto: e.target.value }))} />
+      <textarea className="ck-campo-largo" rows={4} placeholder="Anotação (opcional)" aria-label="Anotação (opcional)" value={form.texto} onChange={(e) => onChange((atual) => ({ ...atual, texto: e.target.value }))} onKeyDown={(e) => { if (e.key === "Escape") onCancelar(); else enviarAoEnter(e); }} />
       <button type="submit" disabled={!form.titulo.trim()}>Salvar</button>
       <button type="button" className="secundario" onClick={onCancelar}>Cancelar</button>
     </form>
   );
+}
+
+function ConfiguracoesVisuais({ tema, setTema, desfoque, setDesfoque, ajusteFundo, setAjusteFundo, escolherFundo, fundo, removerFundo, erroFundo }) {
+  return <div className="ck-ajustes ck-config-ajustes">
+    <h2>Aparência</h2>
+    <span className="ck-ajuste" role="group" aria-label="Tema">
+      {[['escuro', 'Tema escuro'], ['claro', 'Tema claro']].map(([v, nome]) => <button key={v} type="button" className={`secundario ck-ajuste-btn${tema === v ? ' ativo' : ''}`} aria-pressed={tema === v} onClick={() => setTema(v)}>{nome}</button>)}
+    </span>
+    <label className="ck-arquivo"><input type="file" accept="image/*" onChange={escolherFundo} /><span>Trocar imagem</span></label>
+    <label className="ck-desfoque">Desfoque<input type="range" min="0" max="20" value={desfoque} onChange={(e) => setDesfoque(Number(e.target.value))} /><span>{desfoque}px</span></label>
+    <span className="ck-ajuste" role="group" aria-label="Ajuste da imagem">
+      {[['preencher', 'Preencher', 'Cobre a tela toda (corta as bordas se a proporção for diferente)'], ['inteira', 'Inteira', 'Mostra a imagem inteira, sem cortar']].map(([v, nome, dica]) => <button key={v} type="button" className={`secundario ck-ajuste-btn${ajusteFundo === v ? ' ativo' : ''}`} aria-pressed={ajusteFundo === v} title={dica} onClick={() => setAjusteFundo(v)}>{nome}</button>)}
+    </span>
+    {fundo && <button type="button" className="secundario" onClick={removerFundo}>Voltar ao padrão</button>}
+    {erroFundo && <p className="ck-erro">{erroFundo}</p>}
+    <small>A imagem fica salva só neste navegador.</small>
+  </div>;
 }
 
 function Checklist({ usuario }) {
@@ -1352,6 +1378,7 @@ function Checklist({ usuario }) {
   const [anotacoes, setAnotacoes] = useState(() => lerStorage(STORAGE_NOTES, []));
   const [sessoesAnotacoes, setSessoesAnotacoes] = useState(() => lerStorage(STORAGE_NOTE_GROUPS, []));
   const [pagina, setPagina] = useState("tarefas");
+  const [abaConfiguracoes, setAbaConfiguracoes] = useState("preferencias");
   const paginaRef = useRef(pagina);
   paginaRef.current = pagina;
   const [nomeSessaoAnotacao, setNomeSessaoAnotacao] = useState("");
@@ -1362,7 +1389,6 @@ function Checklist({ usuario }) {
   const [fundo, setFundo] = useState(null); // URL (blob:) do papel de parede, carregado do IndexedDB
   const [desfoque, setDesfoque] = useState(() => lerStorage(STORAGE_BLUR, DESFOQUE_PADRAO));
   const [ajusteFundo, setAjusteFundo] = useState(() => lerStorage(STORAGE_BG_AJUSTE, "preencher"));
-  const [ajustes, setAjustes] = useState(false);
   const [pushAtivo, setPushAtivo] = useState(false); // este aparelho recebe avisos do servidor (app fechado)
   const [avisoPush, setAvisoPush] = useState("");
   const [intervaloAviso, setIntervaloAviso] = useState(() => {
@@ -1374,7 +1400,6 @@ function Checklist({ usuario }) {
     document.documentElement.dataset.tema = tema;
     salvarStorage(STORAGE_TEMA, tema);
   }, [tema]);
-  const [dadosAberto, setDadosAberto] = useState(false); // painel Exportar / Importar
   const [msgDados, setMsgDados] = useState({ texto: "", erro: false });
   const [, setTick] = useState(0);
   const [erroFundo, setErroFundo] = useState("");
@@ -2327,79 +2352,12 @@ function Checklist({ usuario }) {
           <span className={`ck-sync ck-sync-${sync}`} role="status" title="Sincronização com a nuvem">
             {{ salvando: "Salvando…", salvo: "Salvo", erro: "Sem conexão", conflito: "Conflito" }[sync] || ""}
           </span>
-          <button
-            type="button"
-            className="ck-icone"
-            onClick={() => setDadosAberto((v) => !v)}
-            aria-expanded={dadosAberto}
-            title="Conta e backup"
-            aria-label="Conta, exportar e importar"
-          >
-            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round">
-              <path d="M5 13V3M5 3L2.5 5.5M5 3l2.5 2.5" />
-              <path d="M11 3v10M11 13l-2.5-2.5M11 13l2.5-2.5" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            className="ck-icone"
-            onClick={() => setAjustes((v) => !v)}
-            aria-expanded={ajustes}
-            title="Imagem de fundo"
-            aria-label="Imagem de fundo"
-          >
-            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round">
-              <rect x="1.8" y="2.8" width="12.4" height="10.4" rx="2" />
-              <circle cx="5.4" cy="6.2" r="1.2" />
-              <path d="M2.5 12l3.8-3.6 2.7 2.4 2-1.8 2.5 2.2" />
-            </svg>
-          </button>
-          <button
-            type="button"
-            className="ck-icone"
-            onClick={sair}
-            title={`Sair da conta (${usuario.email})`}
-            aria-label="Sair da conta"
-          >
-            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round">
-              <path d="M6.5 2.5H4a1.5 1.5 0 0 0-1.5 1.5v8A1.5 1.5 0 0 0 4 13.5h2.5" />
-              <path d="M10 5l3 3-3 3M13 8H6.5" />
-            </svg>
+
+          <button type="button" className="ck-icone" onClick={() => setPagina("configuracoes")} title="Configurações" aria-label="Abrir configurações">
+            <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6.5 1.8h3l.4 1.7a5 5 0 0 1 1.2.7l1.7-.5 1.5 2.6-1.3 1.2v1.4l1.3 1.2-1.5 2.6-1.7-.5a5 5 0 0 1-1.2.7l-.4 1.7h-3l-.4-1.7a5 5 0 0 1-1.2-.7l-1.7.5-1.5-2.6L3 8.9V7.5L1.7 6.3l1.5-2.6 1.7.5a5 5 0 0 1 1.2-.7z"/><circle cx="8" cy="8.2" r="2.1"/></svg>
           </button>
           </div>
         </div>
-        {ajustes && (
-          <div className="ck-ajustes">
-            <span className="ck-ajuste" role="group" aria-label="Tema">
-              {[["escuro", "Tema escuro"], ["claro", "Tema claro"]].map(([v, nome]) => (
-                <button key={v} type="button" className={`secundario ck-ajuste-btn${tema === v ? " ativo" : ""}`} aria-pressed={tema === v} onClick={() => setTema(v)}>
-                  {nome}
-                </button>
-              ))}
-            </span>
-            <label className="ck-arquivo">
-              <input type="file" accept="image/*" onChange={escolherFundo} />
-              <span>Trocar imagem</span>
-            </label>
-            <label className="ck-desfoque">
-              Desfoque
-              <input type="range" min="0" max="20" value={desfoque} onChange={(e) => setDesfoque(Number(e.target.value))} />
-              <span>{desfoque}px</span>
-            </label>
-            <span className="ck-ajuste" role="group" aria-label="Ajuste da imagem">
-              {[["preencher", "Preencher", "Cobre a tela toda (corta as bordas se a proporção for diferente)"], ["inteira", "Inteira", "Mostra a imagem inteira, sem cortar"]].map(([v, nome, dica]) => (
-                <button key={v} type="button" className={`secundario ck-ajuste-btn${ajusteFundo === v ? " ativo" : ""}`} aria-pressed={ajusteFundo === v} title={dica} onClick={() => setAjusteFundo(v)}>
-                  {nome}
-                </button>
-              ))}
-            </span>
-            {fundo && (
-              <button type="button" className="secundario" onClick={removerFundo}>Voltar ao padrão</button>
-            )}
-            {erroFundo && <p className="ck-erro">{erroFundo}</p>}
-            <small>A imagem fica salva só neste navegador.</small>
-          </div>
-        )}
         {sync === "conflito" && (
           <div className="ck-conflito" role="alert">
             <p>Essas tarefas foram alteradas em outro lugar. Qual versão você quer manter?</p>
@@ -2409,25 +2367,31 @@ function Checklist({ usuario }) {
             </div>
           </div>
         )}
-        {dadosAberto && (
-          <div className="ck-ajustes">
-            <span className="ck-conta">{usuario.email}</span>
-            <button type="button" className="secundario" onClick={sair}>Sair</button>
-            <button type="button" className="secundario" onClick={exportarDados}>Exportar</button>
-            <label className="ck-arquivo">
-              <input type="file" accept=".json,application/json" onChange={importarDados} />
-              <span>Importar</span>
-            </label>
-            {msgDados.texto && <p className={msgDados.erro ? "ck-erro" : undefined} style={msgDados.erro ? undefined : { flex: "1 1 100%", margin: 0, fontSize: 12, color: "var(--suave)" }}>{msgDados.texto}</p>}
-            <small>Suas tarefas já ficam salvas na nuvem; exportar gera um backup (.json). Importar substitui o que estiver aqui e também vai pra nuvem.</small>
-          </div>
-        )}
+
       </header>
 
       <div className="ck-abas ck-abas-principais" role="tablist" aria-label="Área principal">
         <button type="button" role="tab" className="ck-aba" aria-selected={pagina === "tarefas"} onClick={() => setPagina("tarefas")}>Checklist</button>
         <button type="button" role="tab" className="ck-aba" aria-selected={pagina === "anotacoes"} onClick={() => setPagina("anotacoes")}>Anotações</button>
       </div>
+      {pagina === "configuracoes" && <section className="ck-configuracoes">
+        <div className="ck-config-titulo"><h2>Configurações</h2><button type="button" className="secundario" onClick={() => setPagina("tarefas")}>Voltar para o início</button></div>
+        <div className="ck-abas" role="tablist" aria-label="Categorias de configurações">
+          <button type="button" role="tab" className="ck-aba" aria-selected={abaConfiguracoes === "preferencias"} onClick={() => setAbaConfiguracoes("preferencias")}>Preferências</button>
+          <button type="button" role="tab" className="ck-aba" aria-selected={abaConfiguracoes === "conta"} onClick={() => setAbaConfiguracoes("conta")}>Conta</button>
+        </div>
+        {abaConfiguracoes === "preferencias" ? <ConfiguracoesVisuais tema={tema} setTema={setTema} desfoque={desfoque} setDesfoque={setDesfoque} ajusteFundo={ajusteFundo} setAjusteFundo={setAjusteFundo} escolherFundo={escolherFundo} fundo={fundo} removerFundo={removerFundo} erroFundo={erroFundo} /> : <section className="ck-conta-config">
+          <h3>Conta</h3>
+          <p className="ck-conta">{usuario.email}</p>
+          <div className="ck-ajustes">
+            <button type="button" className="secundario" onClick={exportarDados}>Exportar backup</button>
+            <label className="ck-arquivo"><input type="file" accept=".json,application/json" onChange={importarDados} /><span>Importar backup</span></label>
+            {msgDados.texto && <p className={msgDados.erro ? "ck-erro" : undefined}>{msgDados.texto}</p>}
+            <small>Seus dados são sincronizados com a nuvem. O backup permite guardar ou importar uma cópia (.json).</small>
+          </div>
+          <button type="button" className="secundario ck-sair-conta" onClick={sair}>Sair da conta</button>
+        </section>}
+      </section>}
       {pagina === "tarefas" ? <>
       <div className="ck-barras-topo">
       {criandoSolta ? (
@@ -2450,10 +2414,10 @@ function Checklist({ usuario }) {
           className="ck-nova-divisao"
           onSubmit={criarGrupo}
           onBlur={(e) => {
-            if (!e.currentTarget.contains(e.relatedTarget)) {
+            fecharAoClicarFora(e, () => {
               setCriandoGrupo(false);
               setNomeGrupo("");
-            }
+            });
           }}
         >
           <input
@@ -2648,10 +2612,10 @@ function Checklist({ usuario }) {
           </>
         )}
       </section>
-      </> : <section className="ck-anotacoes">
+      </> : pagina === "anotacoes" ? <section className="ck-anotacoes">
         <div className="ck-barras-topo">
           {formAnotacao && !formAnotacao.id && (!formAnotacao.sessaoId || !sessoesAnotacoes.some((s) => s.id === formAnotacao.sessaoId)) ? <FormularioAnotacao form={formAnotacao} sessoes={sessoesAnotacoes} onSalvar={salvarAnotacao} onChange={setFormAnotacao} onCancelar={() => setFormAnotacao(null)} /> : <BarraMais rotulo="Adicionar anotação" atalho={ATALHO_TAREFA} onClick={() => abrirNovaAnotacao()} />}
-          {criandoSessaoAnotacao ? <form className="ck-nova-divisao" onSubmit={criarSessaoAnotacao} onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) { setCriandoSessaoAnotacao(false); setNomeSessaoAnotacao(""); } }}>
+          {criandoSessaoAnotacao ? <form className="ck-nova-divisao" onSubmit={criarSessaoAnotacao} onBlur={(e) => fecharAoClicarFora(e, () => { setCriandoSessaoAnotacao(false); setNomeSessaoAnotacao(""); })}>
             <input id="campo-sessao-anotacao" autoFocus value={nomeSessaoAnotacao} onChange={(e) => setNomeSessaoAnotacao(e.target.value)} placeholder="Nome da sessão (ex: Ideias)" aria-label="Nome da sessão de anotações" maxLength={60} onKeyDown={(e) => { if (e.key === "Escape") { setCriandoSessaoAnotacao(false); setNomeSessaoAnotacao(""); } }} />
             <button type="submit" disabled={!nomeSessaoAnotacao.trim()}>Criar</button>
           </form> : <BarraMais rotulo="Adicionar sessão" atalho={ATALHO_SESSAO} onClick={() => setCriandoSessaoAnotacao(true)} />}
@@ -2673,7 +2637,7 @@ function Checklist({ usuario }) {
         </section>)}
         {(anotacoes.some((a) => !a.sessaoId || !sessoesAnotacoes.some((s) => s.id === a.sessaoId)) || arrastando?.tipo === "anotacao") && <section className="ck-grupo"><h2 className={`ck-secao${ordem.sobre === "__sem_sessao__" && ordem.arrastando?.tipo === "anotacao" ? " alvo" : ""}`} {...alvoProps(ordem, "destinoAnotacoes", "__sem_sessao__", null)}>Sem sessão</h2>{anotacoes.filter((a) => !a.sessaoId || !sessoesAnotacoes.some((s) => s.id === a.sessaoId)).map((a) => <article className={`ck-anotacao${ordem.sobre === a.id && ordem.arrastando?.tipo === "anotacao" ? " alvo" : ""}`} key={a.id} {...alvoProps(ordem, "anotacao", a.id, null)}><Alca id={a.id} tipo="anotacao" grupo={null} ordem={ordem} imagem=".ck-anotacao" /><div className="ck-anotacao-corpo"><div><strong>{a.titulo}</strong><time>{new Date(`${a.data}T00:00`).toLocaleDateString("pt-BR")}</time></div>{a.texto && !descricoesAnotacaoFechadas[a.id] && <p>{a.texto}</p>}</div>{a.texto && <ToggleDescricao fechada={descricoesAnotacaoFechadas[a.id]} onClick={() => setDescricoesAnotacaoFechadas((atual) => ({ ...atual, [a.id]: !atual[a.id] }))} />}<button type="button" className="ck-icone" title="Editar anotação" aria-label={`Editar ${a.titulo}`} onClick={() => setFormAnotacao({ ...a })}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" /></svg></button><button type="button" className="ck-apagar" onClick={() => setAnotacoes((xs) => xs.filter((x) => x.id !== a.id))}>Apagar</button></article>)}</section>}
         {!formAnotacao && anotacoes.length === 0 && sessoesAnotacoes.length === 0 && <p className="ck-vazio">Adicione uma anotação ou crie uma sessão.</p>}
-      </section>}
+      </section> : null}
 
       <footer className="ck-rodape">
         <span>
