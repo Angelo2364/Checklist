@@ -1122,6 +1122,7 @@ function NovaTarefa({ onAdd, placeholder, onFechar, idCampo }) {
 /* Alça com bolinhas: arraste ou use as setas ↑ ↓ com ela em foco */
 function Alca({ id, tipo, grupo, ordem, imagem }) {
   return (
+    <>
     <span
       role="button"
       tabIndex={0}
@@ -1149,6 +1150,11 @@ function Alca({ id, tipo, grupo, ordem, imagem }) {
         {[3, 8, 13].map((y) => [2.5, 7.5].map((x) => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.4" />))}
       </svg>
     </span>
+    <span className="ck-mover-mobile" aria-label="Mover item">
+      <button type="button" aria-label="Mover para cima" title="Mover para cima" onClick={() => ordem.moverPor(tipo, id, -1, grupo)}>↑</button>
+      <button type="button" aria-label="Mover para baixo" title="Mover para baixo" onClick={() => ordem.moverPor(tipo, id, 1, grupo)}>↓</button>
+    </span>
+    </>
   );
 }
 
