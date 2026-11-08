@@ -2498,3 +2498,155 @@ body {
 :root[data-tema="claro"] .com-fundo .ck-anotacoes .ck-grupo > .ck-secao {
   background: color-mix(in srgb, var(--grupo-bg) 56%, transparent);
 }
+
+/* Guia interativo de primeira visita */
+.ck-tutorial {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  pointer-events: none;
+}
+
+.ck-tutorial-bloqueio {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: rgba(15, 12, 27, 0.68);
+  cursor: default;
+  pointer-events: auto;
+}
+
+.ck-tutorial.com-foco .ck-tutorial-bloqueio {
+  background: transparent;
+}
+
+.ck-tutorial-foco {
+  position: fixed;
+  z-index: 1;
+  border: 2px solid rgba(255, 255, 255, 0.96);
+  border-radius: 14px;
+  box-shadow: 0 0 0 9999px rgba(15, 12, 27, 0.68), 0 0 24px rgba(151, 207, 255, 0.45);
+  pointer-events: none;
+  transition: top 0.2s ease, left 0.2s ease, width 0.2s ease, height 0.2s ease;
+}
+
+.ck-tutorial-cartao {
+  position: fixed;
+  z-index: 2;
+  width: min(420px, calc(100vw - 28px));
+  max-height: calc(100vh - 28px);
+  overflow: auto;
+  padding: 20px;
+  border: 1px solid color-mix(in srgb, var(--azul-forte) 28%, var(--linha));
+  border-radius: 18px;
+  color: var(--tinta);
+  background: color-mix(in srgb, var(--fundo) 94%, transparent);
+  box-shadow: 0 18px 60px rgba(10, 8, 22, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  -webkit-backdrop-filter: blur(24px) saturate(1.45);
+  backdrop-filter: blur(24px) saturate(1.45);
+  pointer-events: auto;
+}
+
+.ck-tutorial-progresso {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  color: var(--suave);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ck-tutorial-progresso button {
+  padding: 4px 7px;
+  border: 0;
+  color: var(--suave);
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+.ck-tutorial-progresso button:hover {
+  color: var(--azul-forte);
+}
+
+.ck-tutorial-cartao h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+.ck-tutorial-cartao > p {
+  margin: 0;
+  color: color-mix(in srgb, var(--tinta) 82%, var(--suave));
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.ck-tutorial-acoes {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.ck-tutorial-legenda {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 15px;
+  padding: 10px 12px;
+  border: 1px solid var(--linha);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--fundo-hover) 72%, transparent);
+}
+
+.ck-tutorial-exemplo {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--suave);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ck-tutorial-concluir,
+.ck-tutorial-prioridade,
+.ck-tutorial-cores i {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  border: 2px solid var(--suave);
+  border-radius: 50%;
+}
+
+.ck-tutorial-prioridade,
+.ck-tutorial-cores i:nth-child(3) {
+  border: 0;
+  background: var(--prio-verde);
+}
+
+.ck-tutorial-cores {
+  display: inline-flex;
+  gap: 5px;
+  margin-left: auto;
+}
+
+.ck-tutorial-cores i:nth-child(2) { background: var(--prio-amarelo); }
+.ck-tutorial-cores i:nth-child(3) { background: var(--prio-vermelho); }
+
+@media (max-width: 600px) {
+  .ck-tutorial-cartao {
+    padding: 18px;
+    border-radius: 16px;
+  }
+
+  .ck-tutorial-cartao h2 { font-size: 18px; }
+}

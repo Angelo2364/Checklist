@@ -1416,6 +1416,7 @@ function ListaTarefas({ tarefas, alternar, apagar, mudarPrioridade, ordem, edica
           <button
             type="button"
             className={`ck-prio p${t.prioridade || 0}`}
+            data-tutorial="prioridade"
             onClick={() => mudarPrioridade(t.id)}
             title={`${PRIORIDADES[t.prioridade || 0].nome} (clique para trocar)`}
             aria-label={`Prioridade: ${PRIORIDADES[t.prioridade || 0].nome}. Clique para trocar.`}
@@ -1450,7 +1451,7 @@ function FormularioAnotacao({ form, onSalvar, onChange, onCancelar }) {
   );
 }
 
-function ConfiguracoesVisuais({ tema, setTema, desfoque, setDesfoque, ajusteFundo, setAjusteFundo, escolherFundo, fundo, removerFundo, erroFundo, janelaAvisos, setJanelaAvisos }) {
+function ConfiguracoesVisuais({ tema, setTema, desfoque, setDesfoque, ajusteFundo, setAjusteFundo, escolherFundo, fundo, removerFundo, erroFundo, janelaAvisos, setJanelaAvisos, iniciarTutorial }) {
   return <div className="ck-config-preferencias">
     <section className="ck-pref-card">
       <h3>Tema</h3>
@@ -1458,6 +1459,11 @@ function ConfiguracoesVisuais({ tema, setTema, desfoque, setDesfoque, ajusteFund
       <span className="ck-ajuste ck-ajuste-segmentado" role="group" aria-label="Tema">
         {[['escuro', 'Tema escuro'], ['claro', 'Tema claro']].map(([v, nome]) => <button key={v} type="button" className={`secundario ck-ajuste-btn${tema === v ? ' ativo' : ''}`} aria-pressed={tema === v} onClick={() => setTema(v)}>{nome}</button>)}
       </span>
+    </section>
+    <section className="ck-pref-card">
+      <h3>Guia rápido</h3>
+      <p>Veja novamente onde ficam os principais recursos do Crysalis.</p>
+      <button type="button" className="secundario" onClick={iniciarTutorial}>Rever tutorial</button>
     </section>
     <section className="ck-pref-card">
       <h3>Horário dos lembretes</h3>
@@ -1491,7 +1497,112 @@ function ConfiguracoesVisuais({ tema, setTema, desfoque, setDesfoque, ajusteFund
   </div>;
 }
 
+const ETAPAS_TUTORIAL = [
+  {
+    titulo: "Boas-vindas ao Crysalis!",
+    texto: "Este guia rápido mostra onde ficam os recursos principais. Você pode sair quando quiser pelo botão no alto e rever depois em Configurações.",
+  },
+  {
+    alvo: '[data-tutorial="abas"]',
+    titulo: "Checklist e anotações",
+    texto: "Alterne entre suas tarefas e suas anotações por estas abas. As duas áreas permitem organizar os itens em sessões.",
+  },
+  {
+    alvo: '[data-tutorial="criar"]',
+    titulo: "Crie e organize",
+    texto: "Use Adicionar tarefa e Adicionar sessão. Também dá para criar uma tarefa dentro de uma sessão pelo botão + dela. No teclado, Ctrl+F cria um item e Ctrl+D cria uma sessão.",
+  },
+  {
+    alvo: '[data-tutorial="prioridade"]',
+    alternativa: '[data-tutorial="criar"]',
+    titulo: "Concluir e priorizar",
+    texto: "O círculo à esquerda da tarefa marca se ela foi concluída. A bolinha colorida à direita define a prioridade: toque nela para alternar entre tranquila, média e urgente.",
+    legenda: true,
+  },
+  {
+    alvo: '[data-tutorial="painel-lateral"]',
+    titulo: "Agenda, rotinas e contas",
+    texto: "Abaixo do calendário ficam as abas de Rotinas e Contas. No celular, é só rolar a página para encontrar esse painel.",
+  },
+  {
+    alvo: ".ck-cal",
+    titulo: "Eventos e Google Agenda",
+    texto: "Escolha um dia e adicione um evento ao calendário. Depois, clique no botão Google ao lado dele: o Google Agenda vai abrir com os dados já preenchidos. Lá, é só clicar em Salvar.",
+  },
+];
+
+function TutorialGuia({ onEncerrar }) {
+  const [indice, setIndice] = useState(0);
+  const [foco, setFoco] = useState(null);
+  const [posicao, setPosicao] = useState({ top: 16, left: 16 });
+  const cartaoRef = useRef(null);
+  const etapa = ETAPAS_TUTORIAL[indice];
+
+  useEffect(() => {
+    let alvo = etapa.alvo ? document.querySelector(etapa.alvo) : null;
+    if (!alvo && etapa.alternativa) alvo = document.querySelector(etapa.alternativa);
+
+    const atualizar = () => {
+      if (!alvo) {
+        setFoco(null);
+        return;
+      }
+      const r = alvo.getBoundingClientRect();
+      setFoco({ top: r.top - 6, left: r.left - 6, width: r.width + 12, height: r.height + 12 });
+    };
+
+    if (alvo) alvo.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+    const espera = window.setTimeout(atualizar, alvo ? 350 : 0);
+    window.addEventListener("resize", atualizar);
+    window.addEventListener("scroll", atualizar, true);
+    return () => {
+      window.clearTimeout(espera);
+      window.removeEventListener("resize", atualizar);
+      window.removeEventListener("scroll", atualizar, true);
+    };
+  }, [indice, etapa]);
+
+  useEffect(() => {
+    const largura = Math.min(420, window.innerWidth - 28);
+    const altura = cartaoRef.current?.getBoundingClientRect().height || 260;
+    const limitar = (valor, minimo, maximo) => Math.min(Math.max(valor, minimo), Math.max(minimo, maximo));
+    const left = foco
+      ? limitar(foco.left + foco.width / 2 - largura / 2, 14, window.innerWidth - largura - 14)
+      : (window.innerWidth - largura) / 2;
+    let top = (window.innerHeight - altura) / 2;
+    if (foco) {
+      const abaixo = foco.top + foco.height + 16;
+      top = abaixo + altura <= window.innerHeight - 14 ? abaixo : foco.top - altura - 16;
+      top = limitar(top, 14, window.innerHeight - altura - 14);
+    }
+    setPosicao({ top, left });
+  }, [foco, indice]);
+
+  return <div className={`ck-tutorial${foco ? " com-foco" : " sem-foco"}`}>
+    <div className="ck-tutorial-bloqueio" aria-hidden="true" />
+    {foco && <div className="ck-tutorial-foco" aria-hidden="true" style={{ top: foco.top, left: foco.left, width: foco.width, height: foco.height }} />}
+    <section className="ck-tutorial-cartao" role="dialog" aria-modal="true" aria-labelledby="ck-tutorial-titulo" ref={cartaoRef} style={{ top: posicao.top, left: posicao.left }}>
+      <div className="ck-tutorial-progresso"><span>{indice + 1} de {ETAPAS_TUTORIAL.length}</span><button type="button" onClick={onEncerrar}>Sair do tutorial</button></div>
+      <h2 id="ck-tutorial-titulo" aria-live="polite">{etapa.titulo}</h2>
+      <p>{etapa.texto}</p>
+      {etapa.legenda && <div className="ck-tutorial-legenda" aria-label="Exemplo dos controles da tarefa">
+        <span className="ck-tutorial-exemplo"><i className="ck-tutorial-concluir" />Concluir</span>
+        <span className="ck-tutorial-exemplo"><i className="ck-tutorial-prioridade" />Prioridade</span>
+        <span className="ck-tutorial-cores" aria-hidden="true"><i /><i /><i /></span>
+      </div>}
+      <div className="ck-tutorial-acoes">
+        {indice > 0 && <button type="button" className="secundario" onClick={() => setIndice((n) => n - 1)}>Voltar</button>}
+        <button type="button" onClick={() => indice === ETAPAS_TUTORIAL.length - 1 ? onEncerrar() : setIndice((n) => n + 1)} autoFocus>
+          {indice === ETAPAS_TUTORIAL.length - 1 ? "Concluir" : "Próximo"}
+        </button>
+      </div>
+    </section>
+  </div>;
+}
+
 function Checklist({ usuario }) {
+  const chaveTutorial = `checklist:tutorial:v1:${usuario.id}`;
+  const [tutorialAtivo, setTutorialAtivo] = useState(() => !lerStorage(chaveTutorial, false));
   const [tarefas, setTarefas] = useState(() => lerStorage(STORAGE_TASKS, []));
   const [grupos, setGrupos] = useState(() => lerStorage(STORAGE_GROUPS, []));
   const [eventos, setEventos] = useState(() => lerStorage(STORAGE_EVENTS, []));
@@ -2466,6 +2577,15 @@ function Checklist({ usuario }) {
   }
 
   const ativo = notificar && permissao === "granted";
+  function encerrarTutorial() {
+    salvarStorage(chaveTutorial, true);
+    setTutorialAtivo(false);
+  }
+  function iniciarTutorial() {
+    setPagina("tarefas");
+    setAbaConfiguracoes("preferencias");
+    setTutorialAtivo(true);
+  }
 
   // enquanto a nuvem não responde, não mostra nem deixa editar (evita sobrescrever com dados velhos)
   if (!nuvemPronta) {
@@ -2511,7 +2631,7 @@ function Checklist({ usuario }) {
             {{ salvando: "Salvando…", salvo: "Salvo", erro: "Sem conexão", conflito: "Conflito" }[sync] || ""}
           </span>
 
-          <button type="button" className="ck-icone" onClick={() => setPagina("configuracoes")} title="Configurações" aria-label="Abrir configurações">
+          <button type="button" className="ck-icone" data-tutorial="configuracoes" onClick={() => setPagina("configuracoes")} title="Configurações" aria-label="Abrir configurações">
             <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6.5 1.8h3l.4 1.7a5 5 0 0 1 1.2.7l1.7-.5 1.5 2.6-1.3 1.2v1.4l1.3 1.2-1.5 2.6-1.7-.5a5 5 0 0 1-1.2.7l-.4 1.7h-3l-.4-1.7a5 5 0 0 1-1.2-.7l-1.7.5-1.5-2.6L3 8.9V7.5L1.7 6.3l1.5-2.6 1.7.5a5 5 0 0 1 1.2-.7z"/><circle cx="8" cy="8.2" r="2.1"/></svg>
           </button>
           </div>
@@ -2528,7 +2648,7 @@ function Checklist({ usuario }) {
 
       </header>
 
-      <div className="ck-abas ck-abas-principais" role="tablist" aria-label="Área principal">
+      <div className="ck-abas ck-abas-principais" role="tablist" aria-label="Área principal" data-tutorial="abas">
         <button type="button" role="tab" className="ck-aba" aria-selected={pagina === "tarefas"} onClick={() => setPagina("tarefas")}>Checklist</button>
         <button type="button" role="tab" className="ck-aba" aria-selected={pagina === "anotacoes"} onClick={() => setPagina("anotacoes")}>Anotações</button>
       </div>
@@ -2538,7 +2658,7 @@ function Checklist({ usuario }) {
           <button type="button" role="tab" className="ck-aba" aria-selected={abaConfiguracoes === "preferencias"} onClick={() => setAbaConfiguracoes("preferencias")}>Preferências</button>
           <button type="button" role="tab" className="ck-aba" aria-selected={abaConfiguracoes === "conta"} onClick={() => setAbaConfiguracoes("conta")}>Conta</button>
         </div>
-        {abaConfiguracoes === "preferencias" ? <ConfiguracoesVisuais tema={tema} setTema={setTema} desfoque={desfoque} setDesfoque={setDesfoque} ajusteFundo={ajusteFundo} setAjusteFundo={setAjusteFundo} escolherFundo={escolherFundo} fundo={fundo} removerFundo={removerFundo} erroFundo={erroFundo} janelaAvisos={janelaAvisos} setJanelaAvisos={setJanelaAvisos} /> : <section className="ck-conta-config">
+        {abaConfiguracoes === "preferencias" ? <ConfiguracoesVisuais tema={tema} setTema={setTema} desfoque={desfoque} setDesfoque={setDesfoque} ajusteFundo={ajusteFundo} setAjusteFundo={setAjusteFundo} escolherFundo={escolherFundo} fundo={fundo} removerFundo={removerFundo} erroFundo={erroFundo} janelaAvisos={janelaAvisos} setJanelaAvisos={setJanelaAvisos} iniciarTutorial={iniciarTutorial} /> : <section className="ck-conta-config">
           <div className="ck-conta-identidade"><span className="ck-conta-avatar" aria-hidden="true">{(usuario.email || "?").slice(0, 1).toUpperCase()}</span><div><small>Conta conectada</small><strong>{usuario.email}</strong></div></div>
           <button type="button" className="ck-sair-conta" onClick={sair}><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"><path d="M6.5 2.5H4a1.5 1.5 0 0 0-1.5 1.5v8A1.5 1.5 0 0 0 4 13.5h2.5"/><path d="M10 5l3 3-3 3M13 8H6.5"/></svg>Sair da conta</button>
           <div className="ck-backup-card">
@@ -2554,7 +2674,7 @@ function Checklist({ usuario }) {
         </section>}
       </section>}
       {pagina === "tarefas" ? <>
-      <div className="ck-barras-topo">
+      <div className="ck-barras-topo" data-tutorial="criar">
       {criandoSolta ? (
         <NovaTarefa
           idCampo="campo-tarefa"
@@ -2809,13 +2929,13 @@ function Checklist({ usuario }) {
         <span aria-hidden="true"> · </span>
         <Contato />
                 <span aria-hidden="true"> · </span>
-                <span aria-hidden="true"> V0.63 </span>
+                <span aria-hidden="true"> V0.65 </span>
       </footer>
     </main>
 
     <aside className="ck-lateral">
       <Calendario eventos={eventos} adicionar={adicionarEvento} editar={editarEvento} apagar={apagarEvento} />
-      <section className="ck-painel">
+      <section className="ck-painel" data-tutorial="painel-lateral">
         <div className="ck-abas" role="tablist">
           <button type="button" role="tab" className="ck-aba" aria-selected={aba === "rotinas"} onClick={() => setAba("rotinas")}>
             Rotinas
@@ -2832,6 +2952,7 @@ function Checklist({ usuario }) {
         )}
       </section>
     </aside>
+    {tutorialAtivo && <TutorialGuia onEncerrar={encerrarTutorial} />}
     </div>
   );
 }

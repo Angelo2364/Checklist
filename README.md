@@ -42,6 +42,7 @@ Entre com sua conta para sincronizar seus dados com a nuvem e continuar de onde 
 
 - Layout responsivo para celular e desktop.
 - Pode ser instalado como **PWA** em navegadores compatíveis.
+- Guia interativo na primeira visita, com opção de pular e rever pelas configurações.
 - No celular, reordene tarefas e anotações com toque longo e arraste.
 - Use `Enter` para confirmar uma tarefa ou anotação e `Shift + Enter` para pular uma linha no texto.
 - Atalhos: `Ctrl + F` para abrir a criação de tarefa/anotação e `Ctrl + D` para abrir a criação de sessão. No Mac, use `⌘` no lugar de `Ctrl`.
