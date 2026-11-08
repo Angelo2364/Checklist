@@ -162,6 +162,7 @@ function Hora24({ value, onChange, rotulo, opcional }) {
   useEffect(() => {
     if (value !== juntar(h, m)) {
       const [a, b] = value ? value.split(":") : ["", ""];
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setH(a);
       setM(b);
     }
@@ -335,6 +336,7 @@ function DiaMes({ value, onChange }) {
 
   useEffect(() => {
     if (value !== calcular(d, m)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setD(value ? value.slice(8, 10) : "");
       setM(value ? value.slice(5, 7) : "");
     }
@@ -1353,19 +1355,27 @@ function FormularioAnotacao({ form, sessoes, onSalvar, onChange, onCancelar }) {
 }
 
 function ConfiguracoesVisuais({ tema, setTema, desfoque, setDesfoque, ajusteFundo, setAjusteFundo, escolherFundo, fundo, removerFundo, erroFundo }) {
-  return <div className="ck-ajustes ck-config-ajustes">
-    <h2>Aparência</h2>
-    <span className="ck-ajuste" role="group" aria-label="Tema">
-      {[['escuro', 'Tema escuro'], ['claro', 'Tema claro']].map(([v, nome]) => <button key={v} type="button" className={`secundario ck-ajuste-btn${tema === v ? ' ativo' : ''}`} aria-pressed={tema === v} onClick={() => setTema(v)}>{nome}</button>)}
-    </span>
-    <label className="ck-arquivo"><input type="file" accept="image/*" onChange={escolherFundo} /><span>Trocar imagem</span></label>
-    <label className="ck-desfoque">Desfoque<input type="range" min="0" max="20" value={desfoque} onChange={(e) => setDesfoque(Number(e.target.value))} /><span>{desfoque}px</span></label>
-    <span className="ck-ajuste" role="group" aria-label="Ajuste da imagem">
-      {[['preencher', 'Preencher', 'Cobre a tela toda (corta as bordas se a proporção for diferente)'], ['inteira', 'Inteira', 'Mostra a imagem inteira, sem cortar']].map(([v, nome, dica]) => <button key={v} type="button" className={`secundario ck-ajuste-btn${ajusteFundo === v ? ' ativo' : ''}`} aria-pressed={ajusteFundo === v} title={dica} onClick={() => setAjusteFundo(v)}>{nome}</button>)}
-    </span>
-    {fundo && <button type="button" className="secundario" onClick={removerFundo}>Voltar ao padrão</button>}
-    {erroFundo && <p className="ck-erro">{erroFundo}</p>}
-    <small>A imagem fica salva só neste navegador.</small>
+  return <div className="ck-config-preferencias">
+    <section className="ck-pref-card">
+      <h3>Tema</h3>
+      <p>Escolha como a checklist aparece neste navegador.</p>
+      <span className="ck-ajuste ck-ajuste-segmentado" role="group" aria-label="Tema">
+        {[['escuro', 'Tema escuro'], ['claro', 'Tema claro']].map(([v, nome]) => <button key={v} type="button" className={`secundario ck-ajuste-btn${tema === v ? ' ativo' : ''}`} aria-pressed={tema === v} onClick={() => setTema(v)}>{nome}</button>)}
+      </span>
+    </section>
+    <section className="ck-pref-card">
+      <h3>Imagem de fundo</h3>
+      <p>A imagem e o desfoque ficam salvos só neste navegador.</p>
+      <label className="ck-arquivo"><input type="file" accept="image/*" onChange={escolherFundo} /><span>Escolher imagem</span></label>
+      <label className="ck-desfoque">
+        <span>Desfoque</span><input type="range" min="0" max="20" value={desfoque} style={{ "--ck-range-progresso": `${desfoque * 5}%` }} onChange={(e) => setDesfoque(Number(e.target.value))} /><output>{desfoque}px</output>
+      </label>
+      <div className="ck-pref-encaixe"><strong>Encaixe da imagem</strong><span className="ck-ajuste ck-ajuste-segmentado" role="group" aria-label="Ajuste da imagem">
+        {[['preencher', 'Preencher', 'Cobre a tela toda (corta as bordas se a proporção for diferente)'], ['inteira', 'Inteira', 'Mostra a imagem inteira, sem cortar']].map(([v, nome, dica]) => <button key={v} type="button" className={`secundario ck-ajuste-btn${ajusteFundo === v ? ' ativo' : ''}`} aria-pressed={ajusteFundo === v} title={dica} onClick={() => setAjusteFundo(v)}>{nome}</button>)}
+      </span></div>
+      {fundo && <button type="button" className="secundario" onClick={removerFundo}>Voltar ao padrão</button>}
+      {erroFundo && <p className="ck-erro">{erroFundo}</p>}
+    </section>
   </div>;
 }
 
@@ -1461,6 +1471,8 @@ function Checklist({ usuario }) {
   // carga inicial: a nuvem manda; conta nova sobe o que já existir neste aparelho
   useEffect(() => {
     let cancelado = false;
+    // Mostra o estado de carga imediatamente ao trocar de conta ou tentar novamente.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSync("carregando");
     (async () => {
       try {
@@ -1498,7 +1510,6 @@ function Checklist({ usuario }) {
     return () => {
       cancelado = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usuario.id, tentativa]);
 
   async function salvarNaNuvem(forcar = false) {
@@ -1565,7 +1576,6 @@ function Checklist({ usuario }) {
       document.removeEventListener("visibilitychange", conferir);
       window.removeEventListener("focus", conferir);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nuvemPronta, usuario.id]);
 
   async function usarDaNuvem() {
@@ -1889,7 +1899,6 @@ function Checklist({ usuario }) {
       clearInterval(id);
       document.removeEventListener("visibilitychange", checar);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notificar, permissao, intervaloAviso, pushAtivo]);
 
   function mudarIntervalo(minutos) {
@@ -1903,6 +1912,8 @@ function Checklist({ usuario }) {
   useEffect(() => {
     if (!notificar || permissao !== "granted") return;
     if (!pushSuportado()) {
+      // O aparelho não recebe push; atualiza o estado visual antes de retornar.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setPushAtivo(false);
       setAvisoPush(`${motivoSemPush()} Os lembretes só chegam com o app aberto.`);
       return;
@@ -2381,15 +2392,18 @@ function Checklist({ usuario }) {
           <button type="button" role="tab" className="ck-aba" aria-selected={abaConfiguracoes === "conta"} onClick={() => setAbaConfiguracoes("conta")}>Conta</button>
         </div>
         {abaConfiguracoes === "preferencias" ? <ConfiguracoesVisuais tema={tema} setTema={setTema} desfoque={desfoque} setDesfoque={setDesfoque} ajusteFundo={ajusteFundo} setAjusteFundo={setAjusteFundo} escolherFundo={escolherFundo} fundo={fundo} removerFundo={removerFundo} erroFundo={erroFundo} /> : <section className="ck-conta-config">
-          <h3>Conta</h3>
-          <p className="ck-conta">{usuario.email}</p>
-          <div className="ck-ajustes">
-            <button type="button" className="secundario" onClick={exportarDados}>Exportar backup</button>
-            <label className="ck-arquivo"><input type="file" accept=".json,application/json" onChange={importarDados} /><span>Importar backup</span></label>
-            {msgDados.texto && <p className={msgDados.erro ? "ck-erro" : undefined}>{msgDados.texto}</p>}
-            <small>Seus dados são sincronizados com a nuvem. O backup permite guardar ou importar uma cópia (.json).</small>
+          <div className="ck-conta-identidade"><span className="ck-conta-avatar" aria-hidden="true">{(usuario.email || "?").slice(0, 1).toUpperCase()}</span><div><small>Conta conectada</small><strong>{usuario.email}</strong></div></div>
+          <button type="button" className="ck-sair-conta" onClick={sair}><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"><path d="M6.5 2.5H4a1.5 1.5 0 0 0-1.5 1.5v8A1.5 1.5 0 0 0 4 13.5h2.5"/><path d="M10 5l3 3-3 3M13 8H6.5"/></svg>Sair da conta</button>
+          <div className="ck-backup-card">
+            <h3>Backups</h3>
+            <p>Exporte uma cópia dos seus dados ou importe um arquivo de backup.</p>
+            <div className="ck-backup-acoes">
+              <button type="button" className="secundario" onClick={exportarDados}>Exportar backup</button>
+              <label className="ck-arquivo"><input type="file" accept=".json,application/json" onChange={importarDados} /><span>Importar backup</span></label>
+            </div>
+            {msgDados.texto && <p className={msgDados.erro ? "ck-erro" : "ck-msg-dados"}>{msgDados.texto}</p>}
+            <small>Os dados também são sincronizados com sua conta na nuvem.</small>
           </div>
-          <button type="button" className="secundario ck-sair-conta" onClick={sair}>Sair da conta</button>
         </section>}
       </section>}
       {pagina === "tarefas" ? <>

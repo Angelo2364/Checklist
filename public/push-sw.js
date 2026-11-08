@@ -3,7 +3,7 @@
 // este arquivo é anexado a ele pela opção workbox.importScripts do vite.config.js.
 
 self.addEventListener("push", (event) => {
-  let d = {};
+  let d;
   try {
     d = event.data ? event.data.json() : {};
   } catch {

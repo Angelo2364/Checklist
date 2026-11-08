@@ -1038,15 +1038,6 @@ a.ck-ev-mapa:hover {
   flex-direction: column;
 }
 
-.ck-ajustes {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 0 4px;
-}
-
-.ck-ajustes small,
 .ck-erro {
   flex: 1 1 100%;
   margin: 0;
@@ -1240,13 +1231,37 @@ a.ck-ev-mapa:hover {
 
 .ck-configuracoes { min-height: 320px; padding: 16px; }
 .ck-config-titulo { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
-.ck-config-titulo h2, .ck-config-ajustes h2 { margin: 0; font-size: 18px; }
-.ck-config-ajustes { padding: 0; border-top: 0; }
-.ck-conta-config { padding: 16px 0; }
-.ck-conta-config h3 { margin: 0 0 8px; }
-.ck-conta-config > .ck-conta { display: block; margin: 0 0 12px; }
-.ck-conta-config .ck-ajustes { padding: 0; }
-.ck-sair-conta { margin-top: 18px; }
+.ck-config-titulo h2 { margin: 0; font-size: 20px; }
+.ck-configuracoes > .ck-abas { margin-bottom: 18px; overflow: hidden; border: 1px solid var(--linha); border-top: 0; border-radius: 12px; background: color-mix(in srgb, var(--fundo-hover) 55%, transparent); }
+.ck-configuracoes > .ck-abas .ck-aba { border-right: 1px solid var(--linha); border-bottom: 0; }
+.ck-configuracoes > .ck-abas .ck-aba:last-child { border-right: 0; }
+.ck-configuracoes > .ck-abas .ck-aba[aria-selected="true"] { background: color-mix(in srgb, var(--rosa) 28%, transparent); box-shadow: inset 0 -3px var(--rosa); }
+.ck-config-preferencias { display: grid; gap: 14px; padding-top: 18px; }
+.ck-pref-card, .ck-conta-identidade, .ck-backup-card { padding: 16px; border: 1px solid var(--linha); border-radius: 14px; background: color-mix(in srgb, var(--fundo) 75%, var(--fundo-hover)); box-shadow: 0 3px 12px color-mix(in srgb, var(--tinta) 5%, transparent); }
+.ck-pref-card h3, .ck-backup-card h3 { margin: 0 0 5px; font-size: 15px; }
+.ck-pref-card > p, .ck-backup-card > p { margin: 0 0 14px; color: var(--suave); font-size: 13px; line-height: 1.5; }
+.ck-pref-card > .ck-ajuste, .ck-pref-card > .ck-arquivo { margin: 2px 0 8px; }
+.ck-ajuste-segmentado { display: inline-flex; width: fit-content; gap: 0; overflow: hidden; padding: 3px; border: 1px solid var(--linha); border-radius: 11px; background: color-mix(in srgb, var(--fundo-hover) 65%, transparent); }
+.ck-ajuste-segmentado .ck-ajuste-btn { border-color: transparent; border-radius: 8px; }
+.ck-ajuste-segmentado .ck-ajuste-btn + .ck-ajuste-btn { margin-left: 3px; }
+.ck-pref-card .ck-arquivo span { border-color: var(--linha); background: color-mix(in srgb, var(--fundo) 75%, transparent); }
+.ck-desfoque { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; width: 100%; margin: 12px 0 16px; color: var(--tinta); font-size: 13px; font-weight: 600; }
+.ck-desfoque input[type="range"] { width: 100%; height: 8px; margin: 0; appearance: none; border: 1px solid color-mix(in srgb, var(--azul-forte) 30%, var(--linha)); border-radius: 999px; background: linear-gradient(90deg, var(--azul-forte) var(--ck-range-progresso, 50%), color-mix(in srgb, var(--fundo-hover) 80%, var(--linha)) var(--ck-range-progresso, 50%)); cursor: pointer; }
+.ck-desfoque input[type="range"]::-webkit-slider-thumb { width: 18px; height: 18px; appearance: none; border: 2px solid var(--fundo); border-radius: 50%; background: var(--azul-forte); box-shadow: 0 1px 5px color-mix(in srgb, var(--tinta) 28%, transparent); }
+.ck-desfoque input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border: 2px solid var(--fundo); border-radius: 50%; background: var(--azul-forte); box-shadow: 0 1px 5px color-mix(in srgb, var(--tinta) 28%, transparent); }
+.ck-desfoque output { min-width: 40px; color: var(--suave); text-align: right; font-variant-numeric: tabular-nums; }
+.ck-pref-encaixe { display: grid; gap: 8px; margin-bottom: 10px; font-size: 13px; }
+.ck-conta-config { display: grid; gap: 14px; padding: 18px 0 0; }
+.ck-conta-identidade { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.ck-conta-avatar { display: grid; flex: none; place-items: center; width: 42px; height: 42px; border: 1px solid var(--linha); border-radius: 50%; color: var(--tinta); background: color-mix(in srgb, var(--rosa) 35%, var(--fundo)); font-weight: 800; }
+.ck-conta-identidade div { display: grid; min-width: 0; gap: 3px; }
+.ck-conta-identidade small, .ck-backup-card small { color: var(--suave); font-size: 12px; }
+.ck-conta-identidade strong { overflow-wrap: anywhere; font-size: 14px; }
+.ck-sair-conta { display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: fit-content; padding: 8px 14px; border: 1px solid color-mix(in srgb, var(--perigo) 45%, var(--linha)); border-radius: 10px; color: var(--perigo); background: color-mix(in srgb, var(--perigo) 7%, transparent); font: inherit; font-weight: 700; cursor: pointer; }
+.ck-sair-conta:hover { border-color: var(--perigo); background: color-mix(in srgb, var(--perigo) 14%, transparent); }
+.ck-backup-acoes { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ck-backup-card small { display: block; margin-top: 12px; }
+.ck-msg-dados { margin: 10px 0 0; color: var(--suave); font-size: 12px; }
 
 .ck-anotacoes { padding-bottom: 16px; }
 .ck-anotacoes .ck-nova-divisao { flex: 1 1 100%; }

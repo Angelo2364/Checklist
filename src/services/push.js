@@ -55,7 +55,7 @@ export async function ativarPush(userId, intervalo, reiniciar = false) {
         userVisibleOnly: true,
         applicationServerKey: chaveParaBytes(CHAVE_PUBLICA),
       });
-    } catch (err) {
+    } catch {
       // inscrição antiga feita com outra chave: limpa e tenta de novo
       const velha = await reg.pushManager.getSubscription();
       if (velha) await velha.unsubscribe();
