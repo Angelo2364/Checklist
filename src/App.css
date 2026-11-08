@@ -291,6 +291,16 @@ button.secundario:hover {
   border-color: transparent;
 }
 
+.ck-apagar-icone {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 50%;
+}
+
 .ck-vazio {
   margin: 0;
   padding: 48px 16px;
@@ -1049,6 +1059,63 @@ a.ck-ev-mapa:hover {
 .ck-contas .ck-lista label {
   gap: 10px;
   padding: 9px 12px;
+}
+
+.ck-contas .ck-resumo-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ck-resumo-cabecalho > div {
+  display: grid;
+  gap: 2px;
+}
+
+.ck-conta-adicionar {
+  width: 30px;
+  height: 30px;
+}
+
+.ck-grupo-topo .ck-apagar-icone {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+}
+
+.ck-lista li.ck-item-editando,
+.ck-rotinas li.ck-item-editando {
+  display: block;
+  padding: 8px 10px;
+}
+
+.ck-form-conta,
+.ck-form-rotina {
+  width: 100%;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--linha);
+  border-radius: 12px;
+}
+
+.ck-form-data {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--suave);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ck-form-data input {
+  min-width: 0;
+  padding: 7px 9px;
+  color: var(--tinta);
+  background: var(--fundo);
+  border: 1px solid var(--linha);
+  border-radius: 9px;
+  font: inherit;
 }
 
 .ck-contas .ck-conta-corpo {

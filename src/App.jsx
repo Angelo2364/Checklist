@@ -611,7 +611,7 @@ function Calendario({ eventos, adicionar, editar, apagar }) {
                 </svg>
               </button>
               <a className="ck-apagar" href={linkGoogle(e)} target="_blank" rel="noreferrer" title="Abrir no Google Agenda">Google</a>
-              <button type="button" className="ck-apagar" onClick={() => apagar(e.id)} aria-label={`Apagar ${e.titulo}`}>Apagar</button>
+              <BotaoApagar nome={`evento ${e.titulo}`} onClick={() => apagar(e.id)} />
             </li>
           ))}
         </ul>
@@ -751,14 +751,47 @@ function ValorConta({ conta, onSalvar }) {
   );
 }
 
+function BotaoApagar({ nome, onClick }) {
+  return <button type="button" className="ck-apagar ck-apagar-icone" onClick={onClick} title={`Apagar ${nome}`} aria-label={`Apagar ${nome}`}>
+    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="m4 4 8 8m0-8-8 8" /></svg>
+  </button>;
+}
+
+function FormularioConta({ conta, onSalvar, onCancelar }) {
+  const [nome, setNome] = useState(conta.nome);
+  const [valor, setValor] = useState(conta.valor ? String(conta.valor).replace(".", ",") : "");
+  const [dia, setDia] = useState(String(conta.dia));
+  const [parcelas, setParcelas] = useState(conta.total ? String(conta.total) : "");
+
+  function enviar(e) {
+    e.preventDefault();
+    if (!nome.trim()) return;
+    onSalvar({
+      nome: nome.trim(),
+      valor: lerValor(valor),
+      dia: Math.min(31, Math.max(1, Number(dia) || conta.dia)),
+      total: Math.max(0, Math.floor(Number(parcelas) || 0)),
+    });
+  }
+
+  return <form className="ck-form-grupo ck-form-conta" onSubmit={enviar} onBlur={(e) => fecharAoClicarFora(e, onCancelar)} onKeyDown={(e) => e.key === "Escape" && onCancelar()}>
+    <input autoFocus type="text" className="ck-campo-largo" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome da conta" aria-label="Nome da conta" maxLength={80} required />
+    <input type="text" inputMode="decimal" className="ck-num ck-num-v" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="Valor (R$)" aria-label="Valor da conta" />
+    <input type="number" className="ck-num" min="1" max="31" value={dia} onChange={(e) => setDia(e.target.value)} placeholder="Vence dia" aria-label="Dia do vencimento" />
+    <input type="number" className="ck-num ck-num-p" min="1" max="999" value={parcelas} onChange={(e) => setParcelas(e.target.value)} placeholder="Parcelas" aria-label="Número de parcelas" />
+    <span className="ck-edit-acoes"><button type="submit" disabled={!nome.trim()}>Salvar</button><button type="button" className="ck-icone" onClick={onCancelar} title="Cancelar edição" aria-label="Cancelar edição"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="m4 4 8 8m0-8-8 8" /></svg></button></span>
+  </form>;
+}
+
 /* Contas recorrentes: vence todo mês no mesmo dia, com parcelas opcionais */
 function vencimento(c) {
   const [a, m] = c.ciclo.split("-").map(Number);
   return new Date(a, m - 1, Math.min(c.dia, new Date(a, m, 0).getDate()));
 }
 
-function Contas({ contas, adicionar, alternar, apagar, definirValor }) {
+function Contas({ contas, adicionar, alternar, apagar, definirValor, editar }) {
   const [abrindo, setAbrindo] = useState(false);
+  const [editandoId, setEditandoId] = useState(null);
   const [nome, setNome] = useState("");
   const [dia, setDia] = useState("");
   const [parcelas, setParcelas] = useState("");
@@ -795,8 +828,10 @@ function Contas({ contas, adicionar, alternar, apagar, definirValor }) {
   return (
     <section className="ck-contas">
       <div className="ck-resumo">
-        <span className="ck-resumo-rotulo">Despesas fixas</span>
-        <strong className="ck-resumo-valor">{BRL(total)}</strong>
+        <div className="ck-resumo-cabecalho">
+          <div><span className="ck-resumo-rotulo">Despesas fixas</span><strong className="ck-resumo-valor">{BRL(total)}</strong></div>
+          <button type="button" className="ck-mais ck-conta-adicionar" onClick={() => setAbrindo((atual) => !atual)} aria-label={abrindo ? "Fechar formulário de conta" : "Adicionar conta"} title={abrindo ? "Fechar" : "Adicionar conta"} aria-expanded={abrindo}><IconeMais /></button>
+        </div>
         {total > 0 && (
           <span className="ck-resumo-sub">
             Pago {BRL(pago)} · Falta {BRL(total - pago)}
@@ -804,11 +839,12 @@ function Contas({ contas, adicionar, alternar, apagar, definirValor }) {
         )}
       </div>
       {contas.length === 0 ? (
-        <p className="ck-vazio-cal">Nenhuma conta ainda. Adicione abaixo.</p>
+        <p className="ck-vazio-cal">Nenhuma conta ainda. Use o + ao lado do total para adicionar.</p>
       ) : (
         <ul className="ck-lista">
           {contas.map((c) => {
             const [texto, classe] = situacao(c);
+            if (editandoId === c.id) return <li key={c.id} className="ck-item-editando"><FormularioConta conta={c} onSalvar={(campos) => { editar(c.id, campos); setEditandoId(null); }} onCancelar={() => setEditandoId(null)} /></li>;
             return (
               <li key={c.id} className={c.pago ? "feita" : ""}>
                 <label>
@@ -823,7 +859,8 @@ function Contas({ contas, adicionar, alternar, apagar, definirValor }) {
                   </span>
                 </label>
                 <ValorConta conta={c} onSalvar={(v) => definirValor(c.id, v)} />
-                <button type="button" className="ck-apagar" onClick={() => apagar(c.id)} aria-label={`Apagar conta ${c.nome}`}>Apagar</button>
+                <button type="button" className="ck-icone" onClick={() => setEditandoId(c.id)} title={`Editar conta ${c.nome}`} aria-label={`Editar conta ${c.nome}`}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" /></svg></button>
+                <BotaoApagar nome={`conta ${c.nome}`} onClick={() => apagar(c.id)} />
               </li>
             );
           })}
@@ -854,15 +891,37 @@ function Contas({ contas, adicionar, alternar, apagar, definirValor }) {
           <input type="number" className="ck-num ck-num-p" min="1" max="999" value={parcelas} onChange={(e) => setParcelas(e.target.value)} placeholder="Parcelas" aria-label="Número de parcelas (opcional)" title="Número de parcelas (opcional; vazio = sem fim)" />
           <button type="submit" disabled={!nome.trim()}>Adicionar</button>
         </form>
-      ) : (
-        <BarraMais rotulo="Adicionar conta" onClick={() => setAbrindo(true)} />
-      )}
+      ) : null}
     </section>
   );
 }
 
 /* Lista das tarefas que se repetem */
-function Rotinas({ rotinas, apagar, mudarPrioridade }) {
+function EditarRotina({ rotina, onSalvar, onCancelar }) {
+  const [texto, setTexto] = useState(rotina.texto);
+  const [cada, setCada] = useState(String(rotina.cada));
+  const [hora, setHora] = useState(rotina.hora || "00:00");
+  const [proxima, setProxima] = useState(rotina.proxima || iso(new Date()));
+  const [descricao, setDescricao] = useState(rotina.descricao || "");
+
+  function enviar(e) {
+    e.preventDefault();
+    if (!texto.trim() || !proxima) return;
+    onSalvar({ texto: texto.trim(), cada: Number(cada), hora: hora || "00:00", proxima, descricao: descricao.trim() });
+  }
+
+  return <form className="ck-form-grupo ck-form-rotina" onSubmit={enviar} onBlur={(e) => fecharAoClicarFora(e, onCancelar)} onKeyDown={(e) => { if (e.key === "Escape") onCancelar(); else if (e.target.matches("textarea")) enviarAoEnter(e); }}>
+    <input autoFocus type="text" className="ck-campo-largo" value={texto} onChange={(e) => setTexto(e.target.value)} aria-label="Nome da rotina" maxLength={200} required />
+    <select value={cada} onChange={(e) => setCada(e.target.value)} aria-label="Frequência da rotina">{OPCOES_REPETE.filter(([valor]) => Number(valor) > 0).map(([valor, rotulo]) => <option key={valor} value={valor}>{rotulo}</option>)}</select>
+    <Hora24 value={hora} onChange={setHora} rotulo="Horário da rotina" />
+    <label className="ck-form-data"><span>Próxima</span><input type="date" value={proxima} onChange={(e) => setProxima(e.target.value)} required /></label>
+    <textarea className="ck-campo-largo" rows={2} value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Observações (opcional)" aria-label="Observações da rotina" maxLength={1000} />
+    <span className="ck-edit-acoes"><button type="submit" disabled={!texto.trim() || !proxima}>Salvar</button><button type="button" className="ck-icone" onClick={onCancelar} title="Cancelar edição" aria-label="Cancelar edição"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="m4 4 8 8m0-8-8 8" /></svg></button></span>
+  </form>;
+}
+
+function Rotinas({ rotinas, apagar, mudarPrioridade, editar }) {
+  const [editandoId, setEditandoId] = useState(null);
   if (rotinas.length === 0) {
     return (
       <section className="ck-rotinas">
@@ -873,7 +932,9 @@ function Rotinas({ rotinas, apagar, mudarPrioridade }) {
   return (
     <section className="ck-rotinas">
       <ul>
-        {rotinas.map((r) => (
+        {rotinas.map((r) => editandoId === r.id ? (
+          <li key={r.id} className="ck-item-editando"><EditarRotina rotina={r} onSalvar={(campos) => { editar(r.id, campos); setEditandoId(null); }} onCancelar={() => setEditandoId(null)} /></li>
+        ) : (
           <li key={r.id}>
             <span className="ck-rot-texto">
               {r.texto}
@@ -887,7 +948,8 @@ function Rotinas({ rotinas, apagar, mudarPrioridade }) {
               title={`Prioridade ao voltar: ${PRIORIDADES[r.prioridade || 0].nome} (clique para trocar)`}
               aria-label={`Prioridade ao voltar: ${PRIORIDADES[r.prioridade || 0].nome}. Clique para trocar.`}
             />
-            <button type="button" className="ck-apagar" onClick={() => apagar(r.id)} aria-label={`Apagar rotina ${r.texto}`}>Apagar</button>
+            <button type="button" className="ck-icone" onClick={() => setEditandoId(r.id)} title={`Editar rotina ${r.texto}`} aria-label={`Editar rotina ${r.texto}`}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" /></svg></button>
+            <BotaoApagar nome={`rotina ${r.texto}`} onClick={() => apagar(r.id)} />
           </li>
         ))}
       </ul>
@@ -1063,12 +1125,22 @@ function BarraMais({ rotulo, onClick, atalho }) {
 
 /* Campo para escrever uma tarefa nova (usado fora e dentro das sessões) */
 function NovaTarefa({ onAdd, placeholder, onFechar, idCampo }) {
+  const formRef = useRef(null);
   const [texto, setTexto] = useState("");
   const [repete, setRepete] = useState("0");
   const [hora, setHora] = useState("00:00");
   const [limite, setLimite] = useState("");
   const [limiteHora, setLimiteHora] = useState("");
   const [descricao, setDescricao] = useState("");
+
+  useEffect(() => {
+    if (!onFechar) return undefined;
+    function fecharAoTocarFora(e) {
+      if (formRef.current && !formRef.current.contains(e.target)) onFechar();
+    }
+    document.addEventListener("pointerdown", fecharAoTocarFora, true);
+    return () => document.removeEventListener("pointerdown", fecharAoTocarFora, true);
+  }, [onFechar]);
 
   function enviar(e) {
     e.preventDefault();
@@ -1083,9 +1155,12 @@ function NovaTarefa({ onAdd, placeholder, onFechar, idCampo }) {
 
   return (
     <form
+      ref={formRef}
       className="ck-form-grupo"
       onSubmit={enviar}
-      onBlur={(e) => fecharAoClicarFora(e, () => onFechar && onFechar())}
+      onBlur={(e) => {
+        if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget) && onFechar) onFechar();
+      }}
     >
       <input
         id={idCampo}
@@ -1335,14 +1410,7 @@ function ListaTarefas({ tarefas, alternar, apagar, mudarPrioridade, ordem, edica
               <path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" />
             </svg>
           </button>
-          <button
-            type="button"
-            className="ck-apagar"
-            onClick={() => apagar(t.id)}
-            aria-label={`Apagar ${t.texto}`}
-          >
-            Apagar
-          </button>
+          <BotaoApagar nome={`tarefa ${t.texto}`} onClick={() => apagar(t.id)} />
         </li>
       ))}
     </ul>
@@ -2041,6 +2109,17 @@ function Checklist({ usuario }) {
     );
   }
 
+  function editarRotina(id, campos) {
+    setRotinas((atual) => atual.map((r) => r.id === id ? { ...r, ...campos } : r));
+    setTarefas((atual) => atual.map((t) => t.rotinaId === id && !t.feita ? {
+      ...t,
+      texto: campos.texto,
+      repeteDias: campos.cada,
+      repeteHora: campos.hora,
+      descricao: campos.descricao,
+    } : t));
+  }
+
   function apagar(id) {
     setTarefas((atual) => atual.filter((t) => t.id !== id));
   }
@@ -2150,6 +2229,10 @@ function Checklist({ usuario }) {
   function adicionarConta(c) {
     const ciclo = iso(new Date()).slice(0, 7);
     setContas((a) => [...a, { id: novoId(), ...c, ciclo, parcela: 1, pago: false }]);
+  }
+
+  function editarConta(id, campos) {
+    setContas((atual) => atual.map((c) => c.id === id ? { ...c, ...campos } : c));
   }
 
   function salvarAnotacao(e) {
@@ -2520,14 +2603,7 @@ function Checklist({ usuario }) {
                 <IconeMais />
               </button>
               {sessaoEmEdicao?.tipo !== "checklist" || sessaoEmEdicao.id !== g.id ? <button type="button" className="ck-icone" title="Editar sessão" aria-label={`Editar sessão ${g.nome}`} onClick={() => iniciarEdicaoSessao("checklist", g)}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" /></svg></button> : null}
-              <button
-                type="button"
-                className="ck-apagar"
-                onClick={() => apagarGrupo(g)}
-                aria-label={`Apagar sessão ${g.nome}`}
-              >
-                Apagar sessão
-              </button>
+              <BotaoApagar nome={`sessão ${g.nome}`} onClick={() => apagarGrupo(g)} />
             </div>
 
             {aberta && (
@@ -2659,15 +2735,15 @@ function Checklist({ usuario }) {
             /> : <button type="button" className="ck-grupo-titulo" aria-expanded={s.aberta !== false} onClick={() => setSessoesAnotacoes((atual) => atual.map((x) => x.id === s.id ? { ...x, aberta: x.aberta === false } : x))}><span className={`ck-seta ${s.aberta !== false ? "aberta" : ""}`}>›</span><span className="ck-grupo-nome">{s.nome}</span><span className="ck-grupo-qtd">{anotacoes.filter((a) => a.sessaoId === s.id).length}</span></button>}
             <button type="button" className="ck-mais" onClick={() => abrirNovaAnotacao(s.id)} title={`Nova anotação em ${s.nome}`} aria-label={`Nova anotação em ${s.nome}`}><IconeMais /></button>
             {sessaoEmEdicao?.tipo !== "anotacoes" || sessaoEmEdicao.id !== s.id ? <button type="button" className="ck-icone" title="Editar sessão" aria-label={`Editar sessão ${s.nome}`} onClick={() => iniciarEdicaoSessao("anotacoes", s)}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" /></svg></button> : null}
-            <button type="button" className="ck-apagar" onClick={() => { if (window.confirm(`Apagar a sessão "${s.nome}"? As anotações vão para Sem sessão.`)) { setSessoesAnotacoes((xs) => xs.filter((x) => x.id !== s.id)); setAnotacoes((xs) => xs.map((a) => a.sessaoId === s.id ? { ...a, sessaoId: null } : a)); } }}>Apagar sessão</button>
+            <BotaoApagar nome={`sessão ${s.nome}`} onClick={() => { if (window.confirm(`Apagar a sessão "${s.nome}"? As anotações vão para Sem sessão.`)) { setSessoesAnotacoes((xs) => xs.filter((x) => x.id !== s.id)); setAnotacoes((xs) => xs.map((a) => a.sessaoId === s.id ? { ...a, sessaoId: null } : a)); } }} />
           </div>
           {formAnotacao?.sessaoId === s.id && <FormularioAnotacao form={formAnotacao} onSalvar={salvarAnotacao} onChange={setFormAnotacao} onCancelar={() => setFormAnotacao(null)} />}
           {s.aberta !== false && anotacoes.filter((a) => a.sessaoId === s.id).map((a) => <article className={`ck-anotacao${ordem.sobre === a.id && ordem.arrastando?.tipo === "anotacao" ? " alvo" : ""}`} key={a.id} {...alvoProps(ordem, "anotacao", a.id, s.id)}>
             <Alca id={a.id} tipo="anotacao" grupo={s.id} ordem={ordem} imagem=".ck-anotacao" />
-            <div className="ck-anotacao-corpo"><div><strong>{a.titulo}</strong><time>{new Date(`${a.data}T00:00`).toLocaleDateString("pt-BR")}</time></div>{a.texto && !descricoesAnotacaoFechadas[a.id] && <p>{a.texto}</p>}</div>{a.texto && <ToggleDescricao fechada={descricoesAnotacaoFechadas[a.id]} onClick={() => setDescricoesAnotacaoFechadas((atual) => ({ ...atual, [a.id]: !atual[a.id] }))} />}<button type="button" className="ck-icone" title="Editar anotação" aria-label={`Editar ${a.titulo}`} onClick={() => setFormAnotacao({ ...a })}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" /></svg></button><button type="button" className="ck-apagar" onClick={() => setAnotacoes((xs) => xs.filter((x) => x.id !== a.id))}>Apagar</button>
+            <div className="ck-anotacao-corpo"><div><strong>{a.titulo}</strong><time>{new Date(`${a.data}T00:00`).toLocaleDateString("pt-BR")}</time></div>{a.texto && !descricoesAnotacaoFechadas[a.id] && <p>{a.texto}</p>}</div>{a.texto && <ToggleDescricao fechada={descricoesAnotacaoFechadas[a.id]} onClick={() => setDescricoesAnotacaoFechadas((atual) => ({ ...atual, [a.id]: !atual[a.id] }))} />}<button type="button" className="ck-icone" title="Editar anotação" aria-label={`Editar ${a.titulo}`} onClick={() => setFormAnotacao({ ...a })}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" /></svg></button><BotaoApagar nome={`anotação ${a.titulo}`} onClick={() => setAnotacoes((xs) => xs.filter((x) => x.id !== a.id))} />
           </article>)}
         </section>)}
-        {(anotacoes.some((a) => !a.sessaoId || !sessoesAnotacoes.some((s) => s.id === a.sessaoId)) || arrastando?.tipo === "anotacao") && <section className="ck-grupo"><h2 className={`ck-secao${ordem.sobre === "__sem_sessao__" && ordem.arrastando?.tipo === "anotacao" ? " alvo" : ""}`} {...alvoProps(ordem, "destinoAnotacoes", "__sem_sessao__", null)}>Sem sessão</h2>{anotacoes.filter((a) => !a.sessaoId || !sessoesAnotacoes.some((s) => s.id === a.sessaoId)).map((a) => <article className={`ck-anotacao${ordem.sobre === a.id && ordem.arrastando?.tipo === "anotacao" ? " alvo" : ""}`} key={a.id} {...alvoProps(ordem, "anotacao", a.id, null)}><Alca id={a.id} tipo="anotacao" grupo={null} ordem={ordem} imagem=".ck-anotacao" /><div className="ck-anotacao-corpo"><div><strong>{a.titulo}</strong><time>{new Date(`${a.data}T00:00`).toLocaleDateString("pt-BR")}</time></div>{a.texto && !descricoesAnotacaoFechadas[a.id] && <p>{a.texto}</p>}</div>{a.texto && <ToggleDescricao fechada={descricoesAnotacaoFechadas[a.id]} onClick={() => setDescricoesAnotacaoFechadas((atual) => ({ ...atual, [a.id]: !atual[a.id] }))} />}<button type="button" className="ck-icone" title="Editar anotação" aria-label={`Editar ${a.titulo}`} onClick={() => setFormAnotacao({ ...a })}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" /></svg></button><button type="button" className="ck-apagar" onClick={() => setAnotacoes((xs) => xs.filter((x) => x.id !== a.id))}>Apagar</button></article>)}</section>}
+        {(anotacoes.some((a) => !a.sessaoId || !sessoesAnotacoes.some((s) => s.id === a.sessaoId)) || arrastando?.tipo === "anotacao") && <section className="ck-grupo"><h2 className={`ck-secao${ordem.sobre === "__sem_sessao__" && ordem.arrastando?.tipo === "anotacao" ? " alvo" : ""}`} {...alvoProps(ordem, "destinoAnotacoes", "__sem_sessao__", null)}>Sem sessão</h2>{anotacoes.filter((a) => !a.sessaoId || !sessoesAnotacoes.some((s) => s.id === a.sessaoId)).map((a) => <article className={`ck-anotacao${ordem.sobre === a.id && ordem.arrastando?.tipo === "anotacao" ? " alvo" : ""}`} key={a.id} {...alvoProps(ordem, "anotacao", a.id, null)}><Alca id={a.id} tipo="anotacao" grupo={null} ordem={ordem} imagem=".ck-anotacao" /><div className="ck-anotacao-corpo"><div><strong>{a.titulo}</strong><time>{new Date(`${a.data}T00:00`).toLocaleDateString("pt-BR")}</time></div>{a.texto && !descricoesAnotacaoFechadas[a.id] && <p>{a.texto}</p>}</div>{a.texto && <ToggleDescricao fechada={descricoesAnotacaoFechadas[a.id]} onClick={() => setDescricoesAnotacaoFechadas((atual) => ({ ...atual, [a.id]: !atual[a.id] }))} />}<button type="button" className="ck-icone" title="Editar anotação" aria-label={`Editar ${a.titulo}`} onClick={() => setFormAnotacao({ ...a })}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" /></svg></button><BotaoApagar nome={`anotação ${a.titulo}`} onClick={() => setAnotacoes((xs) => xs.filter((x) => x.id !== a.id))} /></article>)}</section>}
         {!formAnotacao && anotacoes.length === 0 && sessoesAnotacoes.length === 0 && <p className="ck-vazio">Adicione uma anotação ou crie uma sessão.</p>}
       </section> : null}
 
@@ -2679,7 +2755,7 @@ function Checklist({ usuario }) {
         <span aria-hidden="true"> · </span>
         <Contato />
                 <span aria-hidden="true"> · </span>
-                <span aria-hidden="true"> V0.57 </span>
+                <span aria-hidden="true"> V0.59 </span>
       </footer>
     </main>
 
@@ -2696,9 +2772,9 @@ function Checklist({ usuario }) {
           </button>
         </div>
         {aba === "rotinas" ? (
-          <Rotinas rotinas={rotinas} apagar={apagarRotina} mudarPrioridade={mudarPrioridadeRotina} />
+          <Rotinas rotinas={rotinas} apagar={apagarRotina} mudarPrioridade={mudarPrioridadeRotina} editar={editarRotina} />
         ) : (
-          <Contas contas={contas} adicionar={adicionarConta} alternar={alternarConta} apagar={apagarConta} definirValor={definirValorConta} />
+          <Contas contas={contas} adicionar={adicionarConta} alternar={alternarConta} apagar={apagarConta} definirValor={definirValorConta} editar={editarConta} />
         )}
       </section>
     </aside>
