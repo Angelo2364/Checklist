@@ -2755,7 +2755,7 @@ function Checklist({ usuario }) {
         <span aria-hidden="true"> · </span>
         <Contato />
                 <span aria-hidden="true"> · </span>
-                <span aria-hidden="true"> V0.59 </span>
+                <span aria-hidden="true"> V0.62 </span>
       </footer>
     </main>
 
