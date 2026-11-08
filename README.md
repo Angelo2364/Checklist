@@ -1,118 +1,136 @@
-# Checklist
+<div align="center">
+  <img src="public/Logo.svg" alt="Símbolo do Crysalis" width="112" />
 
-Lista de tarefas em React com sessões, prioridades por cor e lembretes no computador nas horas cheias e meias (21:00, 21:30...). Tudo fica salvo no próprio navegador, sem servidor e sem conta.
+  # Crysalis
 
-## O que ele faz
+  **Um espaço leve para organizar tarefas, ideias e compromissos.**
 
-- **Tarefas:** adicionar, editar (lápis: nome e repetição), marcar e apagar. O círculo tem três estados a cada clique: pendente, meio feita (círculo pela metade) e feita.
-- **Sessões:** agrupar tarefas (por exemplo "Afazeres do RPG"). Também dá para ter tarefas soltas, fora de qualquer sessão. Cada sessão pode ser recolhida e mostra quantas tarefas já foram feitas.
-- **Tarefas que se repetem:** ao criar a tarefa, escolha "Repetir" (todo dia, toda semana, a cada N dias). Mesmo que você apague ou conclua, ela volta quando chegar o dia. Dá para escolher o horário em que ela volta (por exemplo 18:00); sem escolher, volta à meia-noite. Quando volta, você também recebe uma notificação. A prioridade (bolinha) também vale para a tarefa que volta: mude a cor na própria tarefa ou na lista de rotinas, e ela volta sempre com aquela cor. Para parar, apague a rotina na coluna da direita ou edite a tarefa e escolha "Não repete".
-- **Contas recorrentes:** na coluna da direita, a aba "Contas" (ao lado de "Rotinas") guarda contas que vencem todo mês. Você define o valor, o dia do vencimento e, se quiser, o número de parcelas. No topo da aba, "Despesas fixas" mostra a soma dos valores, com quanto já foi pago e quanto falta. Para definir ou corrigir o valor de uma conta, clique nele. Marque quando pagar; ao virar o mês, uma conta paga volta como "a pagar" (e avança a parcela, até quitar). Contas vencidas e não pagas aparecem como atrasadas.
-- **Imagem de fundo:** o botão de imagem no topo permite escolher uma foto do computador e ajustar o desfoque e o ajuste ("Preencher" cobre a tela e pode cortar as bordas; "Inteira" mostra a imagem toda). Qualquer tamanho serve: ela é reduzida automaticamente para no máximo 2560 px de lado e fica salva no navegador.
-- **Calendário:** coluna lateral com o mês, eventos com horário (formato 24 horas, digitado ou com as setas ↑ ↓), endereço (link para o Google Maps) e descrição opcionais e um botão "Google" que abre o evento já preenchido no Google Agenda. Os eventos de hoje também entram na notificação.
-- **Reordenar:** a alça com bolinhas (⋮⋮) à esquerda de cada tarefa e sessão permite arrastar para mudar a ordem. Também dá para focar na alça (Tab) e usar as setas ↑ ↓. A tarefa só se move dentro da própria sessão, e ao mover uma sessão as tarefas dela vão juntas.
-- **Prazo:** ao criar ou editar uma tarefa, digite o dia e o mês (sem ano; vale o próximo em que a data ainda não passou) e, se quiser, um horário limite. A tarefa mostra "⏰ hoje 17:00" (e fica vermelha quando atrasa). Com horário, os lembretes ficam mais insistentes perto do prazo: além do aviso normal das horas cheias e meias, chega um aviso 45 minutos antes e um "chamadão" 15 minutos antes (fica na tela até você fechar, vibra e toca bips). Os avisos de prazo só funcionam com os lembretes ativados.
-- **Prioridade:** a bolinha à direita de cada tarefa troca de cor a cada clique: sem prioridade, verde (tranquila), amarelo (média) e vermelho (urgente).
-- **Lembretes:** toda hora cheia e meia hora do relógio (21:00, 21:30, 22:00...) chega uma notificação com as tarefas que ainda faltam, com as mais urgentes primeiro, de todas as sessões juntas (o nome da sessão aparece ao lado de cada tarefa).
-- **Atalhos de teclado:** `Ctrl + F` abre o campo de nova tarefa e `Ctrl + D` abre o de nova sessão, já com o cursor pronto para digitar.
-- **Salvamento automático:** tudo é guardado no `localStorage` e continua lá depois de fechar ou recarregar a página.
-- **Tema:** segue o modo claro ou escuro do sistema, com cores pastel em rosa, azul e amarelo.
+  Checklist, anotações, calendário e rotina em um só lugar — com sincronização entre dispositivos.
 
-## Arquivos
+  [Abrir o Crysalis](https://www.crysalis.me)
 
-| Arquivo | Para que serve |
+  <br />
+
+  ![React](https://img.shields.io/badge/React-19-149eca?logo=react&logoColor=white)
+  ![Vite](https://img.shields.io/badge/Vite-8-646cff?logo=vite&logoColor=white)
+  ![Supabase](https://img.shields.io/badge/Supabase-auth%20%26%20sync-3ecf8e?logo=supabase&logoColor=white)
+  ![PWA](https://img.shields.io/badge/PWA-instalável-6b4eff)
+</div>
+
+---
+
+## ✨ O que é
+
+O **Crysalis** é um organizador pessoal feito para reunir o que costuma ficar espalhado: tarefas, notas, eventos, rotinas e contas recorrentes. A interface se adapta a celular e computador, com temas claro e escuro e opções para personalizar o papel de parede.
+
+Entre com sua conta para sincronizar seus dados com a nuvem e continuar de onde parou em outro aparelho. Também é possível exportar e importar um backup em JSON.
+
+## 🧭 O que dá para fazer
+
+| Área | Recursos |
 | --- | --- |
-| `App.jsx` | Componente com toda a lógica e a interface |
-| `App.css` | Estilos e cores do site |
+| **Checklist** | Crie tarefas, organize-as em sessões, defina prioridade, prazo e repetição. Reordene os itens por arrastar e soltar. |
+| **Anotações** | Guarde ideias com título, data e descrição opcional. Use sessões para separar os assuntos e reorganize as notas como preferir. |
+| **Calendário** | Registre eventos com data, horário, endereço e descrição. Abra endereços no Google Maps ou prepare o evento no Google Agenda. |
+| **Rotinas** | Acompanhe tarefas recorrentes e escolha a frequência, o horário e a prioridade. |
+| **Contas** | Cadastre despesas mensais, parcelas e vencimentos; acompanhe o total, o que já foi pago e o que falta pagar. |
+| **Lembretes** | Receba notificações de tarefas pendentes e avisos de prazo, conforme as permissões e a configuração do navegador e do servidor. |
+| **Preferências** | Escolha tema claro ou escuro, imagem de fundo, desfoque e ajuste da imagem. |
+| **Conta e backup** | Sincronize os dados com sua conta e exporte ou importe uma cópia em JSON. |
 
-## Como usar no seu projeto React
+## 📱 Feito para o dia a dia
 
-1. Coloque `App.jsx` e `App.css` na pasta `src/`, no lugar dos que o Vite cria.
-2. O `main.jsx` do Vite já importa o `App`, então não precisa mudar nada. O `App.jsx` já importa o `App.css` sozinho.
+- Layout responsivo para celular e desktop.
+- Pode ser instalado como **PWA** em navegadores compatíveis.
+- No celular, reordene tarefas e anotações com toque longo e arraste.
+- Use `Enter` para confirmar uma tarefa ou anotação e `Shift + Enter` para pular uma linha no texto.
+- Atalhos: `Ctrl + F` para abrir a criação de tarefa/anotação e `Ctrl + D` para abrir a criação de sessão. No Mac, use `⌘` no lugar de `Ctrl`.
 
-Se você ainda não tem um projeto React, uma forma rápida de criar um é com o Vite:
+## 🚀 Rodar localmente
+
+### Requisitos
+
+- Node.js e npm.
+- Um projeto Supabase configurado para autenticação e sincronização.
+
+### Instalação
 
 ```bash
-npm create vite@latest meu-checklist -- --template react
-cd meu-checklist
+git clone <URL_DO_REPOSITORIO>
+cd checklist
 npm install
 ```
 
-Depois copie os dois arquivos para `src/`, e rode:
+Crie um arquivo `.env.local` na raiz do projeto:
+
+```env
+VITE_SUPABASE_URL=https://SEU_PROJETO.supabase.co
+VITE_SUPABASE_ANON_KEY=SUA_CHAVE_PUBLICA_DO_SUPABASE
+VITE_VAPID_PUBLIC_KEY=SUA_CHAVE_PUBLICA_VAPID
+```
+
+As variáveis do Supabase são usadas para autenticação e sincronização. A chave VAPID pública habilita a inscrição para notificações push; os lembretes em segundo plano também dependem da configuração do servidor descrita abaixo.
+
+Inicie o servidor de desenvolvimento:
 
 ```bash
 npm run dev
 ```
 
-O site abre em `http://localhost:5173`. O Vite já vem com um `index.css` que pode interferir no visual. Se algo ficar estranho, apague o import de `index.css` no `main.jsx`.
+O Vite exibirá o endereço local no terminal, normalmente `http://localhost:5173`.
 
-## Atalhos de teclado
+### Scripts disponíveis
 
-| Atalho | O que faz |
+| Comando | Ação |
 | --- | --- |
-| `Ctrl + F` (ou `Cmd + F` no Mac) | Abre o campo de nova tarefa |
-| `Ctrl + D` (ou `Cmd + D` no Mac) | Abre o campo de nova sessão |
-| `Enter` | Adiciona e mantém o campo aberto para a próxima |
-| `Esc` | Fecha o campo |
+| `npm run dev` | Inicia o ambiente de desenvolvimento. |
+| `npm run lint` | Verifica o código com ESLint. |
+| `npm run build` | Gera a versão de produção em `dist/`. |
+| `npm run preview` | Abre localmente uma prévia da versão gerada. |
+| `npm run deploy` | Publica o conteúdo de `dist/` com `gh-pages`. |
 
-Esses atalhos substituem a busca na página (`Ctrl + F`) e o "favoritar" (`Ctrl + D`) do navegador apenas neste site. Para usar outras teclas, altere as constantes `ATALHO_TAREFA` e `ATALHO_SESSAO` no topo do `App.jsx`.
+## ☁️ Supabase e notificações
 
-## Notificações
+O projeto usa o Supabase para autenticação e sincronização. Para que essa parte funcione, configure o projeto Supabase, as tabelas e as políticas de acesso usadas pelo app. Cada conta deve acessar somente os próprios dados.
 
-Para ativar, clique em **Ativar lembretes** no fim da página e permita as notificações quando o navegador perguntar.
+Os lembretes push em segundo plano usam a Edge Function `supabase/functions/enviar-lembretes`. Para habilitá-los, configure e publique a função, o agendamento do `pg_cron` e os segredos VAPID e de cron no Supabase. O navegador também precisa permitir notificações. Sem essa configuração, o app pode continuar funcionando, mas os lembretes em segundo plano não estarão disponíveis.
 
-- Funcionam apenas em `localhost` ou em um site com `https`. Abrir o arquivo direto do computador (`file://`) não funciona.
-- A aba precisa ficar aberta, mesmo em segundo plano. Se fechar a aba, os lembretes param.
-- Se não houver nenhuma tarefa pendente, nenhuma notificação é enviada.
-- O botão **Testar agora** mostra como a notificação aparece.
-- Se você bloqueou as notificações, libere pelo cadeado ao lado do endereço do site e recarregue a página.
-- O modo "Não perturbe" ou "Assistente de foco" do sistema pode silenciar as notificações.
+> **Segurança:** mantenha `.env.local` fora do Git. Nunca coloque a `service_role` do Supabase, a chave VAPID privada ou o segredo do cron em variáveis `VITE_*` ou no código do navegador. A chave pública do Supabase deve ser protegida por políticas RLS adequadas.
 
-## Onde ficam os dados
+## 💾 Dados e privacidade
 
-Tudo é salvo no `localStorage` do navegador, com estas chaves:
+- Com uma conta conectada, tarefas, sessões, anotações, eventos, rotinas e contas são sincronizados com o Supabase.
+- O app também mantém dados locais no navegador para carregar a interface e preservar preferências deste aparelho.
+- O papel de parede escolhido e as permissões de notificação dependem do navegador/dispositivo; não são substitutos para o backup.
+- Use **Configurações → Conta → Exportar backup** para baixar uma cópia dos seus dados. A importação substitui os dados atuais pelos dados do arquivo selecionado.
 
-| Chave | Conteúdo |
-| --- | --- |
-| `checklist:tarefas` | Lista de tarefas |
-| `checklist:divisoes` | Lista de sessões |
-| `checklist:eventos` | Eventos do calendário |
-| `checklist:rotinas` | Tarefas que se repetem |
-| `checklist:contas` | Contas recorrentes |
-| `checklist:fundo` / `checklist:desfoque` | Imagem de fundo e desfoque |
-| `checklist:avisosPrazo` | Avisos de prazo já enviados |
-| `checklist:notificar` | Se os lembretes estão ativados |
-| `checklist:ultimaNotificacao` | Última meia hora do relógio já avisada |
+## 🧰 Tecnologias
 
-Formato dos dados:
+- **React** para a interface.
+- **Vite** para desenvolvimento e build.
+- **Supabase** para autenticação, sincronização e funções de servidor.
+- **Service Worker / PWA** para instalação e suporte a notificações.
+- **Capacitor** para integração com Android.
 
-```js
-// tarefa
-{ id: 1712345678.9, texto: "Comprar pão", feita: false, meio: false, grupoId: null, prioridade: 0 }
-// prioridade: 0 = sem, 1 = verde, 2 = amarelo, 3 = vermelho
-// grupoId: id da sessão, ou null se a tarefa estiver solta
+## 📁 Estrutura principal
 
-// sessão
-{ id: 1712345999.1, nome: "Afazeres do RPG", aberta: true }
+```text
+src/
+├── App.jsx                  # Interface e lógica principal
+├── App.css                  # Estilos do aplicativo
+├── Login.jsx                # Entrar, criar conta e recuperar senha
+├── main.jsx                 # Inicialização do React
+└── services/
+    ├── dados.js             # Leitura e gravação dos dados na nuvem
+    ├── push.js              # Inscrição e gestão de notificações push
+    └── supabase.js          # Cliente Supabase
+
+public/
+└── push-sw.js               # Tratamento de notificações no service worker
 ```
 
-**Cuidados:**
-- Os dados ficam só naquele navegador e naquele computador. Outro navegador, outro computador ou uma janela anônima começam com a lista vazia.
-- Limpar os dados do site ou o cache do navegador apaga a lista. Se tiver algo importante, anote em outro lugar.
+---
 
-## Personalização
-
-- **Cores:** estão no começo do `App.css`, no bloco `:root`. O bloco `@media (prefers-color-scheme: dark)` logo abaixo define as cores do modo escuro.
-- **Cores das prioridades:** variáveis `--prio-verde`, `--prio-amarelo` e `--prio-vermelho`.
-- **Largura da coluna:** propriedade `max-width` da classe `.ck`.
-
-## Como funcionam os lembretes
-
-O componente confere a cada 30 segundos em qual meia hora do relógio estamos (por exemplo 21:00 ou 21:30). Quando entra uma meia hora que ainda não foi avisada, ele notifica. Se o navegador atrasar o aviso (aba em segundo plano), ele só mostra se o atraso for de até 5 minutos, para não aparecer um lembrete velho. Ao ativar os lembretes, o primeiro aviso vem na próxima meia hora.
-
-## Possíveis melhorias
-
-- Mover uma tarefa de uma sessão para outra.
-- Renomear sessões.
-- Definir horário de início e fim dos lembretes.
-- Exportar e importar a lista em um arquivo, para fazer backup.
+<div align="center">
+  Feito para deixar a rotina mais clara — uma tarefa de cada vez. 🌱
+</div>
