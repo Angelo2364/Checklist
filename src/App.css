@@ -1363,6 +1363,13 @@ a.ck-ev-mapa:hover {
 .ck-pref-card, .ck-conta-identidade, .ck-backup-card { padding: 16px; border: 1px solid var(--linha); border-radius: 14px; background: color-mix(in srgb, var(--fundo) 75%, var(--fundo-hover)); box-shadow: 0 3px 12px color-mix(in srgb, var(--tinta) 5%, transparent); }
 .ck-pref-card h3, .ck-backup-card h3 { margin: 0 0 5px; font-size: 15px; }
 .ck-pref-card > p, .ck-backup-card > p { margin: 0 0 14px; color: var(--suave); font-size: 13px; line-height: 1.5; }
+.ck-limite-horario { display: flex; align-items: center; gap: 10px; width: fit-content; color: var(--tinta); font-size: 14px; font-weight: 700; cursor: pointer; }
+.ck-limite-horario input { width: 18px; height: 18px; margin: 0; accent-color: var(--azul-forte); cursor: pointer; }
+.ck-periodo-avisos { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: end; gap: 12px; margin: 16px 0 10px; }
+.ck-periodo-avisos label { display: grid; gap: 6px; color: var(--suave); font-size: 12px; font-weight: 700; }
+.ck-periodo-avisos input { width: 100%; min-width: 0; padding: 8px 10px; border: 1px solid var(--linha); border-radius: 10px; color: var(--tinta); background: color-mix(in srgb, var(--fundo) 78%, transparent); font: inherit; font-variant-numeric: tabular-nums; }
+.ck-periodo-avisos > span { padding-bottom: 9px; color: var(--suave); font-size: 13px; }
+.ck-pref-card > small { display: block; margin-top: 8px; color: var(--suave); font-size: 12px; line-height: 1.5; }
 .ck-pref-card > .ck-ajuste, .ck-pref-card > .ck-arquivo { margin: 2px 0 8px; }
 .ck-ajuste-segmentado { display: inline-flex; width: fit-content; gap: 0; overflow: hidden; padding: 3px; border: 1px solid var(--linha); border-radius: 11px; background: color-mix(in srgb, var(--fundo-hover) 65%, transparent); }
 .ck-ajuste-segmentado .ck-ajuste-btn { border-color: transparent; border-radius: 8px; }

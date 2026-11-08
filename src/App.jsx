@@ -27,17 +27,38 @@ const NOME_RODAPE = "Moony"; // aparece no rodapé; ao passar o mouse mostra o n
 const NOME_SECRETO = "Luna";
 const EMAIL_CONTATO = "sayaokaua@gmail.com";
 const STORAGE_INTERVALO = "checklist:intervaloAviso"; // minutos entre os lembretes
+const STORAGE_JANELA_AVISOS = "checklist:janelaAvisos";
+const JANELA_AVISOS_PADRAO = { ativa: false, inicio: "08:00", fim: "22:00" };
 const INTERVALOS_AVISO = [15, 30, 60, 120, 180];
 const rotuloIntervalo = (m) => (m < 60 ? `${m} minutos` : m === 60 ? "1 hora" : `${m / 60} horas`);
 const STORAGE_TEMA = "checklist:tema"; // "escuro" (padrão) | "claro"
 const FORMATO_BACKUP = "checklist-backup"; // marca dos arquivos exportados
 const STORAGE_DONO = "checklist:donoLocal"; // id do usuário a quem pertence o cache local
 
+const horarioValido = (valor) => typeof valor === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(valor);
+function normalizarJanelaAvisos(valor) {
+  return {
+    ativa: valor?.ativa === true,
+    inicio: horarioValido(valor?.inicio) ? valor.inicio : JANELA_AVISOS_PADRAO.inicio,
+    fim: horarioValido(valor?.fim) ? valor.fim : JANELA_AVISOS_PADRAO.fim,
+  };
+}
+function horarioPermiteAvisos(janela, agora = new Date()) {
+  const configuracao = normalizarJanelaAvisos(janela);
+  if (!configuracao.ativa) return true;
+  const minutos = (hora) => Number(hora.slice(0, 2)) * 60 + Number(hora.slice(3, 5));
+  const inicio = minutos(configuracao.inicio);
+  const fim = minutos(configuracao.fim);
+  const atual = agora.getHours() * 60 + agora.getMinutes();
+  if (inicio === fim) return true; // horários iguais significam o dia inteiro
+  return inicio < fim ? atual >= inicio && atual < fim : atual >= inicio || atual < fim;
+}
+
 // o que vai pra nuvem (mesma forma do arquivo exportado, sem o cabeçalho)
 const listaObjs = (v) => (Array.isArray(v) ? v.filter((x) => x && typeof x === "object") : []);
-const empacotar = (tarefas, grupos, eventos, rotinas, contas, anotacoes = [], sessoesAnotacoes = []) => ({ tarefas, grupos, eventos, rotinas, contas, anotacoes, sessoesAnotacoes });
+const empacotar = (tarefas, grupos, eventos, rotinas, contas, anotacoes = [], sessoesAnotacoes = [], janelaAvisos = JANELA_AVISOS_PADRAO) => ({ tarefas, grupos, eventos, rotinas, contas, anotacoes, sessoesAnotacoes, janelaAvisos: normalizarJanelaAvisos(janelaAvisos) });
 const empacotarNuvem = (d) =>
-  empacotar(listaObjs(d?.tarefas), listaObjs(d?.grupos), listaObjs(d?.eventos), listaObjs(d?.rotinas), listaObjs(d?.contas), listaObjs(d?.anotacoes), listaObjs(d?.sessoesAnotacoes));
+  empacotar(listaObjs(d?.tarefas), listaObjs(d?.grupos), listaObjs(d?.eventos), listaObjs(d?.rotinas), listaObjs(d?.contas), listaObjs(d?.anotacoes), listaObjs(d?.sessoesAnotacoes), d?.janelaAvisos);
 // papel de parede padrão: coloque o arquivo bg.png dentro da pasta public/
 const FUNDO_PADRAO = `${import.meta.env.BASE_URL}bg.png`;
 const STORAGE_BG_AJUSTE = "checklist:ajusteFundo";
@@ -1429,7 +1450,7 @@ function FormularioAnotacao({ form, onSalvar, onChange, onCancelar }) {
   );
 }
 
-function ConfiguracoesVisuais({ tema, setTema, desfoque, setDesfoque, ajusteFundo, setAjusteFundo, escolherFundo, fundo, removerFundo, erroFundo }) {
+function ConfiguracoesVisuais({ tema, setTema, desfoque, setDesfoque, ajusteFundo, setAjusteFundo, escolherFundo, fundo, removerFundo, erroFundo, janelaAvisos, setJanelaAvisos }) {
   return <div className="ck-config-preferencias">
     <section className="ck-pref-card">
       <h3>Tema</h3>
@@ -1437,6 +1458,22 @@ function ConfiguracoesVisuais({ tema, setTema, desfoque, setDesfoque, ajusteFund
       <span className="ck-ajuste ck-ajuste-segmentado" role="group" aria-label="Tema">
         {[['escuro', 'Tema escuro'], ['claro', 'Tema claro']].map(([v, nome]) => <button key={v} type="button" className={`secundario ck-ajuste-btn${tema === v ? ' ativo' : ''}`} aria-pressed={tema === v} onClick={() => setTema(v)}>{nome}</button>)}
       </span>
+    </section>
+    <section className="ck-pref-card">
+      <h3>Horário dos lembretes</h3>
+      <p>Escolha em que período você quer receber os resumos e os avisos de prazo.</p>
+      <label className="ck-limite-horario">
+        <input type="checkbox" checked={janelaAvisos.ativa} onChange={(e) => setJanelaAvisos((atual) => ({ ...atual, ativa: e.target.checked }))} />
+        <span>Receber lembretes apenas neste período</span>
+      </label>
+      {janelaAvisos.ativa && <>
+        <div className="ck-periodo-avisos">
+          <label>Início<input type="time" value={janelaAvisos.inicio} onChange={(e) => setJanelaAvisos((atual) => ({ ...atual, inicio: e.target.value }))} /></label>
+          <span aria-hidden="true">até</span>
+          <label>Fim<input type="time" value={janelaAvisos.fim} onChange={(e) => setJanelaAvisos((atual) => ({ ...atual, fim: e.target.value }))} /></label>
+        </div>
+        <small>Fora desse período, os lembretes ficam pausados. O horário pode atravessar a meia-noite; se início e fim forem iguais, os lembretes ficam liberados o dia todo.</small>
+      </>}
     </section>
     <section className="ck-pref-card">
       <h3>Imagem de fundo</h3>
@@ -1480,6 +1517,7 @@ function Checklist({ usuario }) {
     const v = lerStorage(STORAGE_INTERVALO, 30);
     return INTERVALOS_AVISO.includes(v) ? v : 30;
   });
+  const [janelaAvisos, setJanelaAvisos] = useState(() => normalizarJanelaAvisos(lerStorage(STORAGE_JANELA_AVISOS, JANELA_AVISOS_PADRAO)));
   const [tema, setTema] = useState(() => (lerStorage(STORAGE_TEMA, "escuro") === "claro" ? "claro" : "escuro"));
   useEffect(() => {
     document.documentElement.dataset.tema = tema;
@@ -1511,6 +1549,7 @@ function Checklist({ usuario }) {
   const contasRef = useRef([]);
   const anotacoesRef = useRef([]);
   const sessoesAnotacoesRef = useRef([]);
+  const janelaAvisosRef = useRef(janelaAvisos);
   tarefasRef.current = tarefas;
   gruposRef.current = grupos;
   eventosRef.current = eventos;
@@ -1518,6 +1557,7 @@ function Checklist({ usuario }) {
   contasRef.current = contas;
   anotacoesRef.current = anotacoes;
   sessoesAnotacoesRef.current = sessoesAnotacoes;
+  janelaAvisosRef.current = janelaAvisos;
 
   // ---------- sincronização com o Supabase ----------
   const [sync, setSync] = useState("carregando"); // carregando | salvo | salvando | erro | conflito | erro-carregar
@@ -1528,7 +1568,7 @@ function Checklist({ usuario }) {
   const salvandoAgora = useRef(false);
   const bloqueado = useRef(false); // true enquanto há conflito pendente
 
-  const jsonAtual = JSON.stringify(empacotar(tarefas, grupos, eventos, rotinas, contas, anotacoes, sessoesAnotacoes));
+  const jsonAtual = JSON.stringify(empacotar(tarefas, grupos, eventos, rotinas, contas, anotacoes, sessoesAnotacoes, janelaAvisos));
   const jsonAtualRef = useRef(jsonAtual);
   jsonAtualRef.current = jsonAtual;
 
@@ -1541,6 +1581,7 @@ function Checklist({ usuario }) {
     setContas(l.contas);
     setAnotacoes(l.anotacoes);
     setSessoesAnotacoes(l.sessoesAnotacoes);
+    setJanelaAvisos(l.janelaAvisos);
     return JSON.stringify(l);
   }
 
@@ -1561,8 +1602,8 @@ function Checklist({ usuario }) {
           // cache local de outra conta nunca sobe pra esta
           const dono = lerStorage(STORAGE_DONO, null);
           const inicial = dono && dono !== usuario.id
-            ? empacotar([], [], [], [], [], [], [])
-            : empacotar(tarefasRef.current, gruposRef.current, eventosRef.current, rotinasRef.current, contasRef.current, anotacoesRef.current, sessoesAnotacoesRef.current);
+            ? empacotar([], [], [], [], [], [], [], JANELA_AVISOS_PADRAO)
+            : empacotar(tarefasRef.current, gruposRef.current, eventosRef.current, rotinasRef.current, contasRef.current, anotacoesRef.current, sessoesAnotacoesRef.current, janelaAvisosRef.current);
           jsonSalvo.current = aplicarDados(inicial);
           try {
             versaoNuvem.current = await criarDados(usuario.id, inicial);
@@ -1591,7 +1632,7 @@ function Checklist({ usuario }) {
   async function salvarNaNuvem(forcar = false) {
     while (salvandoAgora.current) await new Promise((r) => setTimeout(r, 200));
     if (bloqueado.current && !forcar) return;
-    const dados = empacotar(tarefasRef.current, gruposRef.current, eventosRef.current, rotinasRef.current, contasRef.current, anotacoesRef.current, sessoesAnotacoesRef.current);
+    const dados = empacotar(tarefasRef.current, gruposRef.current, eventosRef.current, rotinasRef.current, contasRef.current, anotacoesRef.current, sessoesAnotacoesRef.current, janelaAvisosRef.current);
     const json = JSON.stringify(dados);
     if (json === jsonSalvo.current && !forcar) return;
     salvandoAgora.current = true;
@@ -1689,7 +1730,7 @@ function Checklist({ usuario }) {
       /* ignora */
     }
     // limpa o cache local pra não deixar suas tarefas num computador compartilhado
-    [STORAGE_TASKS, STORAGE_GROUPS, STORAGE_EVENTS, STORAGE_ROUTINES, STORAGE_BILLS, STORAGE_NOTES, STORAGE_NOTE_GROUPS, STORAGE_DONO, STORAGE_PRAZOS, STORAGE_LAST].forEach((k) => {
+    [STORAGE_TASKS, STORAGE_GROUPS, STORAGE_EVENTS, STORAGE_ROUTINES, STORAGE_BILLS, STORAGE_NOTES, STORAGE_NOTE_GROUPS, STORAGE_JANELA_AVISOS, STORAGE_DONO, STORAGE_PRAZOS, STORAGE_LAST].forEach((k) => {
       try {
         localStorage.removeItem(k);
       } catch {
@@ -1720,6 +1761,7 @@ function Checklist({ usuario }) {
   }, [contas]);
   useEffect(() => { salvarStorage(STORAGE_NOTES, anotacoes); }, [anotacoes]);
   useEffect(() => { salvarStorage(STORAGE_NOTE_GROUPS, sessoesAnotacoes); }, [sessoesAnotacoes]);
+  useEffect(() => { salvarStorage(STORAGE_JANELA_AVISOS, janelaAvisos); }, [janelaAvisos]);
 
   useEffect(() => {
     let url = null;
@@ -1798,7 +1840,8 @@ function Checklist({ usuario }) {
         voltam.length > 0 &&
         typeof Notification !== "undefined" &&
         Notification.permission === "granted" &&
-        lerStorage(STORAGE_NOTIFY, false)
+        lerStorage(STORAGE_NOTIFY, false) &&
+        horarioPermiteAvisos(lerStorage(STORAGE_JANELA_AVISOS, JANELA_AVISOS_PADRAO), agora)
       ) {
         mostrarNotificacao(`Tarefa de volta · ${horaAtual()}`, {
           body: voltam.map((r) => `• ${r.texto}`).join("\n"),
@@ -1877,6 +1920,7 @@ function Checklist({ usuario }) {
   function verificarPrazos() {
     if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
     const agora = new Date();
+    if (!horarioPermiteAvisos(janelaAvisos, agora)) return;
     const vistos = lerStorage(STORAGE_PRAZOS, {});
     let mudou = false;
 
@@ -1959,6 +2003,11 @@ function Checklist({ usuario }) {
     if (!notificar || permissao !== "granted" || pushAtivo) return; // com push ativo, o servidor avisa
 
     const checar = () => {
+      const agora = new Date();
+      if (!horarioPermiteAvisos(janelaAvisos, agora)) {
+        salvarStorage(STORAGE_LAST, slotAtual(intervaloAviso));
+        return;
+      }
       verificarPrazos();
       const slot = slotAtual(intervaloAviso);
       if (lerStorage(STORAGE_LAST, "") === slot) return; // esse intervalo já foi avisado
@@ -1975,7 +2024,9 @@ function Checklist({ usuario }) {
       clearInterval(id);
       document.removeEventListener("visibilitychange", checar);
     };
-  }, [notificar, permissao, intervaloAviso, pushAtivo]);
+    // A função usa refs mutáveis e `janelaAvisos`, já declarada como dependência.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notificar, permissao, intervaloAviso, pushAtivo, janelaAvisos]);
 
   function mudarIntervalo(minutos) {
     setIntervaloAviso(minutos);
@@ -2302,6 +2353,7 @@ function Checklist({ usuario }) {
       contas,
       anotacoes,
       sessoesAnotacoes,
+      janelaAvisos,
     };
     const blob = new Blob([JSON.stringify(dados, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -2330,6 +2382,7 @@ function Checklist({ usuario }) {
       const co = lista(dados.contas);
       const an = lista(dados.anotacoes);
       const san = lista(dados.sessoesAnotacoes);
+      const ja = normalizarJanelaAvisos(dados.janelaAvisos);
       const quando = dados.exportadoEm ? new Date(dados.exportadoEm).toLocaleString("pt-BR") : "data desconhecida";
       const ok = window.confirm(
         `Importar "${arquivo.name}" (exportado em ${quando})?\n\n` +
@@ -2344,6 +2397,7 @@ function Checklist({ usuario }) {
       setContas(co);
       setAnotacoes(an);
       setSessoesAnotacoes(san);
+      setJanelaAvisos(ja);
       setMsgDados({ texto: `Importado: ${t.length} tarefas, ${g.length} sessões, ${ev.length} eventos, ${ro.length} rotinas, ${co.length} contas.`, erro: false });
     } catch {
       setMsgDados({ texto: "Não consegui ler esse arquivo. Use um arquivo exportado por este app (.json).", erro: true });
@@ -2484,7 +2538,7 @@ function Checklist({ usuario }) {
           <button type="button" role="tab" className="ck-aba" aria-selected={abaConfiguracoes === "preferencias"} onClick={() => setAbaConfiguracoes("preferencias")}>Preferências</button>
           <button type="button" role="tab" className="ck-aba" aria-selected={abaConfiguracoes === "conta"} onClick={() => setAbaConfiguracoes("conta")}>Conta</button>
         </div>
-        {abaConfiguracoes === "preferencias" ? <ConfiguracoesVisuais tema={tema} setTema={setTema} desfoque={desfoque} setDesfoque={setDesfoque} ajusteFundo={ajusteFundo} setAjusteFundo={setAjusteFundo} escolherFundo={escolherFundo} fundo={fundo} removerFundo={removerFundo} erroFundo={erroFundo} /> : <section className="ck-conta-config">
+        {abaConfiguracoes === "preferencias" ? <ConfiguracoesVisuais tema={tema} setTema={setTema} desfoque={desfoque} setDesfoque={setDesfoque} ajusteFundo={ajusteFundo} setAjusteFundo={setAjusteFundo} escolherFundo={escolherFundo} fundo={fundo} removerFundo={removerFundo} erroFundo={erroFundo} janelaAvisos={janelaAvisos} setJanelaAvisos={setJanelaAvisos} /> : <section className="ck-conta-config">
           <div className="ck-conta-identidade"><span className="ck-conta-avatar" aria-hidden="true">{(usuario.email || "?").slice(0, 1).toUpperCase()}</span><div><small>Conta conectada</small><strong>{usuario.email}</strong></div></div>
           <button type="button" className="ck-sair-conta" onClick={sair}><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"><path d="M6.5 2.5H4a1.5 1.5 0 0 0-1.5 1.5v8A1.5 1.5 0 0 0 4 13.5h2.5"/><path d="M10 5l3 3-3 3M13 8H6.5"/></svg>Sair da conta</button>
           <div className="ck-backup-card">
@@ -2755,7 +2809,7 @@ function Checklist({ usuario }) {
         <span aria-hidden="true"> · </span>
         <Contato />
                 <span aria-hidden="true"> · </span>
-                <span aria-hidden="true"> V0.62 </span>
+                <span aria-hidden="true"> V0.63 </span>
       </footer>
     </main>
 

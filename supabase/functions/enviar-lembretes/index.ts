@@ -50,6 +50,19 @@ function somarDias(dataISO: string, n: number) {
   return `${x.getUTCFullYear()}-${z2(x.getUTCMonth() + 1)}-${z2(x.getUTCDate())}`;
 }
 
+function horarioPermiteAvisos(janela: any, minutosDia: number) {
+  if (!janela || janela.ativa !== true) return true;
+  const valido = (valor: unknown) => typeof valor === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(valor);
+  if (!valido(janela.inicio) || !valido(janela.fim)) return true;
+  const emMinutos = (hora: string) => Number(hora.slice(0, 2)) * 60 + Number(hora.slice(3, 5));
+  const inicio = emMinutos(janela.inicio);
+  const fim = emMinutos(janela.fim);
+  if (inicio === fim) return true;
+  return inicio < fim
+    ? minutosDia >= inicio && minutosDia < fim
+    : minutosDia >= inicio || minutosDia < fim;
+}
+
 const naiveDe = (data: string, hora: string) => {
   const [a, m, d] = data.split("-").map(Number);
   const [h, mi] = hora.split(":").map(Number);
@@ -144,12 +157,14 @@ Deno.serve(async (req) => {
   for (const sub of subs) {
     const dados: any = dadosDe.get(sub.user_id) ?? {};
     const ag = agoraNoFuso(sub.fuso || "America/Sao_Paulo");
+    const dentroDoHorario = horarioPermiteAvisos(dados.janelaAvisos, ag.minutosDia);
     const mudancas: Record<string, unknown> = {};
 
     // 1) avisos perto do prazo: 45 min antes (lembrete) e 15 min antes (chamadão)
     const vistos: Record<string, number> = { ...(sub.prazos_enviados ?? {}) };
     let mudouVistos = false;
     for (const t of dados.tarefas ?? []) {
+      if (!forcar && !dentroDoHorario) break;
       if (t.feita || !t.limite || !t.limiteHora) continue;
       const faltam = (naiveDe(t.limite, t.limiteHora) - ag.naive) / 60000;
       for (const [marca, grande] of [[45, false], [15, true]] as const) {
@@ -186,7 +201,7 @@ Deno.serve(async (req) => {
     if (forcar || sub.ultimo_slot !== slot) {
       if (!forcar) mudancas.ultimo_slot = slot;
       // só avisa nos primeiros 5 min do intervalo, para não mandar aviso velho
-      if (forcar || ag.minutosDia % intervalo < 5) {
+      if ((forcar || dentroDoHorario) && (forcar || ag.minutosDia % intervalo < 5)) {
         const resumo = montarResumo(dados, ag);
         if (resumo && (await enviar(sub, resumo, { TTL: 1200, urgency: "high" }))) enviados++;
       }
