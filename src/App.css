@@ -811,14 +811,7 @@ a.ck-apagar:hover {
   .ck-alca {
     display: grid;
   }
-  .ck-mover-mobile {
-    display: flex;
-  }
 }
-
-.ck-mover-mobile { display: none; flex: none; flex-direction: column; align-self: center; gap: 2px; }
-.ck-mover-mobile button { display: grid; place-items: center; width: 24px; height: 22px; padding: 0; color: var(--suave); background: transparent; border: 1px solid var(--linha); border-radius: 6px; font-size: 14px; line-height: 1; }
-.ck-mover-mobile button:active { color: var(--azul-forte); background: var(--fundo-hover); }
 
 /* ---------- endereço e descrição do evento ---------- */
 .ck-form-grupo .ck-campo-largo {
