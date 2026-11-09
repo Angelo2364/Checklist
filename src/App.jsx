@@ -28,6 +28,7 @@ const NOME_SECRETO = "Luna";
 const EMAIL_CONTATO = "sayaokaua@gmail.com";
 const STORAGE_INTERVALO = "checklist:intervaloAviso"; // minutos entre os lembretes
 const STORAGE_JANELA_AVISOS = "checklist:janelaAvisos";
+const STORAGE_AVISOS_AGENDA_FECHADOS = "checklist:avisosAgendaFechados";
 const JANELA_AVISOS_PADRAO = { ativa: false, inicio: "08:00", fim: "22:00" };
 const INTERVALOS_AVISO = [15, 30, 60, 120, 180];
 const rotuloIntervalo = (m) => (m < 60 ? `${m} minutos` : m === 60 ? "1 hora" : `${m / 60} horas`);
@@ -429,7 +430,7 @@ function DiaMes({ value, onChange }) {
 
   return (
     <span className="ck-hora24" role="group" aria-label="Data limite: dia e mês (opcional)" title="Data limite: dia/mês (opcional). O ano é o próximo em que a data ainda não passou.">
-      <span className="ck-prazo-rotulo">Prazo</span>
+      <span className="ck-prazo-rotulo">Data</span>
       <input
         ref={refD}
         type="text"
@@ -487,21 +488,16 @@ function DiaMes({ value, onChange }) {
 /* Data e horário limite (opcionais) */
 function CampoPrazo({ limite, hora, onLimite, onHora }) {
   return (
-    <>
-      <DiaMes
-        value={limite}
-        onChange={(v) => {
-          onLimite(v);
-          if (!v) onHora("");
-        }}
-      />
-      {limite && <Hora24 value={hora} onChange={onHora} opcional rotulo="Horário limite (opcional)" />}
-    </>
+    <span className="ck-prazo-campos">
+      <span className="ck-prazo-rotulo">Prazo</span>
+      <Hora24 value={hora} onChange={onHora} opcional rotulo="Horário do prazo (opcional)" />
+      {hora && <DiaMes value={limite} onChange={onLimite} />}
+    </span>
   );
 }
 
 /* Calendário do mês com eventos */
-function Calendario({ eventos, adicionar, editar, apagar }) {
+function Calendario({ eventos, tarefasAgendadas, adicionar, editar, apagar, agendarTarefa, editarTarefa, apagarTarefa, alternarTarefaAgendada }) {
   const hojeISO = iso(new Date());
   const [mes, setMes] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [sel, setSel] = useState(hojeISO);
@@ -513,15 +509,19 @@ function Calendario({ eventos, adicionar, editar, apagar }) {
   const [descricao, setDescricao] = useState("");
   const [editandoId, setEditandoId] = useState(null); // evento sendo editado
   const [dataEdit, setDataEdit] = useState("");
+  const [abrindoTarefa, setAbrindoTarefa] = useState(false);
+  const [editandoTarefaId, setEditandoTarefaId] = useState(null);
 
   const ano = mes.getFullYear();
   const m = mes.getMonth();
   const vazios = new Date(ano, m, 1).getDay();
   const total = new Date(ano, m + 1, 0).getDate();
   const comEvento = new Set(eventos.map((e) => e.data));
+  const comTarefa = new Set(tarefasAgendadas.map((t) => t.agendadaPara));
   const doDia = eventos
     .filter((e) => e.data === sel)
     .sort((a, b) => (a.hora || "").localeCompare(b.hora || ""));
+  const tarefasDoDia = tarefasAgendadas.filter((t) => t.agendadaPara === sel);
 
   function limparCampos() {
     setTitulo("");
@@ -569,12 +569,20 @@ function Calendario({ eventos, adicionar, editar, apagar }) {
     limparCampos();
   }
 
+  function abrirFormTarefa() {
+    setAbrindoTarefa(true);
+  }
+
   return (
     <section className="ck-cal">
       <div className="ck-cal-topo">
-        <button type="button" className="ck-cal-nav" aria-label="Mês anterior" onClick={() => setMes(new Date(ano, m - 1, 1))}>‹</button>
+        <button type="button" className="ck-cal-nav" aria-label="Mês anterior" onClick={() => setMes(new Date(ano, m - 1, 1))}>
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m9.5 3.5-4.5 4.5 4.5 4.5" /></svg>
+        </button>
         <strong>{MESES[m]} de {ano}</strong>
-        <button type="button" className="ck-cal-nav" aria-label="Próximo mês" onClick={() => setMes(new Date(ano, m + 1, 1))}>›</button>
+        <button type="button" className="ck-cal-nav" aria-label="Próximo mês" onClick={() => setMes(new Date(ano, m + 1, 1))}>
+          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m6.5 3.5 4.5 4.5-4.5 4.5" /></svg>
+        </button>
       </div>
 
       <div className="ck-cal-grade">
@@ -594,7 +602,7 @@ function Calendario({ eventos, adicionar, editar, apagar }) {
               onClick={() => setSel(id)}
             >
               {i + 1}
-              {comEvento.has(id) && <i />}
+              {(comEvento.has(id) || comTarefa.has(id)) && <i className={`ck-marcador-dia ${comEvento.has(id) && comTarefa.has(id) ? "ambos" : comEvento.has(id) ? "evento" : "tarefa"}`} />}
             </button>
           );
         })}
@@ -604,13 +612,13 @@ function Calendario({ eventos, adicionar, editar, apagar }) {
         {new Date(`${sel}T00:00`).toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}
       </h3>
 
-      {doDia.length === 0 ? (
+      {doDia.length === 0 && tarefasDoDia.length === 0 ? (
         <p className="ck-vazio-cal">Nenhum evento neste dia.</p>
       ) : (
         <ul className="ck-eventos">
           {doDia.map((e) => (
             <li key={e.id}>
-              <span className="ck-ev-hora">{e.hora ? (e.horaFim ? `${e.hora}–${e.horaFim}` : e.hora) : "dia todo"}</span>
+              <span className="ck-ev-hora">{e.hora ? (e.horaFim ? `${e.hora}–${e.horaFim}` : e.hora) : "Dia todo"}</span>
               <span className="ck-ev-titulo">
                 {e.titulo}
                 {e.endereco && (
@@ -633,6 +641,27 @@ function Calendario({ eventos, adicionar, editar, apagar }) {
               </button>
               <a className="ck-apagar" href={linkGoogle(e)} target="_blank" rel="noreferrer" title="Abrir no Google Agenda">Google</a>
               <BotaoApagar nome={`evento ${e.titulo}`} onClick={() => apagar(e.id)} />
+            </li>
+          ))}
+          {tarefasDoDia.map((t) => editandoTarefaId === t.id ? (
+            <li key={`tarefa-${t.id}`} className="ck-evento-tarefa ck-evento-tarefa-editando">
+              <EditarTarefa
+                tarefa={t}
+                incluirDataAgenda
+                onSalvar={(textoAtual, dias, horaAtual, prazo) => { editarTarefa(t.id, textoAtual, dias, horaAtual, prazo); setEditandoTarefaId(null); }}
+                onCancelar={() => setEditandoTarefaId(null)}
+              />
+            </li>
+          ) : (
+            <li key={`tarefa-${t.id}`} className={`ck-evento-tarefa${t.feita ? " feita" : ""}`}>
+              <span className="ck-ev-hora">Tarefa</span>
+              <button type="button" className="ck-ev-titulo ck-ev-tarefa-titulo" onClick={() => alternarTarefaAgendada(t.id)} title="Marcar tarefa como concluída">
+                <span className={`ck-ev-tarefa-caixa${t.feita ? " feita" : t.meio ? " meio" : ""}`} aria-hidden="true">{t.feita ? "✓" : t.meio ? "·" : ""}</span>{t.texto}
+              </button>
+              <button type="button" className="ck-icone" onClick={() => setEditandoTarefaId(t.id)} title="Editar tarefa" aria-label={`Editar ${t.texto}`}>
+                <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" /></svg>
+              </button>
+              <BotaoApagar nome={`tarefa ${t.texto}`} onClick={() => apagarTarefa(t.id)} />
             </li>
           ))}
         </ul>
@@ -702,6 +731,22 @@ function Calendario({ eventos, adicionar, editar, apagar }) {
         </form>
       ) : (
         <BarraMais rotulo="Adicionar evento" onClick={() => setAbrindo(true)} />
+      )}
+      {abrindoTarefa ? (
+        <NovaTarefa
+          modoAgenda
+          dataInicial={sel}
+          placeholder="Nova tarefa agendada"
+          onAdd={(texto, repetir, horaRotina, prazo) => {
+            agendarTarefa(texto, prazo.agendadaPara, repetir, horaRotina, prazo);
+            setSel(prazo.agendadaPara);
+            setMes(new Date(`${prazo.agendadaPara}T00:00`));
+            setAbrindoTarefa(false);
+          }}
+          onFechar={() => setAbrindoTarefa(false)}
+        />
+      ) : (
+        <BarraMais rotulo="Agendar tarefa" onClick={abrirFormTarefa} />
       )}
     </section>
   );
@@ -918,30 +963,35 @@ function Contas({ contas, adicionar, alternar, apagar, definirValor, editar }) {
 }
 
 /* Lista das tarefas que se repetem */
-function EditarRotina({ rotina, onSalvar, onCancelar }) {
+function EditarRotina({ rotina, grupos, onSalvar, onCancelar }) {
   const [texto, setTexto] = useState(rotina.texto);
   const [cada, setCada] = useState(String(rotina.cada));
   const [hora, setHora] = useState(rotina.hora || "00:00");
   const [proxima, setProxima] = useState(rotina.proxima || iso(new Date()));
   const [descricao, setDescricao] = useState(rotina.descricao || "");
+  const [grupoId, setGrupoId] = useState(rotina.grupoId || "");
 
   function enviar(e) {
     e.preventDefault();
     if (!texto.trim() || !proxima) return;
-    onSalvar({ texto: texto.trim(), cada: Number(cada), hora: hora || "00:00", proxima, descricao: descricao.trim() });
+    onSalvar({ texto: texto.trim(), cada: Number(cada), hora: hora || "00:00", proxima, descricao: descricao.trim(), grupoId: grupoId || null });
   }
 
   return <form className="ck-form-grupo ck-form-rotina" onSubmit={enviar} onBlur={(e) => fecharAoClicarFora(e, onCancelar)} onKeyDown={(e) => { if (e.key === "Escape") onCancelar(); else if (e.target.matches("textarea")) enviarAoEnter(e); }}>
     <input autoFocus type="text" className="ck-campo-largo" value={texto} onChange={(e) => setTexto(e.target.value)} aria-label="Nome da rotina" maxLength={200} required />
     <select value={cada} onChange={(e) => setCada(e.target.value)} aria-label="Frequência da rotina">{OPCOES_REPETE.filter(([valor]) => Number(valor) > 0).map(([valor, rotulo]) => <option key={valor} value={valor}>{rotulo}</option>)}</select>
     <Hora24 value={hora} onChange={setHora} rotulo="Horário da rotina" />
+    <select value={grupoId} onChange={(e) => setGrupoId(e.target.value)} aria-label="Sessão das próximas tarefas">
+      <option value="">Sem sessão</option>
+      {grupos.map((g) => <option key={g.id} value={g.id}>{g.nome}</option>)}
+    </select>
     <label className="ck-form-data"><span>Próxima</span><input type="date" value={proxima} onChange={(e) => setProxima(e.target.value)} required /></label>
-    <textarea className="ck-campo-largo" rows={2} value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Observações (opcional)" aria-label="Observações da rotina" maxLength={1000} />
+    <textarea className="ck-campo-largo" rows={2} value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Descrição (opcional)" aria-label="Observações da rotina" maxLength={1000} />
     <span className="ck-edit-acoes"><button type="submit" disabled={!texto.trim() || !proxima}>Salvar</button><button type="button" className="ck-icone" onClick={onCancelar} title="Cancelar edição" aria-label="Cancelar edição"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="m4 4 8 8m0-8-8 8" /></svg></button></span>
   </form>;
 }
 
-function Rotinas({ rotinas, apagar, mudarPrioridade, editar }) {
+function Rotinas({ rotinas, grupos, apagar, mudarPrioridade, editar }) {
   const [editandoId, setEditandoId] = useState(null);
   if (rotinas.length === 0) {
     return (
@@ -954,7 +1004,7 @@ function Rotinas({ rotinas, apagar, mudarPrioridade, editar }) {
     <section className="ck-rotinas">
       <ul>
         {rotinas.map((r) => editandoId === r.id ? (
-          <li key={r.id} className="ck-item-editando"><EditarRotina rotina={r} onSalvar={(campos) => { editar(r.id, campos); setEditandoId(null); }} onCancelar={() => setEditandoId(null)} /></li>
+          <li key={r.id} className="ck-item-editando"><EditarRotina rotina={r} grupos={grupos} onSalvar={(campos) => { editar(r.id, campos); setEditandoId(null); }} onCancelar={() => setEditandoId(null)} /></li>
         ) : (
           <li key={r.id}>
             <span className="ck-rot-texto">
@@ -1145,7 +1195,7 @@ function BarraMais({ rotulo, onClick, atalho }) {
 }
 
 /* Campo para escrever uma tarefa nova (usado fora e dentro das sessões) */
-function NovaTarefa({ onAdd, placeholder, onFechar, idCampo }) {
+function NovaTarefa({ onAdd, placeholder, onFechar, idCampo, modoAgenda = false, dataInicial }) {
   const formRef = useRef(null);
   const [texto, setTexto] = useState("");
   const [repete, setRepete] = useState("0");
@@ -1153,6 +1203,7 @@ function NovaTarefa({ onAdd, placeholder, onFechar, idCampo }) {
   const [limite, setLimite] = useState("");
   const [limiteHora, setLimiteHora] = useState("");
   const [descricao, setDescricao] = useState("");
+  const [agendadaPara, setAgendadaPara] = useState(dataInicial || iso(new Date()));
 
   useEffect(() => {
     if (!onFechar) return undefined;
@@ -1167,7 +1218,10 @@ function NovaTarefa({ onAdd, placeholder, onFechar, idCampo }) {
     e.preventDefault();
     const limpo = texto.trim();
     if (!limpo) return;
-    onAdd(limpo, Number(repete), hora || "00:00", { limite, limiteHora, descricao });
+    onAdd(limpo, Number(repete), hora || "00:00", {
+      limite: limiteHora ? limite || iso(new Date()) : "", limiteHora, descricao,
+      ...(modoAgenda ? { agendadaPara } : {}),
+    });
     setTexto("");
     setLimite("");
     setLimiteHora("");
@@ -1177,7 +1231,7 @@ function NovaTarefa({ onAdd, placeholder, onFechar, idCampo }) {
   return (
     <form
       ref={formRef}
-      className="ck-form-grupo"
+      className={`ck-form-grupo${modoAgenda ? " ck-form-tarefa-agendada" : ""}`}
       onSubmit={enviar}
       onBlur={(e) => {
         if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget) && onFechar) onFechar();
@@ -1194,6 +1248,7 @@ function NovaTarefa({ onAdd, placeholder, onFechar, idCampo }) {
         aria-label={placeholder}
         maxLength={200}
       />
+      {modoAgenda && <label className="ck-form-data ck-form-data-agendada"><span>Começar em</span><input type="date" value={agendadaPara} onChange={(e) => setAgendadaPara(e.target.value)} required /></label>}
       <select
         value={repete}
         onChange={(e) => setRepete(e.target.value)}
@@ -1213,13 +1268,13 @@ function NovaTarefa({ onAdd, placeholder, onFechar, idCampo }) {
         value={descricao}
         onChange={(e) => setDescricao(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Escape") onFechar && onFechar(); else enviarAoEnter(e); }}
-        placeholder="Observações (opcional)"
+        placeholder="Descrição (opcional)"
         aria-label="Observações da tarefa"
         rows={2}
         maxLength={1000}
       />
       <button type="submit" disabled={!texto.trim()}>
-        Adicionar
+        {modoAgenda ? "Agendar tarefa" : "Adicionar"}
       </button>
     </form>
   );
@@ -1286,20 +1341,24 @@ function alvoProps(ordem, tipo, id, grupo) {
 }
 
 /* Formulário para editar uma tarefa já criada */
-function EditarTarefa({ tarefa, onSalvar, onCancelar }) {
+function EditarTarefa({ tarefa, onSalvar, onCancelar, incluirDataAgenda = false }) {
   const [texto, setTexto] = useState(tarefa.texto);
   const [repete, setRepete] = useState(String(tarefa.repeteDias || 0));
   const [hora, setHora] = useState(tarefa.repeteHora || "00:00");
   const [limite, setLimite] = useState(tarefa.limite || "");
   const [limiteHora, setLimiteHora] = useState(tarefa.limiteHora || "");
   const [descricao, setDescricao] = useState(tarefa.descricao || "");
+  const [agendadaPara, setAgendadaPara] = useState(tarefa.agendadaPara || iso(new Date()));
 
   return (
     <form
       className="ck-form-grupo"
       onSubmit={(e) => {
         e.preventDefault();
-        if (texto.trim()) onSalvar(texto.trim(), Number(repete), hora || "00:00", { limite, limiteHora, descricao });
+        if (texto.trim()) onSalvar(texto.trim(), Number(repete), hora || "00:00", {
+          limite: limiteHora ? limite || iso(new Date()) : "", limiteHora, descricao,
+          ...(incluirDataAgenda ? { agendadaPara } : {}),
+        });
       }}
       onBlur={(e) => fecharAoClicarFora(e, onCancelar)}
       onKeyDown={(e) => e.key === "Escape" && onCancelar()}
@@ -1313,6 +1372,7 @@ function EditarTarefa({ tarefa, onSalvar, onCancelar }) {
         aria-label="Nome da tarefa"
         maxLength={200}
       />
+      {incluirDataAgenda && <label className="ck-form-data ck-form-data-agendada"><span>Começar em</span><input type="date" value={agendadaPara} onChange={(e) => setAgendadaPara(e.target.value)} required /></label>}
       <select value={repete} onChange={(e) => setRepete(e.target.value)} aria-label="Repetir tarefa">
         {OPCOES_REPETE.map(([v, nome]) => (
           <option key={v} value={v}>{v ? `↻ ${nome}` : nome}</option>
@@ -1327,7 +1387,7 @@ function EditarTarefa({ tarefa, onSalvar, onCancelar }) {
         value={descricao}
         onChange={(e) => setDescricao(e.target.value)}
         onKeyDown={(e) => { if (e.key === "Escape") onCancelar(); else enviarAoEnter(e); }}
-        placeholder="Observações (opcional)"
+        placeholder="Descrição (opcional)"
         aria-label="Observações da tarefa"
         rows={2}
         maxLength={1000}
@@ -1474,9 +1534,9 @@ function ConfiguracoesVisuais({ tema, setTema, desfoque, setDesfoque, ajusteFund
       </label>
       {janelaAvisos.ativa && <>
         <div className="ck-periodo-avisos">
-          <label>Início<input type="time" value={janelaAvisos.inicio} onChange={(e) => setJanelaAvisos((atual) => ({ ...atual, inicio: e.target.value }))} /></label>
+          <label>Início<Hora24 value={janelaAvisos.inicio} onChange={(inicio) => setJanelaAvisos((atual) => ({ ...atual, inicio }))} rotulo="Início do período de lembretes" /></label>
           <span aria-hidden="true">até</span>
-          <label>Fim<input type="time" value={janelaAvisos.fim} onChange={(e) => setJanelaAvisos((atual) => ({ ...atual, fim: e.target.value }))} /></label>
+          <label>Fim<Hora24 value={janelaAvisos.fim} onChange={(fim) => setJanelaAvisos((atual) => ({ ...atual, fim }))} rotulo="Fim do período de lembretes" /></label>
         </div>
         <small>Fora desse período, os lembretes ficam pausados. O horário pode atravessar a meia-noite; se início e fim forem iguais, os lembretes ficam liberados o dia todo.</small>
       </>}
@@ -1606,6 +1666,7 @@ function Checklist({ usuario }) {
   const [tarefas, setTarefas] = useState(() => lerStorage(STORAGE_TASKS, []));
   const [grupos, setGrupos] = useState(() => lerStorage(STORAGE_GROUPS, []));
   const [eventos, setEventos] = useState(() => lerStorage(STORAGE_EVENTS, []));
+  const [avisosAgendaFechados, setAvisosAgendaFechados] = useState(() => lerStorage(STORAGE_AVISOS_AGENDA_FECHADOS, {}));
   const [rotinas, setRotinas] = useState(() => lerStorage(STORAGE_ROUTINES, []));
   const [contas, setContas] = useState(() => lerStorage(STORAGE_BILLS, []));
   const [anotacoes, setAnotacoes] = useState(() => lerStorage(STORAGE_NOTES, []));
@@ -2022,9 +2083,12 @@ function Checklist({ usuario }) {
 
   const idsGrupos = new Set(grupos.map((g) => g.id));
   // Tarefas sem sessão (ou de uma sessão que não existe mais)
-  const soltas = tarefas.filter((t) => !t.grupoId || !idsGrupos.has(t.grupoId));
-  const pendentes = tarefas.filter((t) => !t.feita);
-  const feitas = tarefas.length - pendentes.length;
+  const hoje = iso(new Date());
+  const tarefasVisiveis = tarefas.filter((t) => !t.agendadaPara || t.agendadaPara <= hoje);
+  const tarefasFuturas = tarefas.filter((t) => t.agendadaPara && t.agendadaPara > hoje);
+  const soltas = tarefasVisiveis.filter((t) => !t.grupoId || !idsGrupos.has(t.grupoId));
+  const pendentes = tarefasVisiveis.filter((t) => !t.feita);
+  const feitas = tarefasVisiveis.length - pendentes.length;
   const meias = pendentes.filter((t) => t.meio).length;
 
   // avisos extras perto do prazo: 45 min antes (lembrete) e 15 min antes (chamadão)
@@ -2036,6 +2100,7 @@ function Checklist({ usuario }) {
     let mudou = false;
 
     tarefasRef.current.forEach((t) => {
+      if (t.agendadaPara && t.agendadaPara > iso(agora)) return;
       const fim = !t.feita && prazoDe(t);
       if (!fim) return;
       const faltam = (fim - agora) / 60000;
@@ -2071,8 +2136,9 @@ function Checklist({ usuario }) {
     if (typeof Notification === "undefined") return;
     if (Notification.permission !== "granted") return;
 
-    const todas = tarefasRef.current.filter((t) => !t.feita);
     const agora = new Date();
+    const hoje = iso(agora);
+    const todas = tarefasRef.current.filter((t) => !t.feita && (!t.agendadaPara || t.agendadaPara <= hoje));
     const hm = `${z2(agora.getHours())}:${z2(agora.getMinutes())}`;
     const evs = eventosRef.current
       .filter((e) => e.data === iso(agora) && (!e.hora || e.hora >= hm))
@@ -2237,6 +2303,15 @@ function Checklist({ usuario }) {
     setEventos((atual) => atual.filter((e) => e.id !== id));
   }
 
+  function dispensarAvisoAgenda(evento) {
+    const chave = `${evento.id}:${evento.data}`;
+    setAvisosAgendaFechados((atual) => {
+      const novos = { ...atual, [chave]: true };
+      salvarStorage(STORAGE_AVISOS_AGENDA_FECHADOS, novos);
+      return novos;
+    });
+  }
+
   function apagarRotina(id) {
     setRotinas((atual) => atual.filter((r) => r.id !== id));
   }
@@ -2279,6 +2354,7 @@ function Checklist({ usuario }) {
       repeteDias: campos.cada,
       repeteHora: campos.hora,
       descricao: campos.descricao,
+      grupoId: campos.grupoId,
     } : t));
   }
 
@@ -2374,14 +2450,19 @@ function Checklist({ usuario }) {
       rotinaId = novoId(); // passou a repetir
       setRotinas((a) => [
         ...a,
-        { id: rotinaId, texto, cada: dias, hora, descricao: (prazo.descricao || "").trim(), grupoId: t.grupoId || null, prioridade: t.prioridade || 0, proxima: somarDias(iso(new Date()), dias) },
+        { id: rotinaId, texto, cada: dias, hora, descricao: (prazo.descricao || "").trim(), grupoId: t.grupoId || null, prioridade: t.prioridade || 0, proxima: somarDias(t.agendadaPara || iso(new Date()), dias) },
       ]);
     } else if (rotina) {
       setRotinas((a) => a.filter((r) => r.id !== rotina.id)); // parou de repetir
     }
 
     setTarefas((a) =>
-      a.map((x) => (x.id === id ? { ...x, texto, repeteDias: dias, repeteHora: dias > 0 ? hora : undefined, rotinaId, limite: prazo.limite || "", limiteHora: prazo.limite ? prazo.limiteHora || "" : "", descricao: (prazo.descricao || "").trim() } : x))
+      a.map((x) => (x.id === id ? {
+        ...x, texto, repeteDias: dias, repeteHora: dias > 0 ? hora : undefined, rotinaId,
+        limite: prazo.limite || "", limiteHora: prazo.limite ? prazo.limiteHora || "" : "",
+        descricao: (prazo.descricao || "").trim(),
+        ...(prazo.agendadaPara ? { agendadaPara: prazo.agendadaPara } : {}),
+      } : x))
     );
     setEditando(null);
   }
@@ -2574,6 +2655,26 @@ function Checklist({ usuario }) {
     if (!window.confirm(aviso)) return;
     setGrupos((atual) => atual.filter((g) => g.id !== grupo.id));
     setTarefas((atual) => atual.filter((t) => t.grupoId !== grupo.id));
+    setRotinas((atual) => atual.map((r) => r.grupoId === grupo.id ? { ...r, grupoId: null } : r));
+  }
+
+  function agendarTarefa(texto, data, repetirDias = 0, hora = "00:00", prazo = {}) {
+    const agendadaPara = data || iso(new Date());
+    const descricao = (prazo.descricao || "").trim();
+    let rotinaId;
+    if (repetirDias > 0) {
+      rotinaId = novoId();
+      setRotinas((atual) => [...atual, {
+        id: rotinaId, texto, cada: repetirDias, hora, grupoId: null, prioridade: 0,
+        proxima: somarDias(agendadaPara, repetirDias), descricao,
+      }]);
+    }
+    setTarefas((atual) => [...atual, {
+      id: novoId(), texto, feita: false, meio: false, grupoId: null,
+      rotinaId, repeteDias: repetirDias, repeteHora: hora,
+      limite: prazo.limite || "", limiteHora: prazo.limite ? prazo.limiteHora || "" : "",
+      descricao, prioridade: 0, agendadaPara,
+    }]);
   }
 
   const ativo = notificar && permissao === "granted";
@@ -2606,6 +2707,15 @@ function Checklist({ usuario }) {
 
   // imagem escolhida pelo usuário, ou o bg.png padrão
   const fundoAtual = fundo || FUNDO_PADRAO;
+  const agoraAvisoAgenda = new Date();
+  const avisosDeHoje = eventos.filter((evento) => {
+    if (avisosAgendaFechados[`${evento.id}:${evento.data}`]) return false;
+    if (evento.data !== iso(agoraAvisoAgenda)) return false;
+    const inicioDia = new Date(`${evento.data}T00:01:00`);
+    if (!evento.hora) return agoraAvisoAgenda >= inicioDia;
+    const inicio = new Date(`${evento.data}T${evento.hora}:00`);
+    return agoraAvisoAgenda >= inicioDia && agoraAvisoAgenda <= new Date(inicio.getTime() + 60 * 60 * 1000);
+  });
 
   return (
     <div className="ck-layout com-fundo">
@@ -2619,9 +2729,10 @@ function Checklist({ usuario }) {
           <div className="ck-topo-titulo">
             <h1>Crysalis</h1>
         <span className="ck-contagem">
-          {tarefas.length === 0
-            ? "Nenhuma tarefa"
-            : `${feitas} de ${tarefas.length} concluídas${
+          {tarefasVisiveis.length === 0
+            ? tarefasFuturas.length > 0 ? `${tarefasFuturas.length} tarefa${tarefasFuturas.length === 1 ? "" : "s"} agendada${tarefasFuturas.length === 1 ? "" : "s"}` : "Nenhuma tarefa"
+            :
+            `${feitas} de ${tarefasVisiveis.length} concluídas${
                 meias > 0 ? ` · ${meias} pela metade` : ""
               }`}
         </span>
@@ -2647,6 +2758,16 @@ function Checklist({ usuario }) {
         )}
 
       </header>
+
+      {avisosDeHoje.length > 0 && <section className="ck-aviso-agenda" aria-label="Avisos da agenda">
+        {avisosDeHoje.map((evento) => <p key={evento.id}>
+          <img className="ck-aviso-agenda-icone" src={`${import.meta.env.BASE_URL}Logo.svg`} alt="" aria-hidden="true" />
+          <span>{evento.hora ? <>Hoje às <strong>{evento.hora}</strong> é dia de <strong>{evento.titulo}</strong>.</> : <>Hoje é dia de <strong>{evento.titulo}</strong>.</>}</span>
+          <button type="button" className="ck-aviso-agenda-fechar" onClick={() => dispensarAvisoAgenda(evento)} aria-label={`Dispensar aviso de ${evento.titulo}`} title="Fechar aviso">
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="m4 4 8 8m0-8-8 8" /></svg>
+          </button>
+        </p>)}
+      </section>}
 
       <div className="ck-abas ck-abas-principais" role="tablist" aria-label="Área principal" data-tutorial="abas">
         <button type="button" role="tab" className="ck-aba" aria-selected={pagina === "tarefas"} onClick={() => setPagina("tarefas")}>Checklist</button>
@@ -2730,14 +2851,14 @@ function Checklist({ usuario }) {
       )}
       </div>
 
-      {tarefas.length === 0 && grupos.length === 0 && (
+      {tarefasVisiveis.length === 0 && grupos.length === 0 && (
         <p className="ck-vazio">
-          Use as faixas acima para adicionar uma tarefa ou criar uma sessão.
+          {tarefasFuturas.length > 0 ? "As tarefas agendadas aparecem aqui a partir da data escolhida." : "Use as faixas acima para adicionar uma tarefa ou criar uma sessão."}
         </p>
       )}
 
       {grupos.map((g) => {
-        const doGrupo = tarefas.filter((t) => t.grupoId === g.id);
+        const doGrupo = tarefasVisiveis.filter((t) => t.grupoId === g.id);
         const feitasGrupo = doGrupo.filter((t) => t.feita).length;
         const aberta = g.aberta !== false;
 
@@ -2790,7 +2911,7 @@ function Checklist({ usuario }) {
                   />
                 )}
                 {doGrupo.length === 0 ? (
-                  <p className="ck-vazio-grupo">Nenhuma tarefa aqui ainda.</p>
+                  <p className="ck-vazio-grupo">{tarefas.some((t) => t.grupoId === g.id && t.agendadaPara > hoje) ? "As tarefas agendadas aparecerão aqui a partir da data escolhida." : "Nenhuma tarefa aqui ainda."}</p>
                 ) : (
                   <ListaTarefas
                     tarefas={doGrupo}
@@ -2929,12 +3050,12 @@ function Checklist({ usuario }) {
         <span aria-hidden="true"> · </span>
         <Contato />
                 <span aria-hidden="true"> · </span>
-                <span aria-hidden="true"> V0.65 </span>
+                <span aria-hidden="true"> V0.77 </span>
       </footer>
     </main>
 
     <aside className="ck-lateral">
-      <Calendario eventos={eventos} adicionar={adicionarEvento} editar={editarEvento} apagar={apagarEvento} />
+      <Calendario eventos={eventos} tarefasAgendadas={tarefas.filter((t) => t.agendadaPara)} adicionar={adicionarEvento} editar={editarEvento} apagar={apagarEvento} agendarTarefa={agendarTarefa} editarTarefa={salvarEdicao} apagarTarefa={apagar} alternarTarefaAgendada={alternar} />
       <section className="ck-painel" data-tutorial="painel-lateral">
         <div className="ck-abas" role="tablist">
           <button type="button" role="tab" className="ck-aba" aria-selected={aba === "rotinas"} onClick={() => setAba("rotinas")}>
@@ -2946,7 +3067,7 @@ function Checklist({ usuario }) {
           </button>
         </div>
         {aba === "rotinas" ? (
-          <Rotinas rotinas={rotinas} apagar={apagarRotina} mudarPrioridade={mudarPrioridadeRotina} editar={editarRotina} />
+          <Rotinas rotinas={rotinas} grupos={grupos} apagar={apagarRotina} mudarPrioridade={mudarPrioridadeRotina} editar={editarRotina} />
         ) : (
           <Contas contas={contas} adicionar={adicionarConta} alternar={alternarConta} apagar={apagarConta} definirValor={definirValorConta} editar={editarConta} />
         )}

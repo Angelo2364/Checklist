@@ -617,11 +617,14 @@ button.secundario:hover {
 }
 
 .ck-cal-nav {
+  display: grid;
+  place-items: center;
   width: 32px;
   height: 32px;
   padding: 0;
   font-size: 20px;
   line-height: 1;
+  text-align: center;
   color: var(--azul-forte);
   background: transparent;
   border: 1px solid var(--linha);
@@ -664,9 +667,9 @@ button.secundario:hover {
 
 .ck-dia.hoje,
 .ck-dia.hoje:hover {
-  color: var(--sobre-pastel);
-  background: var(--amarelo);
-  border-color: var(--amarelo);
+  color: var(--tinta);
+  background: transparent;
+  border: 2px solid var(--amarelo);
 }
 
 .ck-dia.sel {
@@ -674,15 +677,35 @@ button.secundario:hover {
   box-shadow: 0 0 0 1px var(--azul-forte);
 }
 
-.ck-dia i {
+.ck-dia.hoje.sel,
+.ck-dia.hoje.sel:hover {
+  border-color: var(--amarelo);
+  box-shadow: 0 0 0 1px var(--azul-forte);
+}
+
+.ck-dia .ck-marcador-dia {
   position: absolute;
   bottom: 4px;
   left: 50%;
-  width: 5px;
-  height: 5px;
-  margin-left: -2.5px;
-  background: var(--rosa-hover);
+  width: 7px;
+  height: 7px;
+  margin: 0;
+  transform: translateX(-50%);
   border-radius: 50%;
+  border: 1px solid var(--fundo);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--tinta) 28%, transparent);
+}
+
+.ck-dia .ck-marcador-dia.evento {
+  background: var(--amarelo);
+}
+
+.ck-dia .ck-marcador-dia.tarefa {
+  background: var(--rosa-hover);
+}
+
+.ck-dia .ck-marcador-dia.ambos {
+  background: var(--azul-forte);
 }
 
 .ck-cal-data {
@@ -711,6 +734,57 @@ button.secundario:hover {
   gap: 6px;
   padding: 6px 0;
   border-bottom: 1px solid var(--linha);
+}
+
+.ck-eventos li.ck-evento-tarefa-editando {
+  display: block;
+  padding: 8px;
+}
+
+.ck-evento-tarefa-editando .ck-form-grupo {
+  width: 100%;
+  flex: 1 1 100%;
+  border-bottom: 0;
+}
+
+.ck-evento-tarefa.feita .ck-ev-tarefa-titulo {
+  opacity: 0.65;
+  text-decoration: line-through;
+}
+
+.ck-ev-tarefa-titulo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+  color: var(--tinta);
+  background: transparent;
+  border: 0;
+  font: inherit;
+}
+
+.ck-ev-tarefa-caixa {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border: 1.5px solid var(--azul-forte);
+  border-radius: 50%;
+  color: var(--sobre-pastel);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.ck-ev-tarefa-caixa.feita {
+  background: var(--azul-forte);
+}
+
+.ck-ev-tarefa-caixa.meio {
+  border-color: var(--prio-amarelo);
+  background: color-mix(in srgb, var(--prio-amarelo) 28%, transparent);
 }
 
 .ck-ev-hora {
@@ -747,10 +821,71 @@ a.ck-apagar:hover {
   border-radius: 12px;
 }
 
+.ck-cal > .ck-barra-mais:last-child {
+  margin-top: 6px;
+}
+
+.ck-cal .ck-form-tarefa-agendada {
+  margin-top: 8px;
+}
+
+.ck-aviso-agenda {
+  display: grid;
+  gap: 7px;
+  margin: 10px 12px 14px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--azul-forte) 32%, var(--linha));
+  border-radius: 12px;
+  color: var(--tinta);
+  background: color-mix(in srgb, var(--azul-forte) 12%, var(--fundo));
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--tinta) 7%, transparent);
+}
+
+.ck-aviso-agenda p {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  line-height: 1.45;
+}
+
+.ck-aviso-agenda-icone {
+  flex: none;
+  width: 17px;
+  height: 17px;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+  opacity: 0.85;
+}
+
+:root[data-tema="claro"] .ck-aviso-agenda-icone {
+  filter: brightness(0) saturate(100%);
+  opacity: 0.62;
+}
+
+.ck-aviso-agenda-fechar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin-left: auto;
+  padding: 0;
+  color: var(--suave);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 50%;
+}
+
+.ck-aviso-agenda-fechar:hover {
+  color: var(--tinta);
+  background: color-mix(in srgb, var(--azul-forte) 14%, transparent);
+  border-color: var(--linha);
+}
+
 .ck-form-grupo { flex-wrap: wrap; }
 .ck-form-grupo input[type="text"] { flex: 1 1 140px; }
 
-.ck-form-grupo input[type="time"],
 .ck-form-grupo select {
   flex: none;
   padding: 7px 10px;
@@ -1369,6 +1504,9 @@ a.ck-ev-mapa:hover {
 .ck-periodo-avisos label { display: grid; gap: 6px; color: var(--suave); font-size: 12px; font-weight: 700; }
 .ck-periodo-avisos input { width: 100%; min-width: 0; padding: 8px 10px; border: 1px solid var(--linha); border-radius: 10px; color: var(--tinta); background: color-mix(in srgb, var(--fundo) 78%, transparent); font: inherit; font-variant-numeric: tabular-nums; }
 .ck-periodo-avisos > span { padding-bottom: 9px; color: var(--suave); font-size: 13px; }
+.ck-periodo-avisos .ck-hora24 { display: flex; width: 100%; justify-content: center; gap: 2px; padding: 3px 8px; border: 1px solid var(--linha); border-radius: 10px; background: color-mix(in srgb, var(--fundo) 78%, transparent); }
+.ck-periodo-avisos .ck-hora24 input[type="text"] { flex: none; width: 40px; min-width: 0; padding: 7px 4px; border: 0; border-radius: 6px; color: var(--tinta); background: transparent; text-align: center; font: inherit; font-variant-numeric: tabular-nums; }
+.ck-periodo-avisos .ck-hora24 input[type="text"]:focus-visible { outline: 2px solid var(--azul-forte); outline-offset: 1px; }
 .ck-pref-card > small { display: block; margin-top: 8px; color: var(--suave); font-size: 12px; line-height: 1.5; }
 .ck-pref-card > .ck-ajuste, .ck-pref-card > .ck-arquivo { margin: 2px 0 8px; }
 .ck-ajuste-segmentado { display: inline-flex; width: fit-content; gap: 0; overflow: hidden; padding: 3px; border: 1px solid var(--linha); border-radius: 11px; background: color-mix(in srgb, var(--fundo-hover) 65%, transparent); }
@@ -2129,6 +2267,15 @@ body {
   margin-right: 3px;
   font-size: 12px;
   font-weight: 600;
+}
+
+.ck-prazo-campos {
+  display: flex;
+  flex: 1 1 100%;
+  align-items: center;
+  gap: 8px;
+  min-width: 100%;
+  padding: 2px 0;
 }
 
 .ck-ajuste {

@@ -81,7 +81,7 @@ function rotuloPrazo(t: any, ag: ReturnType<typeof agoraNoFuso>) {
 
 // espelha enviarNotificacao() do App.jsx
 function montarResumo(dados: any, ag: ReturnType<typeof agoraNoFuso>) {
-  const pendentes = (dados.tarefas ?? []).filter((t: any) => !t.feita);
+  const pendentes = (dados.tarefas ?? []).filter((t: any) => !t.feita && (!t.agendadaPara || t.agendadaPara <= ag.hoje));
   const eventos = (dados.eventos ?? [])
     .filter((e: any) => e.data === ag.hoje && (!e.hora || e.hora >= ag.hm))
     .sort((a: any, b: any) => (a.hora || "").localeCompare(b.hora || ""));
@@ -165,6 +165,7 @@ Deno.serve(async (req) => {
     let mudouVistos = false;
     for (const t of dados.tarefas ?? []) {
       if (!forcar && !dentroDoHorario) break;
+      if (t.agendadaPara && t.agendadaPara > ag.hoje) continue;
       if (t.feita || !t.limite || !t.limiteHora) continue;
       const faltam = (naiveDe(t.limite, t.limiteHora) - ag.naive) / 60000;
       for (const [marca, grande] of [[45, false], [15, true]] as const) {
