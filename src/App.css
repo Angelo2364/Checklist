@@ -335,26 +335,16 @@ button.secundario:hover {
   height: 26px;
   padding: 0;
   line-height: 0;
-  color: var(--azul-forte);
+  color: inherit;
   background: transparent;
   border: 0;
   border-radius: 0;
 }
 
-.ck-mais svg,
-.ck-mais-logo {
+.ck-mais svg {
   display: block;
   width: 18px;
   height: 18px;
-  object-fit: contain;
-}
-
-.ck-mais-logo {
-  filter: brightness(0) invert(1);
-}
-
-:root[data-tema="claro"] .ck-mais-logo {
-  filter: brightness(0) saturate(100%);
 }
 
 .ck-mais:hover,
@@ -1325,6 +1315,24 @@ a.ck-ev-mapa:hover {
   flex-direction: column;
 }
 
+.ck-topo-marca {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ck-logo-topo {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+}
+
+:root[data-tema="claro"] .ck-logo-topo {
+  filter: brightness(0) saturate(100%);
+}
+
 .ck-erro {
   flex: 1 1 100%;
   margin: 0;
@@ -1550,6 +1558,14 @@ a.ck-ev-mapa:hover {
 .ck-pref-encaixe { display: grid; gap: 8px; margin-bottom: 10px; font-size: 13px; }
 .ck-conta-config { display: grid; gap: 14px; padding: 18px 0 0; }
 .ck-conta-identidade { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.ck-nome-usuario-form { display: grid; gap: 8px; }
+.ck-nome-usuario-form label { color: var(--suave); font-size: 12px; font-weight: 700; }
+.ck-usuario-dica, .ck-login-usuario-hint { color: var(--suave); font-size: 11px; line-height: 1.4; }
+.ck-nome-usuario-form input { width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid var(--linha); border-radius: 10px; color: var(--tinta); background: color-mix(in srgb, var(--fundo) 78%, transparent); font: inherit; }
+.ck-nome-usuario-form input:focus-visible { outline: none; border-color: var(--azul-forte); box-shadow: 0 0 0 3px color-mix(in srgb, var(--azul-forte) 16%, transparent); }
+.ck-nome-usuario-form button { justify-self: start; }
+.ck-usuario-mensagem { margin: 2px 0 0; color: var(--azul-forte); font-size: 12px; line-height: 1.45; }
+.ck-usuario-mensagem.erro { color: var(--perigo); }
 .ck-conta-avatar { display: grid; flex: none; place-items: center; width: 42px; height: 42px; border: 1px solid var(--linha); border-radius: 50%; color: var(--tinta); background: color-mix(in srgb, var(--rosa) 35%, var(--fundo)); font-weight: 800; }
 .ck-conta-identidade div { display: grid; min-width: 0; gap: 3px; }
 .ck-conta-identidade small, .ck-backup-card small { color: var(--suave); font-size: 12px; }
@@ -1596,9 +1612,9 @@ a.ck-ev-mapa:hover {
   height: 20px;
 }
 
-.ck-barras-topo .ck-barra-mais .ck-mais-logo {
-  width: 16px;
-  height: 16px;
+.ck-barras-topo .ck-barra-mais .ck-mais svg {
+  width: 11px;
+  height: 11px;
 }
 
 .ck-barras-topo .ck-atalho {
@@ -2071,6 +2087,8 @@ body {
   font: inherit;
   font-size: 15px;
 }
+
+.ck-login-usuario-hint { margin-top: -1px; }
 
 .ck-login-card input:focus {
   outline: 2px solid var(--azul-forte);
@@ -2825,4 +2843,116 @@ body {
   }
 
   .ck-tutorial-cartao h2 { font-size: 18px; }
+}
+
+/* Social: pedidos de amizade e tarefas partilhadas */
+.ck-topo-botoes { display: flex; align-items: center; gap: 8px; }
+.ck-social-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 6px 9px;
+  color: var(--tinta);
+  background: color-mix(in srgb, var(--fundo-hover) 70%, transparent);
+  border: 1px solid var(--linha);
+  border-radius: 10px;
+  font-size: 12px;
+}
+.ck-social-nav:hover { background: var(--fundo-hover); border-color: var(--azul-forte); }
+.ck-social-page-wrap { padding: 4px 12px 18px; }
+.ck-social-back { margin: 0 0 10px; }
+.ck-social-page, .ck-social-tasks {
+  display: grid;
+  gap: 14px;
+  margin: 12px;
+  padding: 16px;
+  border: 1px solid var(--linha);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--fundo) 78%, transparent);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--tinta) 6%, transparent);
+}
+.ck-social-heading, .ck-social-heading > div, .ck-social-tasks-heading, .ck-social-tasks-heading > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ck-social-heading, .ck-social-tasks-heading { justify-content: space-between; }
+.ck-social-heading h2, .ck-social-tasks-heading h2 { margin: 0; font-size: 18px; }
+.ck-social-heading p { margin: 3px 0 0; color: var(--suave); font-size: 12px; line-height: 1.4; }
+.ck-social-icon { display: grid; flex: none; place-items: center; width: 36px; height: 36px; color: var(--azul-forte); background: color-mix(in srgb, var(--azul) 18%, transparent); border: 1px solid color-mix(in srgb, var(--azul-forte) 25%, var(--linha)); border-radius: 12px; }
+.ck-social-search { display: grid; gap: 7px; padding: 14px; border: 1px solid var(--linha); border-radius: 12px; background: color-mix(in srgb, var(--fundo-hover) 65%, transparent); }
+.ck-social-search label { font-size: 13px; font-weight: 700; }
+.ck-social-search > div { display: flex; gap: 8px; }
+.ck-social-search input, .ck-social-task-form input, .ck-social-task-form textarea, .ck-social-task-form select {
+  min-width: 0;
+  padding: 9px 11px;
+  color: var(--tinta);
+  background: color-mix(in srgb, var(--fundo) 88%, transparent);
+  border: 1px solid var(--linha);
+  border-radius: 9px;
+  font: inherit;
+}
+.ck-social-search input { flex: 1; }
+.ck-social-search small { color: var(--suave); font-size: 11px; }
+.ck-social-result, .ck-social-person {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--linha);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--fundo-hover) 45%, transparent);
+}
+.ck-social-person > span { display: inline-flex; align-items: center; gap: 8px; overflow-wrap: anywhere; }
+.ck-social-person > span svg { flex: none; width: 17px; height: 17px; color: var(--azul-forte); }
+.ck-social-person > div { display: flex; gap: 7px; }
+.ck-social-person small { color: var(--suave); font-size: 11px; }
+.ck-social-list { display: grid; gap: 8px; }
+.ck-social-list h3 { display: flex; align-items: center; gap: 7px; margin: 3px 0 0; font-size: 14px; }
+.ck-social-list h3 > span { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; color: var(--tinta); background: color-mix(in srgb, var(--azul) 32%, transparent); border-radius: 999px; font-size: 11px; }
+.ck-social-empty { margin: 0; padding: 9px 2px; color: var(--suave); font-size: 12px; line-height: 1.5; }
+.ck-social-message { margin: 0; color: var(--azul-forte); font-size: 12px; line-height: 1.45; }
+.ck-social-message.erro { color: var(--perigo); }
+.ck-social-tasks { margin-top: 18px; margin-bottom: 18px; }
+.ck-social-tasks-heading > div { min-width: 0; }
+.ck-social-tasks-heading h2 { font-size: 16px; }
+.ck-social-manage-link { width: auto; padding: 5px 8px; border: 1px solid var(--linha); border-radius: 9px; font-size: 12px; }
+.ck-social-friend-group { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--linha); border-radius: 13px; background: color-mix(in srgb, var(--grupo-bg) 48%, transparent); }
+.ck-social-friend-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 34px; color: var(--tinta); }
+.ck-social-friend-heading strong { overflow-wrap: anywhere; font-size: 14px; }
+.ck-social-task-form { display: grid; gap: 8px; padding: 11px; border: 1px solid var(--linha); border-radius: 11px; background: color-mix(in srgb, var(--fundo) 72%, transparent); }
+.ck-social-task-form textarea { resize: vertical; }
+.ck-social-task-options { display: flex; flex-wrap: wrap; gap: 10px; }
+.ck-social-task-options label { display: inline-flex; align-items: center; gap: 7px; color: var(--suave); font-size: 12px; }
+.ck-social-task-options input, .ck-social-task-options select { padding: 6px 8px; font-size: 12px; }
+.ck-social-form-actions { display: flex; gap: 8px; }
+.ck-social-form-actions button { padding: 7px 12px; font-size: 12px; }
+.ck-social-task { display: flex; align-items: flex-start; gap: 10px; padding: 10px; border: 1px solid var(--linha); border-radius: 11px; background: color-mix(in srgb, var(--fundo) 76%, transparent); }
+.ck-social-task.concluida { opacity: .7; }
+.ck-social-check { display: grid; flex: none; place-items: center; width: 21px; height: 21px; padding: 0; margin-top: 1px; color: var(--tinta); background: transparent; border: 2px solid color-mix(in srgb, var(--azul-forte) 70%, var(--linha)); border-radius: 50%; font-size: 13px; line-height: 1; }
+.ck-social-check:hover { background: color-mix(in srgb, var(--azul) 26%, transparent); border-color: var(--azul-forte); }
+.ck-social-check.feita { color: var(--sobre-pastel); background: var(--azul); border-color: var(--azul); }
+.ck-social-task-content { display: grid; flex: 1; min-width: 0; gap: 4px; }
+.ck-social-task-content strong { overflow-wrap: anywhere; font-size: 13px; }
+.ck-social-task.concluida .ck-social-task-content strong { text-decoration: line-through; color: var(--suave); }
+.ck-social-task-content p { margin: 0; color: var(--suave); font-size: 12px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ck-social-task-meta { display: flex; flex-wrap: wrap; gap: 6px 10px; color: var(--suave); font-size: 11px; }
+.ck-social-priority { font-weight: 700; }
+.ck-social-priority.p1 { color: var(--prio-verde); }
+.ck-social-priority.p2 { color: var(--prio-amarelo); }
+.ck-social-priority.p3 { color: var(--prio-vermelho); }
+.ck-social-task-actions { display: flex; flex: none; align-items: center; gap: 2px; }
+.ck-social-remove { font-size: 20px; line-height: 1; }
+.ck-social-task-form input:focus, .ck-social-task-form textarea:focus, .ck-social-search input:focus { outline: 2px solid color-mix(in srgb, var(--azul-forte) 55%, transparent); outline-offset: 1px; }
+@media (max-width: 480px) {
+  .ck-topo-botoes { gap: 4px; }
+  .ck-social-nav { min-height: 32px; padding: 5px 7px; }
+  .ck-social-page, .ck-social-tasks { margin: 10px 8px; padding: 12px; }
+  .ck-social-search > div { flex-direction: column; }
+  .ck-social-person { align-items: flex-start; flex-direction: column; }
+  .ck-social-person > div { width: 100%; }
+  .ck-social-person > div button { flex: 1; }
 }

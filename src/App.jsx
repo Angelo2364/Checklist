@@ -4,6 +4,7 @@ import { supabase } from "./services/supabase";
 import { carregarDados, criarDados, salvarDados } from "./services/dados";
 import { pushSuportado, motivoSemPush, ativarPush, atualizarPush, desativarPush } from "./services/push";
 import Login, { NovaSenha } from "./Login";
+import Social from "./Social";
 
 const STORAGE_TASKS = "checklist:tarefas";
 const STORAGE_GROUPS = "checklist:divisoes";
@@ -896,7 +897,7 @@ function Contas({ contas, adicionar, alternar, apagar, definirValor, editar }) {
       <div className="ck-resumo">
         <div className="ck-resumo-cabecalho">
           <div><span className="ck-resumo-rotulo">Despesas fixas</span><strong className="ck-resumo-valor">{BRL(total)}</strong></div>
-          <button type="button" className="ck-mais ck-conta-adicionar" onClick={() => setAbrindo((atual) => !atual)} aria-label={abrindo ? "Fechar formulário de conta" : "Adicionar conta"} title={abrindo ? "Fechar" : "Adicionar conta"} aria-expanded={abrindo}><IconeMais borboleta={false} /></button>
+          <button type="button" className="ck-mais ck-conta-adicionar" onClick={() => setAbrindo((atual) => !atual)} aria-label={abrindo ? "Fechar formulário de conta" : "Adicionar conta"} title={abrindo ? "Fechar" : "Adicionar conta"} aria-expanded={abrindo}><IconeMais /></button>
         </div>
         {total > 0 && (
           <span className="ck-resumo-sub">
@@ -1160,12 +1161,8 @@ function novoId() {
   return Date.now() + Math.random();
 }
 
-/* Logo usada como ícone nos controles de adição */
-function IconeMais({ borboleta = true }) {
-  if (borboleta) {
-    return <img className="ck-mais-logo" src={`${import.meta.env.BASE_URL}Logo.svg`} alt="" aria-hidden="true" />;
-  }
-
+/* Sinal de adição nos controles de criar */
+function IconeMais() {
   return (
     <svg
       viewBox="0 0 16 16"
@@ -1662,6 +1659,87 @@ function TutorialGuia({ onEncerrar }) {
       </div>
     </section>
   </div>;
+}
+
+function ConfiguracaoNomeUsuario({ usuario }) {
+  const [nome, setNome] = useState("");
+  const [carregando, setCarregando] = useState(true);
+  const [salvando, setSalvando] = useState(false);
+  const [mensagem, setMensagem] = useState("");
+  const [erro, setErro] = useState(false);
+
+  useEffect(() => {
+    let ativo = true;
+    supabase.from("profiles").select("username").eq("user_id", usuario.id).maybeSingle()
+      .then(({ data, error: erroConsulta }) => {
+        if (!ativo) return;
+        if (erroConsulta) {
+          setMensagem("Não consegui carregar seu nome de usuário. Confira se a atualização do Supabase já foi aplicada.");
+          setErro(true);
+        } else {
+          setNome(data?.username || "");
+        }
+        setCarregando(false);
+      });
+    return () => { ativo = false; };
+  }, [usuario.id]);
+
+  async function salvar(e) {
+    e.preventDefault();
+    setMensagem("");
+    const nomeNormalizado = nome.trim().toLowerCase();
+    if (!/^[a-z0-9_]{3,20}$/.test(nomeNormalizado)) {
+      setMensagem("Use de 3 a 20 letras sem acento, números ou _.");
+      setErro(true);
+      return;
+    }
+
+    setSalvando(true);
+    const { error: erroSalvar } = await supabase.from("profiles").upsert(
+      { user_id: usuario.id, username: nomeNormalizado },
+      { onConflict: "user_id" },
+    );
+    if (erroSalvar?.code === "23505") {
+      setMensagem("Esse nome de usuário já está em uso. Escolha outro.");
+      setErro(true);
+    } else if (erroSalvar) {
+      setMensagem("Não consegui salvar o nome de usuário. Tente novamente.");
+      setErro(true);
+    } else {
+      setNome(nomeNormalizado);
+      setMensagem("Nome de usuário salvo. Você continua entrando com seu email.");
+      setErro(false);
+    }
+    setSalvando(false);
+  }
+
+  return <section className="ck-pref-card ck-usuario-card">
+    <h3>Nome de usuário</h3>
+    <p>Escolha um nome único para sua conta. Por enquanto, o acesso continua sendo pelo email.</p>
+    <form className="ck-nome-usuario-form" onSubmit={salvar}>
+      <label htmlFor="ck-nome-usuario">Nome de usuário</label>
+      <input
+        id="ck-nome-usuario"
+        type="text"
+        autoComplete="username"
+        autoCapitalize="none"
+        spellCheck="false"
+        minLength={3}
+        maxLength={20}
+        pattern="[A-Za-z0-9_]{3,20}"
+        placeholder="seunome"
+        value={nome}
+        onChange={(e) => setNome(e.target.value)}
+        disabled={carregando || salvando}
+        required
+      />
+      <small className="ck-usuario-dica">3–20 caracteres: letras sem acento, números ou _.</small>
+      <button type="submit" className="secundario" disabled={carregando || salvando}>
+        {carregando ? "Carregando…" : salvando ? "Salvando…" : "Salvar nome de usuário"}
+      </button>
+      {mensagem && <p className={erro ? "ck-usuario-mensagem erro" : "ck-usuario-mensagem"} role={erro ? "alert" : "status"}>{mensagem}</p>}
+    </form>
+  </section>;
 }
 
 function Checklist({ usuario }) {
@@ -2731,7 +2809,10 @@ function Checklist({ usuario }) {
       <header className="ck-topo">
         <div className="ck-topo-linha">
           <div className="ck-topo-titulo">
-            <h1>Crysalis</h1>
+            <div className="ck-topo-marca">
+              <img className="ck-logo-topo" src={`${import.meta.env.BASE_URL}Logo.svg`} alt="" aria-hidden="true" />
+              <h1>Crysalis</h1>
+            </div>
         <span className="ck-contagem">
           {tarefasVisiveis.length === 0
             ? tarefasFuturas.length > 0 ? `${tarefasFuturas.length} tarefa${tarefasFuturas.length === 1 ? "" : "s"} agendada${tarefasFuturas.length === 1 ? "" : "s"}` : "Nenhuma tarefa"
@@ -2746,6 +2827,9 @@ function Checklist({ usuario }) {
             {{ salvando: "Salvando…", salvo: "Salvo", erro: "Sem conexão", conflito: "Conflito" }[sync] || ""}
           </span>
 
+          <button type="button" className="ck-social-nav" onClick={() => setPagina("social")} title="Social" aria-label="Abrir Social">
+            <svg viewBox="0 0 20 20" width="17" height="17" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="7" cy="6.5" r="2.5" /><circle cx="14" cy="7.5" r="2" /><path d="M2 16c.3-2.7 2.1-4.2 5-4.2s4.7 1.5 5 4.2M12 12.3c2.8-.6 5.2.9 5.7 3.7" /></svg><span>Social</span>
+          </button>
           <button type="button" className="ck-icone" data-tutorial="configuracoes" onClick={() => setPagina("configuracoes")} title="Configurações" aria-label="Abrir configurações">
             <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6.5 1.8h3l.4 1.7a5 5 0 0 1 1.2.7l1.7-.5 1.5 2.6-1.3 1.2v1.4l1.3 1.2-1.5 2.6-1.7-.5a5 5 0 0 1-1.2.7l-.4 1.7h-3l-.4-1.7a5 5 0 0 1-1.2-.7l-1.7.5-1.5-2.6L3 8.9V7.5L1.7 6.3l1.5-2.6 1.7.5a5 5 0 0 1 1.2-.7z"/><circle cx="8" cy="8.2" r="2.1"/></svg>
           </button>
@@ -2785,6 +2869,7 @@ function Checklist({ usuario }) {
         </div>
         {abaConfiguracoes === "preferencias" ? <ConfiguracoesVisuais tema={tema} setTema={setTema} desfoque={desfoque} setDesfoque={setDesfoque} ajusteFundo={ajusteFundo} setAjusteFundo={setAjusteFundo} escolherFundo={escolherFundo} fundo={fundo} removerFundo={removerFundo} erroFundo={erroFundo} janelaAvisos={janelaAvisos} setJanelaAvisos={setJanelaAvisos} iniciarTutorial={iniciarTutorial} /> : <section className="ck-conta-config">
           <div className="ck-conta-identidade"><span className="ck-conta-avatar" aria-hidden="true">{(usuario.email || "?").slice(0, 1).toUpperCase()}</span><div><small>Conta conectada</small><strong>{usuario.email}</strong></div></div>
+          <ConfiguracaoNomeUsuario usuario={usuario} />
           <button type="button" className="ck-sair-conta" onClick={sair}><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"><path d="M6.5 2.5H4a1.5 1.5 0 0 0-1.5 1.5v8A1.5 1.5 0 0 0 4 13.5h2.5"/><path d="M10 5l3 3-3 3M13 8H6.5"/></svg>Sair da conta</button>
           <div className="ck-backup-card">
             <h3>Backups</h3>
@@ -2899,7 +2984,7 @@ function Checklist({ usuario }) {
                 aria-label={`Nova tarefa em ${g.nome}`}
                 aria-expanded={grupoAdd === g.id}
               >
-                <IconeMais borboleta={false} />
+                <IconeMais />
               </button>
               {sessaoEmEdicao?.tipo !== "checklist" || sessaoEmEdicao.id !== g.id ? <button type="button" className="ck-icone" title="Editar sessão" aria-label={`Editar sessão ${g.nome}`} onClick={() => iniciarEdicaoSessao("checklist", g)}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" /></svg></button> : null}
               <BotaoApagar nome={`sessão ${g.nome}`} onClick={() => apagarGrupo(g)} />
@@ -2946,6 +3031,8 @@ function Checklist({ usuario }) {
           edicao={edicao}
         />
       )}
+
+      <Social user={usuario} view="tasks" onManage={() => setPagina("social")} />
 
       {feitas > 0 && (
         <button type="button" className="ck-link" onClick={limparFeitas}>
@@ -3015,7 +3102,7 @@ function Checklist({ usuario }) {
           </>
         )}
       </section>
-      </> : pagina === "anotacoes" ? <section className="ck-anotacoes">
+      </> : pagina === "social" ? <section className="ck-social-page-wrap"><button type="button" className="secundario ck-social-back" onClick={() => setPagina("tarefas")}>Voltar para checklist</button><Social user={usuario} view="manage" /></section> : pagina === "anotacoes" ? <section className="ck-anotacoes">
         <div className="ck-barras-topo">
           {formAnotacao && !formAnotacao.id && (!formAnotacao.sessaoId || !sessoesAnotacoes.some((s) => s.id === formAnotacao.sessaoId)) ? <FormularioAnotacao form={formAnotacao} onSalvar={salvarAnotacao} onChange={setFormAnotacao} onCancelar={() => setFormAnotacao(null)} /> : <BarraMais rotulo="Adicionar anotação" atalho={ATALHO_TAREFA} onClick={() => abrirNovaAnotacao()} />}
           {criandoSessaoAnotacao ? <form className="ck-nova-divisao" onSubmit={criarSessaoAnotacao} onBlur={(e) => fecharAoClicarFora(e, () => { setCriandoSessaoAnotacao(false); setNomeSessaoAnotacao(""); })}>
@@ -3054,7 +3141,7 @@ function Checklist({ usuario }) {
         <span aria-hidden="true"> · </span>
         <Contato />
                 <span aria-hidden="true"> · </span>
-                <span aria-hidden="true"> V0.79 </span>
+                <span aria-hidden="true"> V0.72 </span>
       </footer>
     </main>
 

@@ -39,6 +39,7 @@ function Moldura({ children, onSubmit }) {
 
 export default function Login() {
   const [modo, setModo] = useState("entrar"); // "entrar" | "criar" | "esqueci"
+  const [nomeUsuario, setNomeUsuario] = useState("");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [carregando, setCarregando] = useState(false);
@@ -49,12 +50,18 @@ export default function Login() {
     setModo(novo);
     setErro("");
     setInfo("");
+    if (novo === "criar") setNomeUsuario("");
   }
 
   async function enviar(e) {
     e.preventDefault();
     setErro("");
     setInfo("");
+    const nomeUsuarioLimpo = nomeUsuario.trim().toLowerCase();
+    if (modo === "criar" && !/^[a-z0-9_]{3,20}$/.test(nomeUsuarioLimpo)) {
+      setErro("Use de 3 a 20 letras sem acento, números ou _.");
+      return;
+    }
     setCarregando(true);
     try {
       const emailLimpo = email.trim();
@@ -63,7 +70,11 @@ export default function Login() {
         if (error) throw error;
         // sucesso: o App percebe a sessão sozinho (onAuthStateChange)
       } else if (modo === "criar") {
-        const { data, error } = await supabase.auth.signUp({ email: emailLimpo, password: senha });
+        const { data, error } = await supabase.auth.signUp({
+          email: emailLimpo,
+          password: senha,
+          options: { data: { username: nomeUsuarioLimpo } },
+        });
         if (error) throw error;
         if (data.user && data.user.identities && data.user.identities.length === 0) {
           setErro("Esse email já tem conta. Tente entrar.");
@@ -81,7 +92,9 @@ export default function Login() {
         setInfo(`Se existir uma conta com ${emailLimpo}, enviamos um link para criar uma nova senha.`);
       }
     } catch (err) {
-      setErro(traduzirErro(err));
+      setErro(modo === "criar" && (err?.code === "unexpected_failure" || err?.message?.includes("saving new user"))
+        ? "Não foi possível criar a conta. Esse nome de usuário pode já estar em uso; tente outro."
+        : traduzirErro(err));
     } finally {
       setCarregando(false);
     }
@@ -100,6 +113,27 @@ export default function Login() {
 
       <h1>Crysalis</h1>
       <p className="ck-login-sub">{titulos[modo]}</p>
+
+      {modo === "criar" && (
+        <label>
+          Nome de usuário
+          <input
+            type="text"
+            autoComplete="username"
+            autoCapitalize="none"
+            spellCheck="false"
+            value={nomeUsuario}
+            onChange={(e) => setNomeUsuario(e.target.value)}
+            minLength={3}
+            maxLength={20}
+            pattern="[A-Za-z0-9_]{3,20}"
+            title="Use de 3 a 20 letras sem acento, números ou _."
+            placeholder="seunome"
+            required
+          />
+          <small className="ck-login-usuario-hint">3–20 caracteres: letras sem acento, números ou _.</small>
+        </label>
+      )}
 
       <label>
         Email
