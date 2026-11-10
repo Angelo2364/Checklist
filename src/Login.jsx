@@ -85,8 +85,11 @@ export default function Login() {
           setSenha("");
         }
       } else {
+        const redirectTo = import.meta.env.DEV
+          ? new URL(import.meta.env.BASE_URL, window.location.origin).href
+          : "https://www.crysalis.me/";
         const { error } = await supabase.auth.resetPasswordForEmail(emailLimpo, {
-          redirectTo: window.location.origin + import.meta.env.BASE_URL,
+          redirectTo,
         });
         if (error) throw error;
         setInfo(`Se existir uma conta com ${emailLimpo}, enviamos um link para criar uma nova senha.`);
