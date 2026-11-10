@@ -331,24 +331,46 @@ button.secundario:hover {
   flex: none;
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: 26px;
+  height: 26px;
   padding: 0;
   line-height: 0;
   color: var(--azul-forte);
   background: transparent;
-  border: 1px solid var(--linha);
-  border-radius: 50%;
+  border: 0;
+  border-radius: 0;
 }
 
-.ck-mais svg {
+.ck-mais svg,
+.ck-mais-logo {
   display: block;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+.ck-mais-logo {
+  filter: brightness(0) invert(1);
+}
+
+:root[data-tema="claro"] .ck-mais-logo {
+  filter: brightness(0) saturate(100%);
 }
 
 .ck-mais:hover,
 .ck-mais[aria-expanded="true"] {
+  background: transparent;
+}
+
+.ck-mais.ck-mais-circular {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--linha);
+  border-radius: 50%;
+}
+
+.ck-mais.ck-mais-circular:hover,
+.ck-mais.ck-mais-circular[aria-expanded="true"] {
   background: color-mix(in srgb, var(--azul) 35%, transparent);
   border-color: var(--azul);
 }
@@ -374,8 +396,7 @@ button.secundario:hover {
 }
 
 .ck-barra-mais:hover .ck-mais {
-  background: color-mix(in srgb, var(--azul) 35%, transparent);
-  border-color: var(--azul);
+  background: transparent;
 }
 
 .ck-nova-divisao,
@@ -1211,6 +1232,14 @@ a.ck-ev-mapa:hover {
 .ck-conta-adicionar {
   width: 30px;
   height: 30px;
+  border: 1px solid var(--linha);
+  border-radius: 50%;
+}
+
+.ck-conta-adicionar:hover,
+.ck-conta-adicionar[aria-expanded="true"] {
+  background: color-mix(in srgb, var(--azul) 35%, transparent);
+  border-color: var(--azul);
 }
 
 .ck-grupo-topo .ck-apagar-icone {
@@ -1567,9 +1596,9 @@ a.ck-ev-mapa:hover {
   height: 20px;
 }
 
-.ck-barras-topo .ck-barra-mais .ck-mais svg {
-  width: 11px;
-  height: 11px;
+.ck-barras-topo .ck-barra-mais .ck-mais-logo {
+  width: 16px;
+  height: 16px;
 }
 
 .ck-barras-topo .ck-atalho {

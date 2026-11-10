@@ -896,7 +896,7 @@ function Contas({ contas, adicionar, alternar, apagar, definirValor, editar }) {
       <div className="ck-resumo">
         <div className="ck-resumo-cabecalho">
           <div><span className="ck-resumo-rotulo">Despesas fixas</span><strong className="ck-resumo-valor">{BRL(total)}</strong></div>
-          <button type="button" className="ck-mais ck-conta-adicionar" onClick={() => setAbrindo((atual) => !atual)} aria-label={abrindo ? "Fechar formulário de conta" : "Adicionar conta"} title={abrindo ? "Fechar" : "Adicionar conta"} aria-expanded={abrindo}><IconeMais /></button>
+          <button type="button" className="ck-mais ck-conta-adicionar" onClick={() => setAbrindo((atual) => !atual)} aria-label={abrindo ? "Fechar formulário de conta" : "Adicionar conta"} title={abrindo ? "Fechar" : "Adicionar conta"} aria-expanded={abrindo}><IconeMais borboleta={false} /></button>
         </div>
         {total > 0 && (
           <span className="ck-resumo-sub">
@@ -1160,8 +1160,12 @@ function novoId() {
   return Date.now() + Math.random();
 }
 
-/* "+" desenhado em SVG para ficar sempre centralizado */
-function IconeMais() {
+/* Logo usada como ícone nos controles de adição */
+function IconeMais({ borboleta = true }) {
+  if (borboleta) {
+    return <img className="ck-mais-logo" src={`${import.meta.env.BASE_URL}Logo.svg`} alt="" aria-hidden="true" />;
+  }
+
   return (
     <svg
       viewBox="0 0 16 16"
@@ -2888,14 +2892,14 @@ function Checklist({ usuario }) {
               </button>}
               <button
                 type="button"
-                className="ck-mais"
+                className="ck-mais ck-mais-circular"
                 onClick={() => abrirAddTarefa(g)}
                 onMouseDown={(e) => e.preventDefault()}
                 title="Nova tarefa nesta sessão"
                 aria-label={`Nova tarefa em ${g.nome}`}
                 aria-expanded={grupoAdd === g.id}
               >
-                <IconeMais />
+                <IconeMais borboleta={false} />
               </button>
               {sessaoEmEdicao?.tipo !== "checklist" || sessaoEmEdicao.id !== g.id ? <button type="button" className="ck-icone" title="Editar sessão" aria-label={`Editar sessão ${g.nome}`} onClick={() => iniciarEdicaoSessao("checklist", g)}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" /></svg></button> : null}
               <BotaoApagar nome={`sessão ${g.nome}`} onClick={() => apagarGrupo(g)} />
@@ -3050,7 +3054,7 @@ function Checklist({ usuario }) {
         <span aria-hidden="true"> · </span>
         <Contato />
                 <span aria-hidden="true"> · </span>
-                <span aria-hidden="true"> V0.77 </span>
+                <span aria-hidden="true"> V0.79 </span>
       </footer>
     </main>
 
