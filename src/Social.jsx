@@ -177,7 +177,7 @@ export default function Social({ user, view = "tasks", onManage }) {
     const result = task
       ? await supabase.from("social_tasks").update({ ...fields, updated_at: new Date().toISOString() }).eq("id", task.id)
       : await supabase.from("social_tasks").insert({
-          friendship_id: friendship.id,
+          friendship_id: friendship.friendship_id,
           created_by: user.id,
           title: fields.title,
           description: fields.description,
