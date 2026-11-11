@@ -26,13 +26,30 @@ function traduzirErro(erro) {
   }
 }
 
-function Moldura({ children, onSubmit }) {
+function ApresentacaoCrysalis() {
+  return <aside className="ck-login-about" aria-labelledby="ck-login-about-title">
+    <div className="ck-login-about-heading"><img src={logo} alt="" aria-hidden="true" /><span>UM ESPAÇO PARA O SEU DIA A DIA</span></div>
+    <h2 id="ck-login-about-title">Organize no seu ritmo.</h2>
+    <p>O Crysalis reúne tarefas, compromissos e ideias em um só lugar, para ajudar você a cuidar do que importa.</p>
+    <ul>
+      <li><span className="ck-login-about-icon tarefas" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M4 5h12M4 10h12M4 15h7"/><circle cx="2.5" cy="5" r=".7" fill="currentColor"/><circle cx="2.5" cy="10" r=".7" fill="currentColor"/><circle cx="2.5" cy="15" r=".7" fill="currentColor"/></svg></span><span><strong>Tarefas e rotinas</strong><small>Organize por sessões, prazos e prioridades.</small></span></li>
+      <li><span className="ck-login-about-icon agenda" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="14" height="13" rx="2"/><path d="M6.5 2.5v3M13.5 2.5v3M3 8h14M6.5 11h2M11.5 11h2M6.5 14h2"/></svg></span><span><strong>Calendário e eventos</strong><small>Visualize compromissos e tarefas agendadas.</small></span></li>
+      <li><span className="ck-login-about-icon notas" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M4 3.5h12v13H4zM7 7h6M7 10h6M7 13h3"/></svg></span><span><strong>Anotações e colaboração</strong><small>Guarde ideias e compartilhe com amigos ou equipes.</small></span></li>
+    </ul>
+    <div className="ck-login-about-slogan">Organize seus dias. Cresça no seu tempo.</div>
+  </aside>;
+}
+
+function Moldura({ children, onSubmit, presentation = false }) {
   return (
     <div className="ck-login">
       <div className="ck-login-fundo" style={{ backgroundImage: `url(${FUNDO})` }} aria-hidden="true" />
-      <form className="ck-login-card" onSubmit={onSubmit}>
-        {children}
-      </form>
+      <main className={`ck-login-layout${presentation ? " com-apresentacao" : ""}`}>
+        <form className="ck-login-card" onSubmit={onSubmit}>
+          {children}
+        </form>
+        {presentation && <ApresentacaoCrysalis />}
+      </main>
     </div>
   );
 }
@@ -111,7 +128,7 @@ export default function Login() {
   const rotulosBotao = { entrar: "Entrar", criar: "Criar conta", esqueci: "Enviar link" };
 
   return (
-    <Moldura onSubmit={enviar}>
+    <Moldura onSubmit={enviar} presentation={modo === "entrar" || modo === "criar"}>
  <img src={logo} alt="Logo do Crysalis" className="ck-login-logo" />
 
       <h1>Crysalis</h1>

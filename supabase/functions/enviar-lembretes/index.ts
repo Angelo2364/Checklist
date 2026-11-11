@@ -154,8 +154,42 @@ Deno.serve(async (req) => {
 
   let enviados = 0;
 
+  // Atualizações de tarefas compartilhadas são colocadas na fila pelo banco,
+  // assim todos os participantes recebem o aviso mesmo quando o app está fechado.
+  const { data: colaboracao } = await supabase.from("collaboration_notifications")
+    .select("*").is("sent_at", null).order("created_at").limit(500);
+  for (const aviso of colaboracao ?? []) {
+    const dados: any = dadosDe.get(aviso.recipient_id) ?? {};
+    const preferences = dados.notificationPreferences ?? {};
+    if (preferences.collaboration === false) {
+      await supabase.from("collaboration_notifications").update({ sent_at: new Date().toISOString() }).eq("id", aviso.id).is("sent_at", null);
+      continue;
+    }
+    const aparelhos = (subs ?? []).filter((sub) => sub.user_id === aviso.recipient_id);
+    if (!aparelhos.length) continue;
+    const dentroDaJanela = aparelhos.some((sub) => {
+      const ag = agoraNoFuso(sub.fuso || "America/Sao_Paulo");
+      return horarioPermiteAvisos(dados.janelaAvisos, ag.minutosDia);
+    });
+    if (!dentroDaJanela) continue;
+    const payload = {
+      titulo: `${String(aviso.actor_name || "Alguém").replace(/^./u, (c: string) => c.toLocaleUpperCase("pt-BR"))} ${aviso.action} uma tarefa · ${aviso.scope_name}`,
+      corpo: `“${aviso.task_title}” foi ${aviso.action === "adicionou" ? "adicionada" : aviso.action === "excluiu" ? "excluída" : "alterada"}.`,
+      tag: `colaboracao-${aviso.scope_type}-${aviso.scope_id}-${aviso.id}`,
+      renotify: true,
+      icon: "/Logo.svg",
+      data: { url: "/" },
+    };
+    for (const sub of aparelhos) {
+      const ag = agoraNoFuso(sub.fuso || "America/Sao_Paulo");
+      if (horarioPermiteAvisos(dados.janelaAvisos, ag.minutosDia) && await enviar(sub, payload, { TTL: 3600, urgency: "normal" })) enviados++;
+    }
+    await supabase.from("collaboration_notifications").update({ sent_at: new Date().toISOString() }).eq("id", aviso.id).is("sent_at", null);
+  }
+
   for (const sub of subs) {
     const dados: any = dadosDe.get(sub.user_id) ?? {};
+    const preferences = dados.notificationPreferences ?? {};
     const ag = agoraNoFuso(sub.fuso || "America/Sao_Paulo");
     const dentroDoHorario = horarioPermiteAvisos(dados.janelaAvisos, ag.minutosDia);
     const mudancas: Record<string, unknown> = {};
@@ -163,7 +197,7 @@ Deno.serve(async (req) => {
     // 1) avisos perto do prazo: 45 min antes (lembrete) e 15 min antes (chamadão)
     const vistos: Record<string, number> = { ...(sub.prazos_enviados ?? {}) };
     let mudouVistos = false;
-    for (const t of dados.tarefas ?? []) {
+    for (const t of (preferences.deadlines === false ? [] : dados.tarefas ?? [])) {
       if (!forcar && !dentroDoHorario) break;
       if (t.agendadaPara && t.agendadaPara > ag.hoje) continue;
       if (t.feita || !t.limite || !t.limiteHora) continue;
@@ -199,7 +233,7 @@ Deno.serve(async (req) => {
     const intervalo = sub.intervalo || 30;
     const ini = Math.floor(ag.minutosDia / intervalo) * intervalo;
     const slot = `${ag.hoje} ${z2(Math.floor(ini / 60))}:${z2(ini % 60)}`;
-    if (forcar || sub.ultimo_slot !== slot) {
+    if (preferences.checklistSummary !== false && (forcar || sub.ultimo_slot !== slot)) {
       if (!forcar) mudancas.ultimo_slot = slot;
       // só avisa nos primeiros 5 min do intervalo, para não mandar aviso velho
       if ((forcar || dentroDoHorario) && (forcar || ag.minutosDia % intervalo < 5)) {

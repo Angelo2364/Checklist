@@ -5,6 +5,7 @@ import { carregarDados, criarDados, salvarDados } from "./services/dados";
 import { pushSuportado, motivoSemPush, ativarPush, atualizarPush, desativarPush } from "./services/push";
 import Login, { NovaSenha } from "./Login";
 import Social from "./Social";
+import Equipes from "./Equipes";
 
 const STORAGE_TASKS = "checklist:tarefas";
 const STORAGE_GROUPS = "checklist:divisoes";
@@ -30,8 +31,10 @@ const EMAIL_CONTATO = "sayaokaua@gmail.com";
 const STORAGE_INTERVALO = "checklist:intervaloAviso"; // minutos entre os lembretes
 const STORAGE_JANELA_AVISOS = "checklist:janelaAvisos";
 const STORAGE_EXCLUIR_SEM_CONFIRMAR = "checklist:excluirSemConfirmar";
+const STORAGE_PREF_NOTIFICACOES = "checklist:preferenciasNotificacoes";
 const STORAGE_AVISOS_AGENDA_FECHADOS = "checklist:avisosAgendaFechados";
 const JANELA_AVISOS_PADRAO = { ativa: false, inicio: "08:00", fim: "22:00" };
+const PREFERENCIAS_NOTIFICACAO_PADRAO = { checklistSummary: true, deadlines: true, collaboration: true };
 const INTERVALOS_AVISO = [15, 30, 60, 120, 180];
 const rotuloIntervalo = (m) => (m < 60 ? `${m} minutos` : m === 60 ? "1 hora" : `${m / 60} horas`);
 const STORAGE_TEMA = "checklist:tema"; // "escuro" (padrão) | "claro"
@@ -39,6 +42,13 @@ const FORMATO_BACKUP = "checklist-backup"; // marca dos arquivos exportados
 const STORAGE_DONO = "checklist:donoLocal"; // id do usuário a quem pertence o cache local
 
 const horarioValido = (valor) => typeof valor === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(valor);
+function normalizarPreferenciasNotificacao(valor) {
+  return {
+    checklistSummary: valor?.checklistSummary !== false,
+    deadlines: valor?.deadlines !== false,
+    collaboration: valor?.collaboration !== false,
+  };
+}
 function normalizarJanelaAvisos(valor) {
   return {
     ativa: valor?.ativa === true,
@@ -59,9 +69,9 @@ function horarioPermiteAvisos(janela, agora = new Date()) {
 
 // o que vai pra nuvem (mesma forma do arquivo exportado, sem o cabeçalho)
 const listaObjs = (v) => (Array.isArray(v) ? v.filter((x) => x && typeof x === "object") : []);
-const empacotar = (tarefas, grupos, eventos, rotinas, contas, anotacoes = [], sessoesAnotacoes = [], janelaAvisos = JANELA_AVISOS_PADRAO, excluirSemConfirmacao = true) => ({ tarefas, grupos, eventos, rotinas, contas, anotacoes, sessoesAnotacoes, janelaAvisos: normalizarJanelaAvisos(janelaAvisos), excluirSemConfirmacao: excluirSemConfirmacao !== false });
+const empacotar = (tarefas, grupos, eventos, rotinas, contas, anotacoes = [], sessoesAnotacoes = [], janelaAvisos = JANELA_AVISOS_PADRAO, excluirSemConfirmacao = true, notificationPreferences = PREFERENCIAS_NOTIFICACAO_PADRAO) => ({ tarefas, grupos, eventos, rotinas, contas, anotacoes, sessoesAnotacoes, janelaAvisos: normalizarJanelaAvisos(janelaAvisos), excluirSemConfirmacao: excluirSemConfirmacao !== false, notificationPreferences: normalizarPreferenciasNotificacao(notificationPreferences) });
 const empacotarNuvem = (d) =>
-  empacotar(listaObjs(d?.tarefas), listaObjs(d?.grupos), listaObjs(d?.eventos), listaObjs(d?.rotinas), listaObjs(d?.contas), listaObjs(d?.anotacoes), listaObjs(d?.sessoesAnotacoes), d?.janelaAvisos, d?.excluirSemConfirmacao);
+  empacotar(listaObjs(d?.tarefas), listaObjs(d?.grupos), listaObjs(d?.eventos), listaObjs(d?.rotinas), listaObjs(d?.contas), listaObjs(d?.anotacoes), listaObjs(d?.sessoesAnotacoes), d?.janelaAvisos, d?.excluirSemConfirmacao, d?.notificationPreferences);
 // papel de parede padrão: coloque o arquivo bg.png dentro da pasta public/
 const FUNDO_PADRAO = `${import.meta.env.BASE_URL}bg.png`;
 const STORAGE_BG_AJUSTE = "checklist:ajusteFundo";
@@ -1719,7 +1729,7 @@ function FormularioAnotacao({ form, onSalvar, onChange, onCancelar }) {
   );
 }
 
-function ConfiguracoesVisuais({ tema, setTema, desfoque, setDesfoque, ajusteFundo, setAjusteFundo, escolherFundo, fundo, removerFundo, erroFundo, janelaAvisos, setJanelaAvisos, excluirSemConfirmacao, setExcluirSemConfirmacao, iniciarTutorial }) {
+function ConfiguracoesVisuais({ tema, setTema, desfoque, setDesfoque, ajusteFundo, setAjusteFundo, escolherFundo, fundo, removerFundo, erroFundo, janelaAvisos, setJanelaAvisos, excluirSemConfirmacao, setExcluirSemConfirmacao, notificationPreferences, setNotificationPreferences, iniciarTutorial }) {
   return <div className="ck-config-preferencias">
     <section className="ck-pref-card">
       <h3>Tema</h3>
@@ -1740,6 +1750,13 @@ function ConfiguracoesVisuais({ tema, setTema, desfoque, setDesfoque, ajusteFund
         <input type="checkbox" checked={excluirSemConfirmacao} onChange={(e) => setExcluirSemConfirmacao(e.target.checked)} />
         <span>Excluir tarefas sem confirmação</span>
       </label>
+    </section>
+    <section className="ck-pref-card">
+      <h3 id="config-notificacoes">Notificações</h3>
+      <p>Escolha quais avisos este aparelho e sua conta podem receber.</p>
+      <label className="ck-limite-horario"><input type="checkbox" checked={notificationPreferences.checklistSummary} onChange={(e) => setNotificationPreferences((p) => ({ ...p, checklistSummary: e.target.checked }))} /><span>Resumo periódico da checklist</span></label>
+      <label className="ck-limite-horario"><input type="checkbox" checked={notificationPreferences.deadlines} onChange={(e) => setNotificationPreferences((p) => ({ ...p, deadlines: e.target.checked }))} /><span>Avisos de prazo</span></label>
+      <label className="ck-limite-horario"><input type="checkbox" checked={notificationPreferences.collaboration} onChange={(e) => setNotificationPreferences((p) => ({ ...p, collaboration: e.target.checked }))} /><span>Atualizações de tarefas com amigos e equipes</span></label>
     </section>
     <section className="ck-pref-card">
       <h3>Horário dos lembretes</h3>
@@ -1989,6 +2006,7 @@ function Checklist({ usuario }) {
     return INTERVALOS_AVISO.includes(v) ? v : 30;
   });
   const [janelaAvisos, setJanelaAvisos] = useState(() => normalizarJanelaAvisos(lerStorage(STORAGE_JANELA_AVISOS, JANELA_AVISOS_PADRAO)));
+  const [notificationPreferences, setNotificationPreferences] = useState(() => normalizarPreferenciasNotificacao(lerStorage(STORAGE_PREF_NOTIFICACOES, PREFERENCIAS_NOTIFICACAO_PADRAO)));
   const [excluirSemConfirmacao, setExcluirSemConfirmacao] = useState(() => lerStorage(STORAGE_EXCLUIR_SEM_CONFIRMAR, true) !== false);
   const [tema, setTema] = useState(() => (lerStorage(STORAGE_TEMA, "escuro") === "claro" ? "claro" : "escuro"));
   useEffect(() => {
@@ -2033,6 +2051,7 @@ function Checklist({ usuario }) {
   const anotacoesRef = useRef([]);
   const sessoesAnotacoesRef = useRef([]);
   const janelaAvisosRef = useRef(janelaAvisos);
+  const notificationPreferencesRef = useRef(notificationPreferences);
   const excluirSemConfirmacaoRef = useRef(excluirSemConfirmacao);
   tarefasRef.current = tarefas;
   gruposRef.current = grupos;
@@ -2042,6 +2061,7 @@ function Checklist({ usuario }) {
   anotacoesRef.current = anotacoes;
   sessoesAnotacoesRef.current = sessoesAnotacoes;
   janelaAvisosRef.current = janelaAvisos;
+  notificationPreferencesRef.current = notificationPreferences;
   excluirSemConfirmacaoRef.current = excluirSemConfirmacao;
 
   // ---------- sincronização com o Supabase ----------
@@ -2053,7 +2073,7 @@ function Checklist({ usuario }) {
   const salvandoAgora = useRef(false);
   const bloqueado = useRef(false); // true enquanto há conflito pendente
 
-  const jsonAtual = JSON.stringify(empacotar(tarefas, grupos, eventos, rotinas, contas, anotacoes, sessoesAnotacoes, janelaAvisos, excluirSemConfirmacao));
+  const jsonAtual = JSON.stringify(empacotar(tarefas, grupos, eventos, rotinas, contas, anotacoes, sessoesAnotacoes, janelaAvisos, excluirSemConfirmacao, notificationPreferences));
   const jsonAtualRef = useRef(jsonAtual);
   jsonAtualRef.current = jsonAtual;
 
@@ -2068,6 +2088,7 @@ function Checklist({ usuario }) {
     setSessoesAnotacoes(l.sessoesAnotacoes);
     setJanelaAvisos(l.janelaAvisos);
     setExcluirSemConfirmacao(l.excluirSemConfirmacao);
+    setNotificationPreferences(l.notificationPreferences);
     return JSON.stringify(l);
   }
 
@@ -2088,8 +2109,8 @@ function Checklist({ usuario }) {
           // cache local de outra conta nunca sobe pra esta
           const dono = lerStorage(STORAGE_DONO, null);
           const inicial = dono && dono !== usuario.id
-            ? empacotar([], [], [], [], [], [], [], JANELA_AVISOS_PADRAO, true)
-            : empacotar(tarefasRef.current, gruposRef.current, eventosRef.current, rotinasRef.current, contasRef.current, anotacoesRef.current, sessoesAnotacoesRef.current, janelaAvisosRef.current, excluirSemConfirmacaoRef.current);
+            ? empacotar([], [], [], [], [], [], [], JANELA_AVISOS_PADRAO, true, PREFERENCIAS_NOTIFICACAO_PADRAO)
+            : empacotar(tarefasRef.current, gruposRef.current, eventosRef.current, rotinasRef.current, contasRef.current, anotacoesRef.current, sessoesAnotacoesRef.current, janelaAvisosRef.current, excluirSemConfirmacaoRef.current, notificationPreferencesRef.current);
           jsonSalvo.current = aplicarDados(inicial);
           try {
             versaoNuvem.current = await criarDados(usuario.id, inicial);
@@ -2118,7 +2139,7 @@ function Checklist({ usuario }) {
   async function salvarNaNuvem(forcar = false) {
     while (salvandoAgora.current) await new Promise((r) => setTimeout(r, 200));
     if (bloqueado.current && !forcar) return;
-    const dados = empacotar(tarefasRef.current, gruposRef.current, eventosRef.current, rotinasRef.current, contasRef.current, anotacoesRef.current, sessoesAnotacoesRef.current, janelaAvisosRef.current, excluirSemConfirmacaoRef.current);
+    const dados = empacotar(tarefasRef.current, gruposRef.current, eventosRef.current, rotinasRef.current, contasRef.current, anotacoesRef.current, sessoesAnotacoesRef.current, janelaAvisosRef.current, excluirSemConfirmacaoRef.current, notificationPreferencesRef.current);
     const json = JSON.stringify(dados);
     if (json === jsonSalvo.current && !forcar) return;
     salvandoAgora.current = true;
@@ -2216,7 +2237,7 @@ function Checklist({ usuario }) {
       /* ignora */
     }
     // limpa o cache local pra não deixar suas tarefas num computador compartilhado
-    [STORAGE_TASKS, STORAGE_GROUPS, STORAGE_EVENTS, STORAGE_ROUTINES, STORAGE_BILLS, STORAGE_NOTES, STORAGE_NOTE_GROUPS, STORAGE_JANELA_AVISOS, STORAGE_EXCLUIR_SEM_CONFIRMAR, STORAGE_DONO, STORAGE_PRAZOS, STORAGE_LAST].forEach((k) => {
+    [STORAGE_TASKS, STORAGE_GROUPS, STORAGE_EVENTS, STORAGE_ROUTINES, STORAGE_BILLS, STORAGE_NOTES, STORAGE_NOTE_GROUPS, STORAGE_JANELA_AVISOS, STORAGE_PREF_NOTIFICACOES, STORAGE_EXCLUIR_SEM_CONFIRMAR, STORAGE_DONO, STORAGE_PRAZOS, STORAGE_LAST].forEach((k) => {
       try {
         localStorage.removeItem(k);
       } catch {
@@ -2248,6 +2269,7 @@ function Checklist({ usuario }) {
   useEffect(() => { salvarStorage(STORAGE_NOTES, anotacoes); }, [anotacoes]);
   useEffect(() => { salvarStorage(STORAGE_NOTE_GROUPS, sessoesAnotacoes); }, [sessoesAnotacoes]);
   useEffect(() => { salvarStorage(STORAGE_JANELA_AVISOS, janelaAvisos); }, [janelaAvisos]);
+  useEffect(() => { salvarStorage(STORAGE_PREF_NOTIFICACOES, notificationPreferences); }, [notificationPreferences]);
   useEffect(() => { salvarStorage(STORAGE_EXCLUIR_SEM_CONFIRMAR, excluirSemConfirmacao); }, [excluirSemConfirmacao]);
 
   useEffect(() => {
@@ -2325,6 +2347,7 @@ function Checklist({ usuario }) {
       );
       if (
         voltam.length > 0 &&
+        notificationPreferencesRef.current.checklistSummary &&
         typeof Notification !== "undefined" &&
         Notification.permission === "granted" &&
         lerStorage(STORAGE_NOTIFY, false) &&
@@ -2409,6 +2432,7 @@ function Checklist({ usuario }) {
 
   // avisos extras perto do prazo: 45 min antes (lembrete) e 15 min antes (chamadão)
   function verificarPrazos() {
+    if (!notificationPreferences.deadlines) return;
     if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
     const agora = new Date();
     if (!horarioPermiteAvisos(janelaAvisos, agora)) return;
@@ -2449,6 +2473,7 @@ function Checklist({ usuario }) {
   }
 
   function enviarNotificacao() {
+    if (!notificationPreferences.checklistSummary) return;
     if (typeof Notification === "undefined") return;
     if (Notification.permission !== "granted") return;
 
@@ -2519,13 +2544,19 @@ function Checklist({ usuario }) {
     };
     // A função usa refs mutáveis e `janelaAvisos`, já declarada como dependência.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notificar, permissao, intervaloAviso, pushAtivo, janelaAvisos]);
+  }, [notificar, permissao, intervaloAviso, pushAtivo, janelaAvisos, notificationPreferences]);
 
   function mudarIntervalo(minutos) {
     setIntervaloAviso(minutos);
     salvarStorage(STORAGE_INTERVALO, minutos);
     salvarStorage(STORAGE_LAST, slotAtual(minutos)); // recomeça a contar a partir de agora
     if (pushAtivo) atualizarPush(minutos).catch(() => setAvisoPush("Não consegui atualizar o intervalo no servidor."));
+  }
+
+  function abrirPreferenciasNotificacao() {
+    setAbaConfiguracoes("preferencias");
+    setPagina("configuracoes");
+    window.setTimeout(() => document.getElementById("config-notificacoes")?.scrollIntoView({ behavior: "smooth", block: "center" }), 120);
   }
 
   // mantém este aparelho inscrito no push (também refaz a inscrição se trocar de conta)
@@ -2892,6 +2923,7 @@ function Checklist({ usuario }) {
       sessoesAnotacoes,
       janelaAvisos,
       excluirSemConfirmacao,
+      notificationPreferences,
     };
     const blob = new Blob([JSON.stringify(dados, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -2921,6 +2953,7 @@ function Checklist({ usuario }) {
       const an = lista(dados.anotacoes);
       const san = lista(dados.sessoesAnotacoes);
       const ja = normalizarJanelaAvisos(dados.janelaAvisos);
+      const prefNotificacoes = normalizarPreferenciasNotificacao(dados.notificationPreferences);
       const excluirSemConfirmacaoImportado = dados.excluirSemConfirmacao !== false;
       const quando = dados.exportadoEm ? new Date(dados.exportadoEm).toLocaleString("pt-BR") : "data desconhecida";
       const ok = window.confirm(
@@ -2937,6 +2970,7 @@ function Checklist({ usuario }) {
       setAnotacoes(an);
       setSessoesAnotacoes(san);
       setJanelaAvisos(ja);
+      setNotificationPreferences(prefNotificacoes);
       setExcluirSemConfirmacao(excluirSemConfirmacaoImportado);
       setMsgDados({ texto: `Importado: ${t.length} tarefas, ${g.length} sessões, ${ev.length} eventos, ${ro.length} rotinas, ${co.length} contas.`, erro: false });
     } catch {
@@ -3105,6 +3139,7 @@ function Checklist({ usuario }) {
           <button type="button" className="ck-social-nav" onClick={() => setPagina("social")} title="Social" aria-label="Abrir Social">
             <svg viewBox="0 0 20 20" width="17" height="17" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="7" cy="6.5" r="2.5" /><circle cx="14" cy="7.5" r="2" /><path d="M2 16c.3-2.7 2.1-4.2 5-4.2s4.7 1.5 5 4.2M12 12.3c2.8-.6 5.2.9 5.7 3.7" /></svg><span>Social</span>
           </button>
+          <button type="button" className="ck-social-nav" onClick={() => setPagina("equipes")} title="Equipes" aria-label="Abrir equipes"><svg viewBox="0 0 20 20" width="17" height="17" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="2.4"/><circle cx="14" cy="6" r="2.4"/><path d="M1.8 16c.3-2.7 1.8-4 4.2-4h.2m11.9 4c-.3-2.7-1.8-4-4.2-4h-.2M6 16c.3-3.4 1.6-5 4-5s3.7 1.6 4 5"/></svg><span>Equipes</span></button>
           <button type="button" className="ck-icone" data-tutorial="configuracoes" onClick={() => setPagina("configuracoes")} title="Configurações" aria-label="Abrir configurações">
             <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6.5 1.8h3l.4 1.7a5 5 0 0 1 1.2.7l1.7-.5 1.5 2.6-1.3 1.2v1.4l1.3 1.2-1.5 2.6-1.7-.5a5 5 0 0 1-1.2.7l-.4 1.7h-3l-.4-1.7a5 5 0 0 1-1.2-.7l-1.7.5-1.5-2.6L3 8.9V7.5L1.7 6.3l1.5-2.6 1.7.5a5 5 0 0 1 1.2-.7z"/><circle cx="8" cy="8.2" r="2.1"/></svg>
           </button>
@@ -3149,7 +3184,7 @@ function Checklist({ usuario }) {
           <button type="button" role="tab" className="ck-aba" aria-selected={abaConfiguracoes === "preferencias"} onClick={() => setAbaConfiguracoes("preferencias")}>Preferências</button>
           <button type="button" role="tab" className="ck-aba" aria-selected={abaConfiguracoes === "conta"} onClick={() => setAbaConfiguracoes("conta")}>Conta</button>
         </div>
-        {abaConfiguracoes === "preferencias" ? <ConfiguracoesVisuais tema={tema} setTema={setTema} desfoque={desfoque} setDesfoque={setDesfoque} ajusteFundo={ajusteFundo} setAjusteFundo={setAjusteFundo} escolherFundo={escolherFundo} fundo={fundo} removerFundo={removerFundo} erroFundo={erroFundo} janelaAvisos={janelaAvisos} setJanelaAvisos={setJanelaAvisos} excluirSemConfirmacao={excluirSemConfirmacao} setExcluirSemConfirmacao={setExcluirSemConfirmacao} iniciarTutorial={iniciarTutorial} /> : <section className="ck-conta-config">
+        {abaConfiguracoes === "preferencias" ? <ConfiguracoesVisuais tema={tema} setTema={setTema} desfoque={desfoque} setDesfoque={setDesfoque} ajusteFundo={ajusteFundo} setAjusteFundo={setAjusteFundo} escolherFundo={escolherFundo} fundo={fundo} removerFundo={removerFundo} erroFundo={erroFundo} janelaAvisos={janelaAvisos} setJanelaAvisos={setJanelaAvisos} excluirSemConfirmacao={excluirSemConfirmacao} setExcluirSemConfirmacao={setExcluirSemConfirmacao} notificationPreferences={notificationPreferences} setNotificationPreferences={setNotificationPreferences} iniciarTutorial={iniciarTutorial} /> : <section className="ck-conta-config">
           <div className="ck-conta-identidade"><span className="ck-conta-avatar" aria-hidden="true">{(usuario.email || "?").slice(0, 1).toUpperCase()}</span><div><small>Conta conectada</small><strong>{usuario.email}</strong></div></div>
           <ConfiguracaoNomeUsuario usuario={usuario} onNomeSalvo={setNomeUsuarioDefinido} />
           <button type="button" className="ck-sair-conta" onClick={sair}><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"><path d="M6.5 2.5H4a1.5 1.5 0 0 0-1.5 1.5v8A1.5 1.5 0 0 0 4 13.5h2.5"/><path d="M10 5l3 3-3 3M13 8H6.5"/></svg>Sair da conta</button>
@@ -3353,6 +3388,7 @@ function Checklist({ usuario }) {
                   <option key={m} value={m}>{rotuloIntervalo(m)}</option>
                 ))}
               </select>
+              <button type="button" className="ck-icone ck-aviso-config" onClick={abrirPreferenciasNotificacao} title="Configurar quais notificações receber" aria-label="Configurar notificações"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6.5 1.8h3l.4 1.7a5 5 0 0 1 1.2.7l1.7-.5 1.5 2.6-1.3 1.2v1.4l1.3 1.2-1.5 2.6-1.7-.5a5 5 0 0 1-1.2.7l-.4 1.7h-3l-.4-1.7a5 5 0 0 1-1.2-.7l-1.7.5-1.5-2.6L3 8.9V7.5L1.7 6.3l1.5-2.6 1.7.5a5 5 0 0 1 1.2-.7z"/><circle cx="8" cy="8.2" r="2.1"/></svg></button>
               {" "}
             </p>
             <div className="ck-acoes">
@@ -3386,7 +3422,7 @@ function Checklist({ usuario }) {
           </>
         )}
       </section>
-      </> : pagina === "social" ? <section className="ck-social-page-wrap"><Social user={usuario} view="manage" /></section> : pagina === "anotacoes" ? <section className="ck-anotacoes">
+      </> : pagina === "social" ? <section className="ck-social-page-wrap"><Social user={usuario} view="manage" /></section> : pagina === "equipes" ? <section className="ck-social-page-wrap"><Equipes user={usuario} /></section> : pagina === "anotacoes" ? <section className="ck-anotacoes">
         <div className="ck-barras-topo">
           {formAnotacao && !formAnotacao.id && (!formAnotacao.sessaoId || !sessoesAnotacoes.some((s) => s.id === formAnotacao.sessaoId)) ? <FormularioAnotacao form={formAnotacao} onSalvar={salvarAnotacao} onChange={setFormAnotacao} onCancelar={() => setFormAnotacao(null)} /> : <BarraMais rotulo="Adicionar anotação" atalho={ATALHO_TAREFA} onClick={() => abrirNovaAnotacao()} />}
           {criandoSessaoAnotacao ? <form className="ck-nova-divisao" onSubmit={criarSessaoAnotacao} onBlur={(e) => fecharAoClicarFora(e, () => { setCriandoSessaoAnotacao(false); setNomeSessaoAnotacao(""); })}>

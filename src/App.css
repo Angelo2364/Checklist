@@ -2047,7 +2047,7 @@ body {
   display: grid;
   place-items: center;
   padding: 20px;
-  overflow: hidden;
+  overflow-x: hidden;
 }
 
 .ck-login-fundo {
@@ -2059,10 +2059,19 @@ body {
   filter: blur(10px);
 }
 
-.ck-login-card {
+.ck-login-layout {
   position: relative;
   z-index: 1;
-  width: min(380px, 100%);
+  display: grid;
+  grid-template-columns: minmax(320px, 380px) minmax(280px, 340px);
+  align-items: stretch;
+  gap: 18px;
+  width: min(760px, 100%);
+}
+.ck-login-layout:not(.com-apresentacao) { grid-template-columns: minmax(0, 380px); width: min(380px, 100%); }
+
+.ck-login-card {
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -2079,6 +2088,39 @@ body {
     inset -1px -1px 0 rgba(255, 255, 255, 0.14),
     0 0 48px rgba(0, 0, 0, 0.35);
 }
+
+.ck-login-about {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+  min-width: 0;
+  padding: 25px 23px;
+  color: var(--tinta);
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--azul) 16%, transparent), transparent 55%),
+    color-mix(in srgb, var(--fundo) 44%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.6);
+  backdrop-filter: blur(14px) saturate(1.6);
+  border: 1px solid color-mix(in srgb, white 25%, var(--linha));
+  border-radius: 22px;
+  box-shadow: inset 1px 1px 0 color-mix(in srgb, white 24%, transparent), 0 12px 38px rgba(0,0,0,.2);
+}
+.ck-login-about-heading { display: flex; align-items: center; gap: 9px; color: var(--suave); font-size: 10px; font-weight: 800; letter-spacing: .11em; }
+.ck-login-about-heading img { width: 30px; height: 30px; object-fit: contain; }
+.ck-login-about h2 { margin: 0; font-size: 22px; line-height: 1.18; letter-spacing: -.025em; }
+.ck-login-about > p { margin: 0; color: var(--suave); font-size: 13px; line-height: 1.55; }
+.ck-login-about ul { display: grid; gap: 9px; margin: 2px 0 0; padding: 0; list-style: none; }
+.ck-login-about li { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 9px; border: 1px solid color-mix(in srgb, var(--linha) 80%, transparent); border-radius: 12px; background: color-mix(in srgb, var(--fundo) 24%, transparent); }
+.ck-login-about li > span:last-child { display: grid; gap: 2px; min-width: 0; }
+.ck-login-about li strong { font-size: 12px; line-height: 1.25; }
+.ck-login-about li small { color: var(--suave); font-size: 11px; line-height: 1.35; }
+.ck-login-about-icon { display: grid; flex: none; place-items: center; width: 34px; height: 34px; border: 1px solid var(--linha); border-radius: 10px; background: color-mix(in srgb, var(--fundo) 55%, transparent); }
+.ck-login-about-icon svg { width: 19px; height: 19px; }
+.ck-login-about-icon.tarefas { color: var(--azul-forte); }
+.ck-login-about-icon.agenda { color: #d49820; }
+.ck-login-about-icon.notas { color: #bd5c88; }
+.ck-login-about-slogan { padding-top: 10px; border-top: 1px solid color-mix(in srgb, var(--linha) 75%, transparent); color: var(--suave); font-size: 11px; font-weight: 700; }
 
 .ck-login-card h1 {
   margin: 0;
@@ -2201,6 +2243,16 @@ body {
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0.1) 100%),
     color-mix(in srgb, var(--fundo) 70%, transparent);
+}
+:root[data-tema="claro"] .ck-login-about { background: color-mix(in srgb, var(--fundo) 72%, transparent); border-color: color-mix(in srgb, var(--linha) 78%, white); }
+@media (max-width: 760px) {
+  .ck-login { align-items: start; min-height: 100vh; min-height: 100dvh; padding: 18px 14px 28px; }
+  .ck-login-layout { grid-template-columns: minmax(0, 1fr); gap: 12px; width: min(420px, 100%); margin: auto; }
+  .ck-login-layout:not(.com-apresentacao) { width: min(420px, 100%); }
+  .ck-login-card { padding: 24px 22px; }
+  .ck-login-about { gap: 11px; padding: 18px; border-radius: 18px; }
+  .ck-login-about h2 { font-size: 19px; }
+  .ck-login-about ul { grid-template-columns: minmax(0,1fr); gap: 7px; }
 }
 
 /* ---------- linha da tarefa: repetição e prazo descem se faltar espaço ---------- */
@@ -3237,6 +3289,90 @@ body {
 .ck-painel .ck-contas .ck-lista li + li { border-top: 1px solid var(--linha); }
 :root[data-tema="claro"] .ck-painel .ck-rotinas li,
 :root[data-tema="claro"] .ck-painel .ck-contas .ck-lista li { background: color-mix(in srgb, var(--fundo) 90%, transparent); }
+
+/* Notas compartilhadas, equipes e preferências de avisos */
+.ck-social-notes-toggle { display: grid; flex: none; place-items: center; width: 30px; height: 30px; padding: 5px; color: var(--suave); background: transparent; border: 1px solid transparent; border-radius: 9px; cursor: pointer; }
+.ck-social-notes-toggle:hover { color: var(--tinta); background: var(--fundo-hover); border-color: var(--linha); }
+.ck-social-notes-toggle svg, .ck-social-notes-toggle img { display: block; width: 18px; height: 18px; }
+.ck-social-notes-toggle img { filter: grayscale(1); opacity: .72; }
+.ck-shared-notes { display: grid; gap: 8px; }
+.ck-shared-note-add { display: inline-flex; align-items: center; justify-content: center; justify-self: start; width: auto; min-height: 32px; padding: 5px 10px; color: var(--tinta); background: color-mix(in srgb, var(--fundo-hover) 70%, transparent); border: 1px solid var(--linha); border-radius: 9px; cursor: pointer; }
+.ck-team-tabs { display: flex; flex-wrap: wrap; gap: 7px; }
+.ck-team-tabs button, .ck-team-panel > header > button, .ck-team-new-group button, .ck-team-add-member button { min-height: 34px; padding: 6px 11px; color: var(--tinta); background: color-mix(in srgb, var(--fundo-hover) 70%, transparent); border: 1px solid var(--linha); border-radius: 10px; }
+.ck-team-tabs button.ativo { color: var(--tinta); border-color: var(--azul-forte); background: color-mix(in srgb, var(--azul) 24%, var(--fundo)); }
+.ck-team-panel { display: grid; gap: 10px; min-width: 0; padding: 13px; border: 1px solid var(--linha); border-radius: 15px; background: color-mix(in srgb, var(--fundo) 78%, transparent); }
+.ck-team-panel > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ck-team-panel > header h3 { margin: 0; font-size: 15px; }
+.ck-team-panel > header > span { color: var(--suave); font-size: 12px; }
+.ck-team-settings-controls { display: flex; align-items: center; gap: 7px; margin-left: auto; }
+.ck-team-settings-controls > span { color: var(--suave); font-size: 12px; }
+.ck-team-settings { display: grid; gap: 9px; padding-top: 9px; border-top: 1px solid var(--linha); }
+.ck-team-settings > h4 { margin: 0; color: var(--suave); font-size: 12px; }
+.ck-team-delete { min-height: 34px; padding: 6px 11px; color: var(--perigo); background: transparent; border: 1px solid color-mix(in srgb, var(--perigo) 45%, var(--linha)); border-radius: 10px; }
+.ck-team-delete:hover { background: color-mix(in srgb, var(--perigo) 12%, transparent); }
+.ck-team-create-friends { display: grid; grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)); gap: 6px; margin: 0; padding: 9px; border: 1px solid var(--linha); border-radius: 10px; }
+.ck-team-create-friends legend { padding: 0 5px; color: var(--suave); font-size: 12px; }
+.ck-team-create-friends label { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 5px 7px; border-radius: 8px; background: color-mix(in srgb, var(--fundo) 65%, transparent); cursor: pointer; }
+.ck-team-create-friends label span { overflow-wrap: anywhere; font-size: 12px; }
+.ck-team-create-friends input { accent-color: var(--azul-forte); }
+.ck-team-members { display: flex; flex-wrap: wrap; gap: 7px; }
+.ck-team-members > div { display: inline-flex; align-items: center; gap: 5px; padding: 4px 5px 4px 10px; border: 1px solid var(--linha); border-radius: 999px; background: color-mix(in srgb, var(--fundo-hover) 55%, transparent); font-size: 12px; }
+.ck-team-add-member, .ck-team-new-group { display: flex; flex-wrap: wrap; gap: 7px; }
+.ck-team-add-member select, .ck-team-new-group input, .ck-team-fields input, .ck-team-fields select { min-width: 0; padding: 7px 10px; color: var(--tinta); background: color-mix(in srgb, var(--fundo) 88%, transparent); border: 1px solid var(--linha); border-radius: 9px; font: inherit; }
+.ck-team-add-member select, .ck-team-new-group input { flex: 1; }
+.ck-team-task-group { display: grid; gap: 7px; }
+.ck-team-task-group h4 { display: flex; align-items: center; justify-content: space-between; margin: 5px 0 0; color: var(--suave); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; }
+.ck-team-fields { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.ck-team-fields label { display: inline-flex; align-items: center; gap: 5px; color: var(--suave); font-size: 12px; }
+.ck-team-fields input, .ck-team-fields select { max-width: 170px; }
+.ck-team-task-row { display: flex; align-items: center; padding: 7px; }
+.ck-social-task-status { display: grid; flex: none; place-items: center; width: 22px; height: 22px; padding: 0; color: var(--tinta); background: transparent; border: 2px solid color-mix(in srgb, var(--azul-forte) 56%, var(--tinta)); border-radius: 50%; font-weight: 800; }
+.ck-social-task-status.parcial { background: linear-gradient(90deg, var(--azul) 50%, transparent 50%); border-color: var(--azul-forte); }
+.ck-social-task-status.feita { background: var(--azul); border-color: var(--azul); }
+.ck-social-task-content { display: grid; flex: 1; min-width: 0; gap: 3px; overflow-wrap: anywhere; font-size: 13px; }
+.ck-social-task-content small { color: var(--suave); font-size: 11px; white-space: pre-wrap; }
+.ck-team-note { display: grid; grid-template-columns: minmax(0,1fr) 30px 30px; align-items: center; gap: 5px; padding: 9px; border: 1px solid var(--linha); border-radius: 12px; background: color-mix(in srgb, var(--fundo) 90%, transparent); }
+.ck-team-note > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; min-width: 0; }
+.ck-team-note strong { overflow-wrap: anywhere; }
+.ck-team-note time { color: var(--suave); font-size: 11px; }
+.ck-team-note p { grid-column: 1 / -1; margin: 0; color: var(--suave); font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ck-aviso-config { display: inline-grid; vertical-align: middle; width: 28px; height: 28px; margin-left: 4px; border-radius: 8px; }
+@media (max-width: 520px) { .ck-team-fields { align-items: stretch; } .ck-team-fields label { flex: 1 1 100%; justify-content: space-between; } .ck-team-add-member > * { flex: 1 1 100%; } }
+
+.ck-team-create-area { display: grid; gap: 8px; }
+.ck-team-create-area > .ck-barra-mais { border: 1px solid var(--linha); border-radius: 10px; }
+.ck-team-create { margin: 0; }
+.ck-team-toolbar { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; padding: 0; }
+.ck-team-toolbar .ck-barra-mais { min-width: 0; padding: 7px 10px; border: 1px solid var(--linha); border-radius: 10px; background: color-mix(in srgb, var(--fundo-hover) 62%, transparent); }
+.ck-team-work-panel { gap: 9px; padding: 0 0 10px; overflow: hidden; }
+.ck-team-work-panel > header { padding: 12px 13px 0; }
+.ck-team-work-panel > .ck-team-toolbar, .ck-team-work-panel > .ck-team-editor, .ck-team-work-panel > .ck-team-note-editor { margin-left: 10px; margin-right: 10px; }
+.ck-team-editor { display: grid; gap: 8px; margin-top: 0; padding: 10px; border: 1px solid var(--linha); border-radius: 12px; background: color-mix(in srgb, var(--fundo) 82%, transparent); }
+.ck-team-editor > input[type="text"] { width: 100%; box-sizing: border-box; }
+.ck-team-editor .ck-social-repeat-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ck-team-editor .ck-social-repeat-row > select { flex: 1; min-width: 0; }
+.ck-team-editor .ck-prazo-campos { margin-top: 2px; padding-top: 7px; border-top: 1px solid color-mix(in srgb,var(--linha) 72%,transparent); }
+.ck-team-editor .ck-social-diammes input { width: 32px; min-width: 0; text-align: center; }
+.ck-team-editor .ck-campo-largo { width: 100%; box-sizing: border-box; }
+.ck-team-editor .ck-tarefa-form-rodape { margin-top: 0; }
+.ck-team-note-editor { display: grid; gap: 8px; margin: 0 10px; padding: 10px; border: 1px solid var(--linha); border-radius: 12px; background: color-mix(in srgb, var(--fundo) 82%, transparent); }
+.ck-team-note-editor > input[type="text"], .ck-team-note-editor > textarea { width: 100%; box-sizing: border-box; }
+.ck-team-session { overflow: hidden; margin: 0 10px; border: 1px solid var(--linha); border-radius: 13px; background: color-mix(in srgb,var(--grupo-bg) 34%,transparent); }
+.ck-team-session > header { display: flex; align-items: center; gap: 5px; padding-right: 7px; background: color-mix(in srgb,var(--grupo-bg) 86%,var(--fundo)); border-bottom: 1px solid var(--linha); }
+.ck-team-session > header .ck-grupo-titulo { padding: 10px; }
+.ck-team-session-body { display: grid; gap: 7px; padding: 8px; }
+.ck-team-task-group > h4 { margin: 7px 10px 0; }
+.ck-team-session-editor { display: flex; align-items: center; gap: 7px; padding: 9px 12px; }
+.ck-team-session-editor input { min-width: 0; flex: 1; }
+.ck-team-note { display: flex; align-items: flex-start; gap: 7px; padding: 8px; }
+.ck-team-note-bubble { display: block !important; flex: 1; min-width: 0; padding: 9px 11px; border: 1px solid color-mix(in srgb,var(--linha) 88%,transparent); border-radius: 12px; background: color-mix(in srgb,var(--fundo-hover) 56%,transparent); }
+.ck-team-note-bubble > div { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; }
+.ck-team-note-bubble p { margin: 5px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.ck-team-note-actions { display: flex !important; flex: none; align-items: center; gap: 2px !important; }
+.ck-team-note-actions .ck-icone { width: 28px; height: 28px; }
+.ck-team-note-actions .ck-social-remove { font-size: 19px; }
+.ck-shared-notes .ck-team-note { margin: 0; }
+@media (max-width: 520px) { .ck-team-toolbar { grid-template-columns: 1fr; } }
 @media (max-width: 520px) {
   .ck-repeticao-personalizada { align-items: flex-start; }
   .ck-painel .ck-rotinas li,
