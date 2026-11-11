@@ -68,11 +68,9 @@ const STORAGE_BG_AJUSTE = "checklist:ajusteFundo";
 const OPCOES_REPETE = [
   [0, "Não repete"],
   [1, "Todo dia"],
-  [2, "A cada 2 dias"],
   [3, "A cada 3 dias"],
-  [7, "Toda semana"],
-  [14, "A cada 2 semanas"],
-  [30, "A cada 30 dias"],
+  [30, "Uma vez por mês"],
+  ["personalizado", "Intervalo personalizado"],
 ];
 
 const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
@@ -86,6 +84,8 @@ function enviarAoEnter(e) {
 }
 function fecharAoClicarFora(e, fechar) {
   const formulario = e.currentTarget;
+  if (e.relatedTarget && formulario.contains(e.relatedTarget)) return;
+  if (formulario.dataset.interacaoInterna === "true") return;
   window.setTimeout(() => {
     if (!formulario.contains(document.activeElement)) fechar();
   }, 50);
@@ -96,9 +96,70 @@ function somarDias(dataISO, n) {
   return iso(new Date(a, m - 1, d + n));
 }
 const rotuloRepete = (n) =>
-  n === 1 ? "todo dia" : n === 7 ? "toda semana" : `a cada ${n} dias`;
-const rotuloRotina = (n, hora) =>
-  rotuloRepete(n) + (hora && hora !== "00:00" ? ` às ${hora}` : "");
+  n === 1 ? "todo dia" : n === 7 ? "toda semana" : n === 30 ? "uma vez por mês" : `a cada ${n} dias`;
+const rotuloRotina = (n, hora, recorrencia) => {
+  let frequencia = rotuloRepete(n);
+  if (recorrencia?.tipo === "semana") {
+    const dias = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
+    frequencia = `toda semana · ${recorrencia.diasSemana.map((dia) => dias[dia]).join(", ")}`;
+  } else if (recorrencia?.tipo === "meses") {
+    frequencia = recorrencia.intervalo === 1 ? "uma vez por mês" : `a cada ${recorrencia.intervalo} meses`;
+  } else if (recorrencia?.tipo === "dias" && ![1, 3].includes(recorrencia.intervalo)) {
+    frequencia = `a cada ${recorrencia.intervalo} dias`;
+  }
+  return frequencia + (hora && hora !== "00:00" ? ` às ${hora}` : "");
+};
+
+const recorrenciaSimples = (dias) => dias === 1 || dias === 3
+  ? { tipo: "dias", intervalo: dias }
+  : dias > 0 ? { tipo: "dias", intervalo: dias } : null;
+
+function proximaDataRotina(dataBase, recorrencia) {
+  if (!recorrencia) return somarDias(dataBase, 1);
+  if (recorrencia.tipo === "meses") {
+    const [ano, mes, dia] = dataBase.split("-").map(Number);
+    const destino = new Date(ano, mes - 1 + Math.max(1, Number(recorrencia.intervalo) || 1), 1);
+    return iso(new Date(destino.getFullYear(), destino.getMonth(), Math.min(dia, new Date(destino.getFullYear(), destino.getMonth() + 1, 0).getDate())));
+  }
+  if (recorrencia.tipo === "semana") {
+    const selecionados = new Set((recorrencia.diasSemana || []).map(Number));
+    if (!selecionados.size) return somarDias(dataBase, 7);
+    for (let dias = 1; dias <= 7; dias += 1) {
+      const proxima = somarDias(dataBase, dias);
+      const [ano, mes, dia] = proxima.split("-").map(Number);
+      if (selecionados.has(new Date(ano, mes - 1, dia).getDay())) return proxima;
+    }
+    return somarDias(dataBase, 7);
+  }
+  return somarDias(dataBase, Math.max(1, Number(recorrencia.intervalo) || 1));
+}
+
+function opcaoRepeticao(recorrencia, dias) {
+  const configurada = recorrencia || (dias > 0 ? { tipo: "dias", intervalo: dias } : null);
+  if (!configurada) return "0";
+  if (configurada.tipo === "semana") return "personalizado";
+  if (configurada.tipo === "meses") return configurada.intervalo === 1 ? "30" : "personalizado";
+  if (configurada.tipo === "dias" && [1, 3].includes(configurada.intervalo)) return String(configurada.intervalo);
+  return "personalizado";
+}
+
+function configRecorrenciaPadrao(recorrencia, dias) {
+  if (recorrencia) return { ...recorrencia, diasSemana: recorrencia.diasSemana || [] };
+  return { tipo: dias === 30 ? "meses" : "dias", intervalo: dias || 2, diasSemana: [] };
+}
+
+function recorrenciaSelecionada(opcao, config) {
+  if (opcao === "personalizado") return config;
+  if (Number(opcao) === 30) return { tipo: "meses", intervalo: 1 };
+  return recorrenciaSimples(Number(opcao));
+}
+
+function intervaloLegado(recorrencia) {
+  if (!recorrencia) return 0;
+  if (recorrencia.tipo === "semana") return 7;
+  if (recorrencia.tipo === "meses") return Math.max(1, Number(recorrencia.intervalo) || 1) * 30;
+  return Math.max(1, Number(recorrencia.intervalo) || 1);
+}
 
 // prazo da tarefa: "até hoje 17:00" e se já passou
 function rotuloPrazo(t, agora = new Date()) {
@@ -108,6 +169,20 @@ function rotuloPrazo(t, agora = new Date()) {
     t.limite === hoje ? "hoje" : t.limite === somarDias(hoje, 1) ? "amanhã" : t.limite.split("-").reverse().slice(0, 2).join("/");
   const fim = new Date(`${t.limite}T${t.limiteHora || "23:59"}`);
   return { texto: `até ${dia}${t.limiteHora ? ` ${t.limiteHora}` : ""}`, atrasada: !t.feita && fim < agora };
+}
+
+function prioridadePeloPrazo(t, agora = new Date()) {
+  const prioridade = Number(t.prioridade) || 0;
+  if (!prioridade || !t.limite || t.feita) return prioridade;
+  const prazo = new Date(`${t.limite}T${t.limiteHora || "23:59"}:00`).getTime();
+  const idCriacao = Number(t.criadaEm || t.id);
+  const criada = Number.isFinite(idCriacao) && idCriacao > 1e12 ? idCriacao : agora.getTime();
+  const duracao = prazo - criada;
+  const restante = prazo - agora.getTime();
+  if (duracao <= 0) return prioridade;
+  if (restante <= duracao / 4) return Math.max(prioridade, 3);
+  if (restante <= duracao / 2) return Math.max(prioridade, 2);
+  return prioridade;
 }
 
 // só tarefas com data E horário recebem os avisos de prazo
@@ -343,7 +418,7 @@ function dataDe(dd, mm) {
   return "";
 }
 
-function DiaMes({ value, onChange }) {
+function DiaMes({ value, onChange, rotulo = "Data limite" }) {
   const [d, setD] = useState(value ? value.slice(8, 10) : "");
   const [m, setM] = useState(value ? value.slice(5, 7) : "");
   const refD = useRef(null);
@@ -430,8 +505,7 @@ function DiaMes({ value, onChange }) {
   };
 
   return (
-    <span className="ck-hora24" role="group" aria-label="Data limite: dia e mês (opcional)" title="Data limite: dia/mês (opcional). O ano é o próximo em que a data ainda não passou.">
-      <span className="ck-prazo-rotulo">Data</span>
+    <span className="ck-hora24" role="group" aria-label={`${rotulo}: dia e mês (opcional)`} title={`${rotulo}: dia/mês (opcional). O ano é o próximo em que a data ainda não passou.`}>
       <input
         ref={refD}
         type="text"
@@ -440,7 +514,7 @@ function DiaMes({ value, onChange }) {
         maxLength={2}
         value={d}
         placeholder="dd"
-        aria-label="Dia limite"
+        aria-label={`${rotulo} - dia`}
         onChange={digitarDia}
         onBlur={(e) => sair(e, "d")}
         {...selecionar}
@@ -466,7 +540,7 @@ function DiaMes({ value, onChange }) {
         maxLength={2}
         value={m}
         placeholder="mm"
-        aria-label="Mês limite"
+        aria-label={`${rotulo} - mês`}
         onChange={digitarMes}
         onBlur={(e) => sair(e, "m")}
         {...selecionar}
@@ -491,10 +565,47 @@ function CampoPrazo({ limite, hora, onLimite, onHora }) {
   return (
     <span className="ck-prazo-campos">
       <span className="ck-prazo-rotulo">Prazo</span>
+      <DiaMes value={limite} onChange={onLimite} />
       <Hora24 value={hora} onChange={onHora} opcional rotulo="Horário do prazo (opcional)" />
-      {hora && <DiaMes value={limite} onChange={onLimite} />}
     </span>
   );
+}
+
+function IconeComentario({ tamanho = 16 }) {
+  return <svg viewBox="0 0 16 16" width={tamanho} height={tamanho} aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M13.5 7.7a5.6 5.6 0 0 1-5.8 5.1 6.2 6.2 0 0 1-2.5-.5L2 13l.8-2.7a5 5 0 0 1-.8-2.6A5.5 5.5 0 0 1 7.8 2.5h.4a5.5 5.5 0 0 1 5.3 5.2z" /><path d="M5.5 7.8h5M5.5 10h3.2" /></svg>;
+}
+
+function CampoComentarioTarefa({ valor, onChange, children }) {
+  const [aberto, setAberto] = useState(Boolean(valor));
+  return <div className="ck-tarefa-form-rodape">
+    <div className="ck-tarefa-form-botoes">{children}</div>
+    {aberto && <textarea className="ck-comentario-input" rows={2} maxLength={1000} placeholder="Comentário (opcional)" aria-label="Comentário da tarefa" value={valor} onChange={(e) => onChange(e.target.value)} onKeyDown={enviarAoEnter} />}
+    <button type="button" className="ck-comentario-botao" aria-label={aberto ? "Ocultar campo de comentário" : "Adicionar comentário"} aria-expanded={aberto} title={aberto ? "Ocultar comentário" : "Adicionar comentário"} onClick={() => setAberto((atual) => !atual)}><IconeComentario /></button>
+  </div>;
+}
+
+function SeletorRepeticao({ value, onChange, config, onConfigChange }) {
+  const dias = [[1, "Seg"], [2, "Ter"], [3, "Qua"], [4, "Qui"], [5, "Sex"], [6, "Sáb"], [0, "Dom"]];
+  return <>
+    <select value={value} onChange={(e) => onChange(e.target.value)} aria-label="Frequência da rotina">
+      {OPCOES_REPETE.map(([v, nome]) => <option key={v} value={v}>{nome}</option>)}
+    </select>
+    {value === "personalizado" && <div className="ck-repeticao-personalizada">
+      <label className="ck-repeticao-tipo">Repetir por
+        <select value={config.tipo} onChange={(e) => onConfigChange((atual) => ({ ...atual, tipo: e.target.value }))}>
+          <option value="dias">A cada N dias</option>
+          <option value="semana">Dias da semana</option>
+          <option value="meses">A cada N meses</option>
+        </select>
+      </label>
+      {config.tipo === "dias" || config.tipo === "meses" ? <label className="ck-repeticao-intervalo">A cada
+        <input type="number" min="1" max={config.tipo === "meses" ? "24" : "365"} value={config.intervalo || 1} onChange={(e) => onConfigChange((atual) => ({ ...atual, intervalo: Math.max(1, Number(e.target.value) || 1) }))} />
+        {config.tipo === "meses" ? "meses" : "dias"}
+      </label> : <div className="ck-dias-semana" aria-label="Dias da semana">
+        {dias.map(([numero, rotulo]) => <label key={numero} className={(config.diasSemana || []).includes(numero) ? "selecionado" : ""}><input type="checkbox" checked={(config.diasSemana || []).includes(numero)} onChange={(e) => onConfigChange((atual) => ({ ...atual, diasSemana: e.target.checked ? [...new Set([...(atual.diasSemana || []), numero])].sort((a, b) => dias.findIndex(([dia]) => dia === a) - dias.findIndex(([dia]) => dia === b)) : (atual.diasSemana || []).filter((dia) => dia !== numero) }))} />{rotulo}</label>)}
+      </div>}
+    </div>}
+  </>;
 }
 
 /* Calendário do mês com eventos */
@@ -845,7 +956,7 @@ function FormularioConta({ conta, onSalvar, onCancelar }) {
     <input autoFocus type="text" className="ck-campo-largo" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome da conta" aria-label="Nome da conta" maxLength={80} required />
     <input type="text" inputMode="decimal" className="ck-num ck-num-v" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="Valor (R$)" aria-label="Valor da conta" />
     <input type="number" className="ck-num" min="1" max="31" value={dia} onChange={(e) => setDia(e.target.value)} placeholder="Vence dia" aria-label="Dia do vencimento" />
-    <input type="number" className="ck-num ck-num-p" min="1" max="999" value={parcelas} onChange={(e) => setParcelas(e.target.value)} placeholder="Parcelas" aria-label="Número de parcelas" />
+    <input type="number" className="ck-num ck-num-p" min="0" max="999" value={parcelas} onChange={(e) => setParcelas(e.target.value)} placeholder="Parcelas" aria-label="Número de parcelas (0 = sem parcelas)" />
     <span className="ck-edit-acoes"><button type="submit" disabled={!nome.trim()}>Salvar</button><button type="button" className="ck-icone" onClick={onCancelar} title="Cancelar edição" aria-label="Cancelar edição"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="m4 4 8 8m0-8-8 8" /></svg></button></span>
   </form>;
 }
@@ -955,7 +1066,7 @@ function Contas({ contas, adicionar, alternar, apagar, definirValor, editar }) {
           />
           <input type="text" inputMode="decimal" className="ck-num ck-num-v" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="Valor (R$)" aria-label="Valor da conta" title="Valor da conta em reais (opcional)" />
           <input type="number" className="ck-num" min="1" max="31" value={dia} onChange={(e) => setDia(e.target.value)} placeholder="Vence dia" aria-label="Dia do mês em que vence" title="Dia do mês em que vence (vazio = hoje)" />
-          <input type="number" className="ck-num ck-num-p" min="1" max="999" value={parcelas} onChange={(e) => setParcelas(e.target.value)} placeholder="Parcelas" aria-label="Número de parcelas (opcional)" title="Número de parcelas (opcional; vazio = sem fim)" />
+          <input type="number" className="ck-num ck-num-p" min="0" max="999" value={parcelas} onChange={(e) => setParcelas(e.target.value)} placeholder="Parcelas" aria-label="Número de parcelas (opcional; 0 = sem parcelas)" title="Número de parcelas (opcional; 0 = sem parcelas)" />
           <button type="submit" disabled={!nome.trim()}>Adicionar</button>
         </form>
       ) : null}
@@ -965,30 +1076,54 @@ function Contas({ contas, adicionar, alternar, apagar, definirValor, editar }) {
 
 /* Lista das tarefas que se repetem */
 function EditarRotina({ rotina, grupos, onSalvar, onCancelar }) {
+  const formularioRef = useRef(null);
+  const cancelarRef = useRef(onCancelar);
   const [texto, setTexto] = useState(rotina.texto);
-  const [cada, setCada] = useState(String(rotina.cada));
+  const [repeticao, setRepeticao] = useState(opcaoRepeticao(rotina.recorrencia, rotina.cada));
+  const [configRepeticao, setConfigRepeticao] = useState(configRecorrenciaPadrao(rotina.recorrencia, rotina.cada));
   const [hora, setHora] = useState(rotina.hora || "00:00");
+  const [limite, setLimite] = useState(rotina.limite || (rotina.limiteHora ? iso(new Date()) : ""));
+  const [limiteHora, setLimiteHora] = useState(rotina.limiteHora || "");
   const [proxima, setProxima] = useState(rotina.proxima || iso(new Date()));
   const [descricao, setDescricao] = useState(rotina.descricao || "");
+  const [comentario, setComentario] = useState(rotina.comentario || "");
   const [grupoId, setGrupoId] = useState(rotina.grupoId || "");
+
+  useEffect(() => { cancelarRef.current = onCancelar; }, [onCancelar]);
+  useEffect(() => {
+    function fecharSeClicouFora(e) {
+      const formulario = formularioRef.current;
+      const cartao = formulario?.closest("li.ck-item-editando") || formulario;
+      if (cartao && !cartao.contains(e.target)) cancelarRef.current();
+    }
+    document.addEventListener("pointerdown", fecharSeClicouFora, true);
+    return () => document.removeEventListener("pointerdown", fecharSeClicouFora, true);
+  }, []);
 
   function enviar(e) {
     e.preventDefault();
     if (!texto.trim() || !proxima) return;
-    onSalvar({ texto: texto.trim(), cada: Number(cada), hora: hora || "00:00", proxima, descricao: descricao.trim(), grupoId: grupoId || null });
+    const recorrencia = recorrenciaSelecionada(repeticao, configRepeticao);
+    if (recorrencia?.tipo === "semana" && !recorrencia.diasSemana?.length) return;
+    onSalvar({ texto: texto.trim(), cada: intervaloLegado(recorrencia), recorrencia, hora: hora || "00:00", limite: limite || (limiteHora ? iso(new Date()) : ""), limiteHora, proxima, descricao: descricao.trim(), comentario: comentario.trim(), grupoId: grupoId || null });
   }
 
-  return <form className="ck-form-grupo ck-form-rotina" onSubmit={enviar} onBlur={(e) => fecharAoClicarFora(e, onCancelar)} onKeyDown={(e) => { if (e.key === "Escape") onCancelar(); else if (e.target.matches("textarea")) enviarAoEnter(e); }}>
+  return <form ref={formularioRef} className="ck-form-grupo ck-form-rotina" onSubmit={enviar} onBlur={(e) => { const cartao = e.currentTarget.closest("li.ck-item-editando") || e.currentTarget; if (e.relatedTarget && !cartao.contains(e.relatedTarget)) onCancelar(); }} onKeyDown={(e) => { if (e.key === "Escape") onCancelar(); else if (e.target.matches("textarea") && !e.target.classList.contains("ck-comentario-input")) enviarAoEnter(e); }}>
     <input autoFocus type="text" className="ck-campo-largo" value={texto} onChange={(e) => setTexto(e.target.value)} aria-label="Nome da rotina" maxLength={200} required />
-    <select value={cada} onChange={(e) => setCada(e.target.value)} aria-label="Frequência da rotina">{OPCOES_REPETE.filter(([valor]) => Number(valor) > 0).map(([valor, rotulo]) => <option key={valor} value={valor}>{rotulo}</option>)}</select>
-    <Hora24 value={hora} onChange={setHora} rotulo="Horário da rotina" />
+    <div className="ck-rotina-frequencia">
+      <SeletorRepeticao value={repeticao} onChange={setRepeticao} config={configRepeticao} onConfigChange={setConfigRepeticao} />
+      <Hora24 value={hora} onChange={setHora} rotulo="Horário da rotina" />
+    </div>
+    <CampoPrazo limite={limite} hora={limiteHora} onLimite={setLimite} onHora={setLimiteHora} />
     <select value={grupoId} onChange={(e) => setGrupoId(e.target.value)} aria-label="Sessão das próximas tarefas">
       <option value="">Sem sessão</option>
       {grupos.map((g) => <option key={g.id} value={g.id}>{g.nome}</option>)}
     </select>
-    <label className="ck-form-data"><span>Próxima</span><input type="date" value={proxima} onChange={(e) => setProxima(e.target.value)} required /></label>
-    <textarea className="ck-campo-largo" rows={2} value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Descrição (opcional)" aria-label="Observações da rotina" maxLength={1000} />
-    <span className="ck-edit-acoes"><button type="submit" disabled={!texto.trim() || !proxima}>Salvar</button><button type="button" className="ck-icone" onClick={onCancelar} title="Cancelar edição" aria-label="Cancelar edição"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="m4 4 8 8m0-8-8 8" /></svg></button></span>
+    <label className="ck-form-data"><span>Próxima</span><DiaMes value={proxima} onChange={setProxima} rotulo="Próxima ocorrência" /></label>
+      <textarea className="ck-campo-largo" rows={2} value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Descrição (opcional)" aria-label="Observações da rotina" maxLength={1000} />
+    <CampoComentarioTarefa valor={comentario} onChange={setComentario}>
+      <span className="ck-edit-acoes"><button type="submit" disabled={!texto.trim() || !proxima || (repeticao === "personalizado" && configRepeticao.tipo === "semana" && !configRepeticao.diasSemana.length)}>Salvar</button><button type="button" className="ck-icone" onClick={onCancelar} title="Cancelar edição" aria-label="Cancelar edição"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="m4 4 8 8m0-8-8 8" /></svg></button></span>
+    </CampoComentarioTarefa>
   </form>;
 }
 
@@ -1010,7 +1145,7 @@ function Rotinas({ rotinas, grupos, apagar, mudarPrioridade, editar }) {
           <li key={r.id}>
             <span className="ck-rot-texto">
               {r.texto}
-              <span className="ck-rot-info">↻ {rotuloRotina(r.cada, r.hora)}</span>
+              <span className="ck-rot-info">↻ {rotuloRotina(r.cada, r.hora, r.recorrencia)}</span>
               <span className="ck-rot-info ck-vencimento">Próxima em {r.proxima.split("-").reverse().slice(0, 2).join("/")} às {r.hora || "00:00"}</span>
             </span>
             <button
@@ -1200,10 +1335,12 @@ function NovaTarefa({ onAdd, placeholder, onFechar, idCampo, modoAgenda = false,
   const formRef = useRef(null);
   const [texto, setTexto] = useState("");
   const [repete, setRepete] = useState("0");
+  const [configRepeticao, setConfigRepeticao] = useState({ tipo: "dias", intervalo: 2, diasSemana: [] });
   const [hora, setHora] = useState("00:00");
   const [limite, setLimite] = useState("");
   const [limiteHora, setLimiteHora] = useState("");
   const [descricao, setDescricao] = useState("");
+  const [comentario, setComentario] = useState("");
   const [agendadaPara, setAgendadaPara] = useState(dataInicial || iso(new Date()));
 
   useEffect(() => {
@@ -1219,14 +1356,19 @@ function NovaTarefa({ onAdd, placeholder, onFechar, idCampo, modoAgenda = false,
     e.preventDefault();
     const limpo = texto.trim();
     if (!limpo) return;
-    onAdd(limpo, Number(repete), hora || "00:00", {
-      limite: limiteHora ? limite || iso(new Date()) : "", limiteHora, descricao,
+    const recorrencia = recorrenciaSelecionada(repete, configRepeticao);
+    if (recorrencia?.tipo === "semana" && !recorrencia.diasSemana?.length) return;
+    const prazoResolvido = limite || (limiteHora ? iso(new Date()) : "");
+    onAdd(limpo, intervaloLegado(recorrencia), hora || "00:00", {
+      limite: prazoResolvido, limiteHora, descricao, comentario, recorrencia,
       ...(modoAgenda ? { agendadaPara } : {}),
     });
+    onFechar?.();
     setTexto("");
     setLimite("");
     setLimiteHora("");
     setDescricao("");
+    setComentario("");
   }
 
   return (
@@ -1250,16 +1392,7 @@ function NovaTarefa({ onAdd, placeholder, onFechar, idCampo, modoAgenda = false,
         maxLength={200}
       />
       {modoAgenda && <label className="ck-form-data ck-form-data-agendada"><span>Começar em</span><input type="date" value={agendadaPara} onChange={(e) => setAgendadaPara(e.target.value)} required /></label>}
-      <select
-        value={repete}
-        onChange={(e) => setRepete(e.target.value)}
-        aria-label="Repetir tarefa"
-        title="Repetir esta tarefa"
-      >
-        {OPCOES_REPETE.map(([v, nome]) => (
-          <option key={v} value={v}>{v ? `↻ ${nome}` : nome}</option>
-        ))}
-      </select>
+      <SeletorRepeticao value={repete} onChange={setRepete} config={configRepeticao} onConfigChange={setConfigRepeticao} />
       {repete !== "0" && (
         <Hora24 value={hora} onChange={setHora} rotulo="Horário em que a tarefa volta" />
       )}
@@ -1274,9 +1407,11 @@ function NovaTarefa({ onAdd, placeholder, onFechar, idCampo, modoAgenda = false,
         rows={2}
         maxLength={1000}
       />
-      <button type="submit" disabled={!texto.trim()}>
-        {modoAgenda ? "Agendar tarefa" : "Adicionar"}
-      </button>
+      <CampoComentarioTarefa valor={comentario} onChange={setComentario}>
+        <button type="submit" disabled={!texto.trim() || (repete === "personalizado" && configRepeticao.tipo === "semana" && !configRepeticao.diasSemana.length)}>
+          {modoAgenda ? "Agendar tarefa" : "Adicionar"}
+        </button>
+      </CampoComentarioTarefa>
     </form>
   );
 }
@@ -1343,25 +1478,45 @@ function alvoProps(ordem, tipo, id, grupo) {
 
 /* Formulário para editar uma tarefa já criada */
 function EditarTarefa({ tarefa, onSalvar, onCancelar, incluirDataAgenda = false }) {
+  const formularioRef = useRef(null);
+  const cancelarRef = useRef(onCancelar);
   const [texto, setTexto] = useState(tarefa.texto);
-  const [repete, setRepete] = useState(String(tarefa.repeteDias || 0));
+  const [repete, setRepete] = useState(opcaoRepeticao(tarefa.recorrencia, tarefa.repeteDias || 0));
+  const [configRepeticao, setConfigRepeticao] = useState(configRecorrenciaPadrao(tarefa.recorrencia, tarefa.repeteDias || 0));
   const [hora, setHora] = useState(tarefa.repeteHora || "00:00");
-  const [limite, setLimite] = useState(tarefa.limite || "");
+  const [limite, setLimite] = useState(tarefa.limite || (tarefa.limiteHora ? iso(new Date()) : ""));
   const [limiteHora, setLimiteHora] = useState(tarefa.limiteHora || "");
   const [descricao, setDescricao] = useState(tarefa.descricao || "");
+  const [comentario, setComentario] = useState(tarefa.comentario || "");
   const [agendadaPara, setAgendadaPara] = useState(tarefa.agendadaPara || iso(new Date()));
+
+  useEffect(() => { cancelarRef.current = onCancelar; }, [onCancelar]);
+  useEffect(() => {
+    function fecharSeClicouFora(e) {
+      const formulario = formularioRef.current;
+      const quadro = formulario?.closest("li.editando, li.ck-evento-tarefa-editando") || formulario;
+      if (quadro && !quadro.contains(e.target)) cancelarRef.current();
+    }
+    document.addEventListener("pointerdown", fecharSeClicouFora, true);
+    return () => document.removeEventListener("pointerdown", fecharSeClicouFora, true);
+  }, []);
 
   return (
     <form
+      ref={formularioRef}
       className="ck-form-grupo"
       onSubmit={(e) => {
         e.preventDefault();
-        if (texto.trim()) onSalvar(texto.trim(), Number(repete), hora || "00:00", {
-          limite: limiteHora ? limite || iso(new Date()) : "", limiteHora, descricao,
+        if (texto.trim()) {
+          const recorrencia = recorrenciaSelecionada(repete, configRepeticao);
+          if (recorrencia?.tipo === "semana" && !recorrencia.diasSemana?.length) return;
+          onSalvar(texto.trim(), intervaloLegado(recorrencia), hora || "00:00", {
+          limite: limite || (limiteHora ? iso(new Date()) : ""), limiteHora, descricao, comentario, recorrencia,
           ...(incluirDataAgenda ? { agendadaPara } : {}),
         });
+        }
       }}
-      onBlur={(e) => fecharAoClicarFora(e, onCancelar)}
+      onBlur={(e) => { const quadro = e.currentTarget.closest("li.editando, li.ck-evento-tarefa-editando") || e.currentTarget; if (e.relatedTarget && !quadro.contains(e.relatedTarget)) onCancelar(); }}
       onKeyDown={(e) => e.key === "Escape" && onCancelar()}
     >
       <input
@@ -1374,11 +1529,7 @@ function EditarTarefa({ tarefa, onSalvar, onCancelar, incluirDataAgenda = false 
         maxLength={200}
       />
       {incluirDataAgenda && <label className="ck-form-data ck-form-data-agendada"><span>Começar em</span><input type="date" value={agendadaPara} onChange={(e) => setAgendadaPara(e.target.value)} required /></label>}
-      <select value={repete} onChange={(e) => setRepete(e.target.value)} aria-label="Repetir tarefa">
-        {OPCOES_REPETE.map(([v, nome]) => (
-          <option key={v} value={v}>{v ? `↻ ${nome}` : nome}</option>
-        ))}
-      </select>
+      <SeletorRepeticao value={repete} onChange={setRepete} config={configRepeticao} onConfigChange={setConfigRepeticao} />
       {repete !== "0" && (
         <Hora24 value={hora} onChange={setHora} rotulo="Horário em que a tarefa volta" />
       )}
@@ -1393,20 +1544,14 @@ function EditarTarefa({ tarefa, onSalvar, onCancelar, incluirDataAgenda = false 
         rows={2}
         maxLength={1000}
       />
-      <span className="ck-edit-acoes">
-        <button type="submit" disabled={!texto.trim()}>Salvar</button>
-        <button
-          type="button"
-          className="ck-icone"
-          onClick={onCancelar}
-          title="Cancelar (Esc)"
-          aria-label="Cancelar edição"
-        >
-          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-            <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" />
-          </svg>
-        </button>
-      </span>
+      <CampoComentarioTarefa valor={comentario} onChange={setComentario}>
+        <span className="ck-edit-acoes">
+          <button type="submit" disabled={!texto.trim() || (repete === "personalizado" && configRepeticao.tipo === "semana" && !configRepeticao.diasSemana.length)}>Salvar</button>
+          <button type="button" className="ck-icone" onClick={onCancelar} title="Cancelar (Esc)" aria-label="Cancelar edição">
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9" /></svg>
+          </button>
+        </span>
+      </CampoComentarioTarefa>
     </form>
   );
 }
@@ -1416,9 +1561,45 @@ function ToggleDescricao({ fechada, onClick }) {
   return <button type="button" className="ck-descricao-toggle" aria-label={fechada ? "Mostrar descrição" : "Ocultar descrição"} title={fechada ? "Mostrar descrição" : "Ocultar descrição"} aria-expanded={!fechada} onClick={onClick}><svg className={`ck-descricao-seta${fechada ? "" : " aberta"}`} viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m3.5 6 4.5 4.5L12.5 6" /></svg></button>;
 }
 
+const ICONES_SESSAO = [
+  ["butterfly", "Borboleta"], ["home", "Casa"], ["person", "Pessoa"], ["work", "Trabalho"],
+  ["book", "Estudos"], ["heart", "Favoritos"], ["star", "Importante"], ["calendar", "Agenda"],
+  ["target", "Objetivo"], ["folder", "Geral"],
+];
+
+function IconeSessao({ icone = "butterfly", className = "", monocromatico = false }) {
+  if (icone === "butterfly") {
+    const classe = `ck-sessao-icone logo${className ? ` ${className}` : ""}${monocromatico ? " monocromatico" : ""}`;
+    const origem = `${import.meta.env.BASE_URL}Logo.svg`;
+    return monocromatico
+      ? <span className={classe} style={{ maskImage: `url("${origem}")`, WebkitMaskImage: `url("${origem}")` }} aria-hidden="true" />
+      : <img className={classe} src={origem} alt="" aria-hidden="true" />;
+  }
+  const paths = {
+    home: <><path d="m2.5 8 6.5-5.5L15.5 8v6a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 14z" /><path d="M7 15.5v-5h4v5" /></>,
+    person: <><circle cx="9" cy="5.5" r="3" /><path d="M3 16c.3-3 2.3-4.7 6-4.7s5.7 1.7 6 4.7" /></>,
+    work: <><rect x="2.5" y="5.5" width="13" height="9.5" rx="1.5" /><path d="M6 5.5V4a1.5 1.5 0 0 1 1.5-1.5h3A1.5 1.5 0 0 1 12 4v1.5M2.5 9h13M7 8.8v1.5h4V8.8" /></>,
+    book: <><path d="M2.5 3.5h4A2.5 2.5 0 0 1 9 6v9a2.5 2.5 0 0 0-2.5-2.5h-4z" /><path d="M15.5 3.5h-4A2.5 2.5 0 0 0 9 6v9a2.5 2.5 0 0 1 2.5-2.5h4z" /></>,
+    heart: <path d="M9 15.5 3 9.8a3.7 3.7 0 0 1 5.2-5.2L9 5.4l.8-.8A3.7 3.7 0 0 1 15 9.8z" />,
+    star: <path d="m9 2.3 2 4.1 4.5.7-3.2 3.2.8 4.5L9 12.7l-4.1 2.1.8-4.5L2.5 7.1 7 6.4z" />,
+    calendar: <><rect x="2.5" y="4" width="13" height="11.5" rx="1.5" /><path d="M5.5 2.5v3M12.5 2.5v3M2.5 7.5h13M5.5 10h2m2 0h2m-6 2.5h2" /></>,
+    target: <><circle cx="9" cy="9" r="6.5" /><circle cx="9" cy="9" r="3.5" /><circle cx="9" cy="9" r=".7" fill="currentColor" stroke="none" /></>,
+    folder: <path d="M2.5 5A1.5 1.5 0 0 1 4 3.5h3l1.5 2h5.5A1.5 1.5 0 0 1 15.5 7v6A1.5 1.5 0 0 1 14 14.5H4A1.5 1.5 0 0 1 2.5 13z" />,
+  };
+  return <svg className={`ck-sessao-icone${className ? ` ${className}` : ""}`} viewBox="0 0 18 18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">{paths[icone] || paths.folder}</svg>;
+}
+
+function SeletorIconeSessao({ value, onChange }) {
+  return <div className="ck-seletor-icones" role="group" aria-label="Ícone da sessão">
+    {ICONES_SESSAO.map(([icone, rotulo]) => <button key={icone} type="button" className="ck-opcao-icone" aria-label={rotulo} title={rotulo} aria-pressed={value === icone} onClick={() => onChange(icone)}><IconeSessao icone={icone} monocromatico /></button>)}
+  </div>;
+}
+
 function EditarNomeSessao({ sessao, onSalvar, onCancelar }) {
   const [nome, setNome] = useState(sessao.nome);
-  return <form className="ck-editar-sessao" onSubmit={(e) => { e.preventDefault(); if (nome.trim()) onSalvar(nome.trim()); }} onBlur={(e) => fecharAoClicarFora(e, onCancelar)} onKeyDown={(e) => { if (e.key === "Escape") onCancelar(); }}>
+  const [icone, setIcone] = useState(sessao.icone || "butterfly");
+  return <form className="ck-editar-sessao" onSubmit={(e) => { e.preventDefault(); if (nome.trim()) onSalvar(nome.trim(), icone); }} onBlur={(e) => fecharAoClicarFora(e, onCancelar)} onKeyDown={(e) => { if (e.key === "Escape") onCancelar(); }}>
+    <SeletorIconeSessao value={icone} onChange={setIcone} />
     <input autoFocus type="text" value={nome} onChange={(e) => setNome(e.target.value)} maxLength={60} required aria-label="Nome da sessão" />
     <button type="submit" className="ck-icone" title="Salvar nome da sessão" aria-label="Salvar nome da sessão" disabled={!nome.trim()}><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m3 8 3.2 3.2L13 4.5" /></svg></button>
     <button type="button" className="ck-icone" title="Cancelar" aria-label="Cancelar edição do nome" onClick={onCancelar}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M3.5 3.5l9 9m0-9-9 9" /></svg></button>
@@ -1426,7 +1607,7 @@ function EditarNomeSessao({ sessao, onSalvar, onCancelar }) {
 }
 
 function ListaTarefas({ tarefas, alternar, apagar, mudarPrioridade, ordem, edicao }) {
-  const [descricoesFechadas, setDescricoesFechadas] = useState({});
+  const [descricoesAbertas, setDescricoesAbertas] = useState({});
   return (
     <ul className="ck-lista">
       {tarefas.map((t) => edicao.id === t.id ? (
@@ -1455,10 +1636,10 @@ function ListaTarefas({ tarefas, alternar, apagar, mudarPrioridade, ordem, edica
             <span className="ck-caixa" aria-hidden="true" />
             <span className="ck-corpo">
               <span className="ck-texto">{t.texto}</span>
-              {(t.repeteDias > 0 || t.limite) && (
+              {(t.repeteDias > 0 || t.limite || t.comentario) && (
                 <span className="ck-meta">
                   {t.repeteDias > 0 && (
-                    <span className="ck-repete" title="Volta sozinha, mesmo se você apagar">↻ {rotuloRotina(t.repeteDias, t.repeteHora)}</span>
+                    <span className="ck-repete" title="Volta sozinha, mesmo se você apagar">↻ {rotuloRotina(t.repeteDias, t.repeteHora, t.recorrencia)}</span>
                   )}
                   {t.limite && (() => {
                     const pz = rotuloPrazo(t);
@@ -1468,20 +1649,24 @@ function ListaTarefas({ tarefas, alternar, apagar, mudarPrioridade, ordem, edica
                       </span>
                     );
                   })()}
+                  {t.comentario && <span className="ck-tarefa-comentario"><IconeComentario tamanho={14} /><span>{t.comentario}</span></span>}
                 </span>
               )}
-              {t.descricao && !descricoesFechadas[t.id] && <span className="ck-descricao">{t.descricao}</span>}
+              {t.descricao && descricoesAbertas[t.id] && <span className="ck-descricao">{t.descricao}</span>}
             </span>
           </label>
-          {t.descricao && <ToggleDescricao fechada={descricoesFechadas[t.id]} onClick={() => setDescricoesFechadas((atual) => ({ ...atual, [t.id]: !atual[t.id] }))} />}
-          <button
+          {t.descricao && <ToggleDescricao fechada={!descricoesAbertas[t.id]} onClick={() => setDescricoesAbertas((atual) => ({ ...atual, [t.id]: !atual[t.id] }))} />}
+          {(() => {
+            const prioridadeVisivel = prioridadePeloPrazo(t);
+            return <button
             type="button"
-            className={`ck-prio p${t.prioridade || 0}`}
+            className={`ck-prio p${prioridadeVisivel}`}
             data-tutorial="prioridade"
             onClick={() => mudarPrioridade(t.id)}
-            title={`${PRIORIDADES[t.prioridade || 0].nome} (clique para trocar)`}
-            aria-label={`Prioridade: ${PRIORIDADES[t.prioridade || 0].nome}. Clique para trocar.`}
-          />
+            title={`${prioridadeVisivel !== (t.prioridade || 0) ? "Aumentada pelo prazo · " : ""}${PRIORIDADES[prioridadeVisivel].nome} (clique para trocar)`}
+            aria-label={`Prioridade: ${PRIORIDADES[prioridadeVisivel].nome}. Clique para trocar.`}
+          />;
+          })()}
           <button
             type="button"
             className="ck-icone"
@@ -1661,7 +1846,7 @@ function TutorialGuia({ onEncerrar }) {
   </div>;
 }
 
-function ConfiguracaoNomeUsuario({ usuario }) {
+function ConfiguracaoNomeUsuario({ usuario, onNomeSalvo }) {
   const [nome, setNome] = useState("");
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
@@ -1707,6 +1892,7 @@ function ConfiguracaoNomeUsuario({ usuario }) {
       setErro(true);
     } else {
       setNome(nomeNormalizado);
+      onNomeSalvo?.(true);
       setMensagem("Nome de usuário salvo. Você continua entrando com seu email.");
       setErro(false);
     }
@@ -1758,6 +1944,7 @@ function Checklist({ usuario }) {
   const paginaRef = useRef(pagina);
   paginaRef.current = pagina;
   const [nomeSessaoAnotacao, setNomeSessaoAnotacao] = useState("");
+  const [iconeSessaoAnotacao, setIconeSessaoAnotacao] = useState("butterfly");
   const [criandoSessaoAnotacao, setCriandoSessaoAnotacao] = useState(false);
   const [formAnotacao, setFormAnotacao] = useState(null);
   const [descricoesAnotacaoFechadas, setDescricoesAnotacaoFechadas] = useState({});
@@ -1784,6 +1971,7 @@ function Checklist({ usuario }) {
   const [arrastando, setArrastando] = useState(null); // {tipo, id, grupo}
   const [sobre, setSobre] = useState(null);
   const [nomeGrupo, setNomeGrupo] = useState("");
+  const [iconeGrupo, setIconeGrupo] = useState("butterfly");
   const [sessaoEmEdicao, setSessaoEmEdicao] = useState(null);
   const [criandoSolta, setCriandoSolta] = useState(false);
   const [criandoGrupo, setCriandoGrupo] = useState(false);
@@ -1794,6 +1982,15 @@ function Checklist({ usuario }) {
   const [permissao, setPermissao] = useState(
     typeof Notification !== "undefined" ? Notification.permission : "unsupported"
   );
+  const [nomeUsuarioDefinido, setNomeUsuarioDefinido] = useState(null);
+  const [avisoNomeFechado, setAvisoNomeFechado] = useState(false);
+
+  useEffect(() => {
+    let ativo = true;
+    supabase.from("profiles").select("username").eq("user_id", usuario.id).maybeSingle()
+      .then(({ data, error }) => { if (ativo) setNomeUsuarioDefinido(error ? null : Boolean(data?.username)); });
+    return () => { ativo = false; };
+  }, [usuario.id]);
 
   // Mantém os dados atuais acessíveis dentro do setInterval
   const tarefasRef = useRef([]);
@@ -2111,12 +2308,13 @@ function Checklist({ usuario }) {
           .map((r) => ({
             id: novoId(), texto: r.texto, feita: false, meio: false,
             grupoId: r.grupoId, prioridade: r.prioridade || 0,
-            rotinaId: r.id, repeteDias: r.cada, repeteHora: r.hora || "00:00",
-            descricao: r.descricao || "",
+            rotinaId: r.id, repeteDias: r.cada, repeteHora: r.hora || "00:00", recorrencia: r.recorrencia,
+            limite: (r.limite || r.limiteHora) ? r.proxima : "", limiteHora: r.limiteHora || "", criadaEm: Date.now(),
+            descricao: r.descricao || "", comentario: r.comentario || "",
           })),
       ]);
       setRotinas((atual) =>
-        atual.map((r) => (vencida(r) ? { ...r, proxima: somarDias(hoje, r.cada) } : r))
+        atual.map((r) => (vencida(r) ? { ...r, proxima: proximaDataRotina(hoje, r.recorrencia || recorrenciaSimples(r.cada)) } : r))
       );
     }
 
@@ -2357,19 +2555,22 @@ function Checklist({ usuario }) {
   /* tarefas */
   function adicionarTarefa(texto, grupoId = null, repetirDias = 0, hora = "00:00", prazo = {}) {
     let rotinaId;
-    if (repetirDias > 0) {
+    const recorrencia = prazo.recorrencia || recorrenciaSimples(repetirDias);
+    const cada = intervaloLegado(recorrencia);
+    if (recorrencia) {
       rotinaId = novoId();
       setRotinas((atual) => [
         ...atual,
-        { id: rotinaId, texto, cada: repetirDias, hora, grupoId, prioridade: 0,
-          proxima: somarDias(iso(new Date()), repetirDias), descricao: (prazo.descricao || "").trim() },
+        { id: rotinaId, texto, cada, recorrencia, hora, grupoId, prioridade: 0,
+          proxima: proximaDataRotina(iso(new Date()), recorrencia), descricao: (prazo.descricao || "").trim(), comentario: (prazo.comentario || "").trim(),
+          limite: prazo.limite || "", limiteHora: prazo.limite ? prazo.limiteHora || "" : "" },
       ]);
     }
     setTarefas((atual) => [
       ...atual,
-      { id: novoId(), texto, feita: false, grupoId, rotinaId, repeteDias: repetirDias, repeteHora: hora,
+      { id: novoId(), texto, feita: false, grupoId, rotinaId, repeteDias: cada, repeteHora: hora, recorrencia, criadaEm: Date.now(),
         limite: prazo.limite || "", limiteHora: prazo.limite ? prazo.limiteHora || "" : "",
-        descricao: (prazo.descricao || "").trim() },
+        descricao: (prazo.descricao || "").trim(), comentario: (prazo.comentario || "").trim() },
     ]);
   }
 
@@ -2435,7 +2636,11 @@ function Checklist({ usuario }) {
       texto: campos.texto,
       repeteDias: campos.cada,
       repeteHora: campos.hora,
+      recorrencia: campos.recorrencia,
+      limite: campos.limite || "",
+      limiteHora: campos.limite ? campos.limiteHora || "" : "",
       descricao: campos.descricao,
+      comentario: campos.comentario || "",
       grupoId: campos.grupoId,
     } : t));
   }
@@ -2518,21 +2723,23 @@ function Checklist({ usuario }) {
     if (!t) return;
     const rotina = rotinas.find((r) => r.id === t.rotinaId);
     let rotinaId = null;
+    const recorrencia = prazo.recorrencia || recorrenciaSimples(dias);
+    const cada = intervaloLegado(recorrencia);
 
-    if (dias > 0 && rotina) {
+    if (recorrencia && rotina) {
       rotinaId = rotina.id; // já repetia: atualiza nome, intervalo e horário
       setRotinas((a) =>
         a.map((r) =>
           r.id === rotina.id
-            ? { ...r, texto, cada: dias, hora, descricao: (prazo.descricao || "").trim(), proxima: dias === r.cada ? r.proxima : somarDias(iso(new Date()), dias) }
+            ? { ...r, texto, cada, recorrencia, hora, limite: prazo.limite || "", limiteHora: prazo.limite ? prazo.limiteHora || "" : "", descricao: (prazo.descricao || "").trim(), comentario: (prazo.comentario || "").trim(), proxima: JSON.stringify(recorrencia) === JSON.stringify(r.recorrencia || recorrenciaSimples(r.cada)) ? r.proxima : proximaDataRotina(iso(new Date()), recorrencia) }
             : r
         )
       );
-    } else if (dias > 0) {
+    } else if (recorrencia) {
       rotinaId = novoId(); // passou a repetir
       setRotinas((a) => [
         ...a,
-        { id: rotinaId, texto, cada: dias, hora, descricao: (prazo.descricao || "").trim(), grupoId: t.grupoId || null, prioridade: t.prioridade || 0, proxima: somarDias(t.agendadaPara || iso(new Date()), dias) },
+        { id: rotinaId, texto, cada, recorrencia, hora, limite: prazo.limite || "", limiteHora: prazo.limite ? prazo.limiteHora || "" : "", descricao: (prazo.descricao || "").trim(), comentario: (prazo.comentario || "").trim(), grupoId: t.grupoId || null, prioridade: t.prioridade || 0, proxima: proximaDataRotina(t.agendadaPara || iso(new Date()), recorrencia) },
       ]);
     } else if (rotina) {
       setRotinas((a) => a.filter((r) => r.id !== rotina.id)); // parou de repetir
@@ -2540,9 +2747,10 @@ function Checklist({ usuario }) {
 
     setTarefas((a) =>
       a.map((x) => (x.id === id ? {
-        ...x, texto, repeteDias: dias, repeteHora: dias > 0 ? hora : undefined, rotinaId,
+        ...x, texto, repeteDias: cada, repeteHora: recorrencia ? hora : undefined, recorrencia, rotinaId, criadaEm: x.criadaEm || Number(x.id) || Date.now(),
         limite: prazo.limite || "", limiteHora: prazo.limite ? prazo.limiteHora || "" : "",
         descricao: (prazo.descricao || "").trim(),
+        comentario: (prazo.comentario || "").trim(),
         ...(prazo.agendadaPara ? { agendadaPara: prazo.agendadaPara } : {}),
       } : x))
     );
@@ -2557,7 +2765,7 @@ function Checklist({ usuario }) {
   }
 
   function editarConta(id, campos) {
-    setContas((atual) => atual.map((c) => c.id === id ? { ...c, ...campos } : c));
+    setContas((atual) => atual.map((c) => c.id === id ? { ...c, ...campos, ...(campos.total === 0 ? { parcela: 1 } : {}) } : c));
   }
 
   function salvarAnotacao(e) {
@@ -2578,8 +2786,9 @@ function Checklist({ usuario }) {
     e.preventDefault();
     const nome = nomeSessaoAnotacao.trim();
     if (!nome) return;
-    setSessoesAnotacoes((a) => [...a, { id: novoId(), nome, aberta: true }]);
+    setSessoesAnotacoes((a) => [...a, { id: novoId(), nome, icone: iconeSessaoAnotacao, aberta: true }]);
     setNomeSessaoAnotacao("");
+    setIconeSessaoAnotacao("butterfly");
     setCriandoSessaoAnotacao(false);
   }
 
@@ -2697,18 +2906,19 @@ function Checklist({ usuario }) {
     e.preventDefault();
     const limpo = nomeGrupo.trim();
     if (!limpo) return;
-    setGrupos((atual) => [...atual, { id: novoId(), nome: limpo, aberta: true }]);
+    setGrupos((atual) => [...atual, { id: novoId(), nome: limpo, icone: iconeGrupo, aberta: true }]);
     setNomeGrupo("");
+    setIconeGrupo("butterfly");
     setCriandoGrupo(false);
   }
 
   function iniciarEdicaoSessao(tipo, sessao) {
-    setSessaoEmEdicao({ tipo, id: sessao.id, nome: sessao.nome });
+    setSessaoEmEdicao({ tipo, id: sessao.id, nome: sessao.nome, icone: sessao.icone || "butterfly" });
   }
 
-  function salvarNomeSessao(tipo, id, nome) {
+  function salvarNomeSessao(tipo, id, nome, icone) {
     const atualizar = tipo === "checklist" ? setGrupos : setSessoesAnotacoes;
-    atualizar((itens) => itens.map((sessao) => sessao.id === id ? { ...sessao, nome } : sessao));
+    atualizar((itens) => itens.map((sessao) => sessao.id === id ? { ...sessao, nome, ...(icone ? { icone } : {}) } : sessao));
     setSessaoEmEdicao(null);
   }
 
@@ -2743,19 +2953,23 @@ function Checklist({ usuario }) {
   function agendarTarefa(texto, data, repetirDias = 0, hora = "00:00", prazo = {}) {
     const agendadaPara = data || iso(new Date());
     const descricao = (prazo.descricao || "").trim();
+    const comentario = (prazo.comentario || "").trim();
+    const recorrencia = prazo.recorrencia || recorrenciaSimples(repetirDias);
+    const cada = intervaloLegado(recorrencia);
     let rotinaId;
-    if (repetirDias > 0) {
+    if (recorrencia) {
       rotinaId = novoId();
       setRotinas((atual) => [...atual, {
-        id: rotinaId, texto, cada: repetirDias, hora, grupoId: null, prioridade: 0,
-        proxima: somarDias(agendadaPara, repetirDias), descricao,
+        id: rotinaId, texto, cada, recorrencia, hora, grupoId: null, prioridade: 0,
+        proxima: proximaDataRotina(agendadaPara, recorrencia), descricao, comentario,
+        limite: prazo.limite || "", limiteHora: prazo.limite ? prazo.limiteHora || "" : "",
       }]);
     }
     setTarefas((atual) => [...atual, {
       id: novoId(), texto, feita: false, meio: false, grupoId: null,
-      rotinaId, repeteDias: repetirDias, repeteHora: hora,
+      rotinaId, repeteDias: cada, repeteHora: hora, recorrencia, criadaEm: Date.now(),
       limite: prazo.limite || "", limiteHora: prazo.limite ? prazo.limiteHora || "" : "",
-      descricao, prioridade: 0, agendadaPara,
+      descricao, comentario, prioridade: 0, agendadaPara,
     }]);
   }
 
@@ -2856,20 +3070,27 @@ function Checklist({ usuario }) {
           </button>
         </p>)}
       </section>}
+      {nomeUsuarioDefinido === false && !avisoNomeFechado && <section className="ck-aviso-agenda ck-aviso-usuario" aria-label="Lembrete de nome de usuário">
+        <p>
+          <img className="ck-aviso-agenda-icone" src={`${import.meta.env.BASE_URL}Logo.svg`} alt="" aria-hidden="true" />
+          <span>Adicione um nome de usuário para que seus amigos encontrem você no Social. <button type="button" className="ck-aviso-link" onClick={() => { setAbaConfiguracoes("conta"); setPagina("configuracoes"); }}>Ir até as configurações</button></span>
+          <button type="button" className="ck-aviso-agenda-fechar" onClick={() => setAvisoNomeFechado(true)} aria-label="Fechar lembrete de nome de usuário" title="Fechar aviso"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="m4 4 8 8m0-8-8 8" /></svg></button>
+        </p>
+      </section>}
 
       <div className="ck-abas ck-abas-principais" role="tablist" aria-label="Área principal" data-tutorial="abas">
         <button type="button" role="tab" className="ck-aba" aria-selected={pagina === "tarefas"} onClick={() => setPagina("tarefas")}>Checklist</button>
         <button type="button" role="tab" className="ck-aba" aria-selected={pagina === "anotacoes"} onClick={() => setPagina("anotacoes")}>Anotações</button>
       </div>
       {pagina === "configuracoes" && <section className="ck-configuracoes">
-        <div className="ck-config-titulo"><h2>Configurações</h2><button type="button" className="secundario" onClick={() => setPagina("tarefas")}>Voltar para o início</button></div>
-        <div className="ck-abas" role="tablist" aria-label="Categorias de configurações">
+        <div className="ck-config-titulo"><h2>Configurações</h2></div>
+        <div className="ck-abas ck-abas-principais" role="tablist" aria-label="Categorias de configurações">
           <button type="button" role="tab" className="ck-aba" aria-selected={abaConfiguracoes === "preferencias"} onClick={() => setAbaConfiguracoes("preferencias")}>Preferências</button>
           <button type="button" role="tab" className="ck-aba" aria-selected={abaConfiguracoes === "conta"} onClick={() => setAbaConfiguracoes("conta")}>Conta</button>
         </div>
         {abaConfiguracoes === "preferencias" ? <ConfiguracoesVisuais tema={tema} setTema={setTema} desfoque={desfoque} setDesfoque={setDesfoque} ajusteFundo={ajusteFundo} setAjusteFundo={setAjusteFundo} escolherFundo={escolherFundo} fundo={fundo} removerFundo={removerFundo} erroFundo={erroFundo} janelaAvisos={janelaAvisos} setJanelaAvisos={setJanelaAvisos} iniciarTutorial={iniciarTutorial} /> : <section className="ck-conta-config">
           <div className="ck-conta-identidade"><span className="ck-conta-avatar" aria-hidden="true">{(usuario.email || "?").slice(0, 1).toUpperCase()}</span><div><small>Conta conectada</small><strong>{usuario.email}</strong></div></div>
-          <ConfiguracaoNomeUsuario usuario={usuario} />
+          <ConfiguracaoNomeUsuario usuario={usuario} onNomeSalvo={setNomeUsuarioDefinido} />
           <button type="button" className="ck-sair-conta" onClick={sair}><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"><path d="M6.5 2.5H4a1.5 1.5 0 0 0-1.5 1.5v8A1.5 1.5 0 0 0 4 13.5h2.5"/><path d="M10 5l3 3-3 3M13 8H6.5"/></svg>Sair da conta</button>
           <div className="ck-backup-card">
             <h3>Backups</h3>
@@ -2911,6 +3132,7 @@ function Checklist({ usuario }) {
             });
           }}
         >
+          <SeletorIconeSessao value={iconeGrupo} onChange={setIconeGrupo} />
           <input
             type="text"
             value={nomeGrupo}
@@ -2961,7 +3183,7 @@ function Checklist({ usuario }) {
               <Alca id={g.id} tipo="grupo" grupo={null} ordem={ordem} imagem=".ck-grupo-topo" />
               {sessaoEmEdicao?.tipo === "checklist" && sessaoEmEdicao.id === g.id ? <EditarNomeSessao
                 sessao={g}
-                onSalvar={(nome) => salvarNomeSessao("checklist", g.id, nome)}
+                onSalvar={(nome, icone) => salvarNomeSessao("checklist", g.id, nome, icone)}
                 onCancelar={() => cancelarEdicaoSessao("checklist", g.id)}
               /> : <button
                 type="button"
@@ -2970,12 +3192,13 @@ function Checklist({ usuario }) {
                 aria-expanded={aberta}
               >
                 <span className={`ck-seta ${aberta ? "aberta" : ""}`}>›</span>
+                <IconeSessao icone={g.icone} monocromatico />
                 <span className="ck-grupo-nome">{g.nome}</span>
                 <span className="ck-grupo-qtd">
                   {feitasGrupo}/{doGrupo.length}
                 </span>
               </button>}
-              <button
+              {sessaoEmEdicao?.tipo !== "checklist" || sessaoEmEdicao.id !== g.id ? <button
                 type="button"
                 className="ck-mais ck-mais-circular"
                 onClick={() => abrirAddTarefa(g)}
@@ -2985,9 +3208,9 @@ function Checklist({ usuario }) {
                 aria-expanded={grupoAdd === g.id}
               >
                 <IconeMais />
-              </button>
+              </button> : null}
               {sessaoEmEdicao?.tipo !== "checklist" || sessaoEmEdicao.id !== g.id ? <button type="button" className="ck-icone" title="Editar sessão" aria-label={`Editar sessão ${g.nome}`} onClick={() => iniciarEdicaoSessao("checklist", g)}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" /></svg></button> : null}
-              <BotaoApagar nome={`sessão ${g.nome}`} onClick={() => apagarGrupo(g)} />
+              {sessaoEmEdicao?.tipo !== "checklist" || sessaoEmEdicao.id !== g.id ? <BotaoApagar nome={`sessão ${g.nome}`} onClick={() => apagarGrupo(g)} /> : null}
             </div>
 
             {aberta && (
@@ -3102,10 +3325,11 @@ function Checklist({ usuario }) {
           </>
         )}
       </section>
-      </> : pagina === "social" ? <section className="ck-social-page-wrap"><button type="button" className="secundario ck-social-back" onClick={() => setPagina("tarefas")}>Voltar para checklist</button><Social user={usuario} view="manage" /></section> : pagina === "anotacoes" ? <section className="ck-anotacoes">
+      </> : pagina === "social" ? <section className="ck-social-page-wrap"><Social user={usuario} view="manage" /></section> : pagina === "anotacoes" ? <section className="ck-anotacoes">
         <div className="ck-barras-topo">
           {formAnotacao && !formAnotacao.id && (!formAnotacao.sessaoId || !sessoesAnotacoes.some((s) => s.id === formAnotacao.sessaoId)) ? <FormularioAnotacao form={formAnotacao} onSalvar={salvarAnotacao} onChange={setFormAnotacao} onCancelar={() => setFormAnotacao(null)} /> : <BarraMais rotulo="Adicionar anotação" atalho={ATALHO_TAREFA} onClick={() => abrirNovaAnotacao()} />}
           {criandoSessaoAnotacao ? <form className="ck-nova-divisao" onSubmit={criarSessaoAnotacao} onBlur={(e) => fecharAoClicarFora(e, () => { setCriandoSessaoAnotacao(false); setNomeSessaoAnotacao(""); })}>
+            <SeletorIconeSessao value={iconeSessaoAnotacao} onChange={setIconeSessaoAnotacao} />
             <input id="campo-sessao-anotacao" autoFocus value={nomeSessaoAnotacao} onChange={(e) => setNomeSessaoAnotacao(e.target.value)} placeholder="Nome da sessão (ex: Ideias)" aria-label="Nome da sessão de anotações" maxLength={60} onKeyDown={(e) => { if (e.key === "Escape") { setCriandoSessaoAnotacao(false); setNomeSessaoAnotacao(""); } }} />
             <button type="submit" disabled={!nomeSessaoAnotacao.trim()}>Criar</button>
           </form> : <BarraMais rotulo="Adicionar sessão" atalho={ATALHO_SESSAO} onClick={() => setCriandoSessaoAnotacao(true)} />}
@@ -3116,12 +3340,12 @@ function Checklist({ usuario }) {
             <Alca id={s.id} tipo="sessaoAnotacao" grupo={null} ordem={ordem} imagem=".ck-grupo-topo" />
             {sessaoEmEdicao?.tipo === "anotacoes" && sessaoEmEdicao.id === s.id ? <EditarNomeSessao
               sessao={s}
-              onSalvar={(nome) => salvarNomeSessao("anotacoes", s.id, nome)}
+              onSalvar={(nome, icone) => salvarNomeSessao("anotacoes", s.id, nome, icone)}
               onCancelar={() => cancelarEdicaoSessao("anotacoes", s.id)}
-            /> : <button type="button" className="ck-grupo-titulo" aria-expanded={s.aberta !== false} onClick={() => setSessoesAnotacoes((atual) => atual.map((x) => x.id === s.id ? { ...x, aberta: x.aberta === false } : x))}><span className={`ck-seta ${s.aberta !== false ? "aberta" : ""}`}>›</span><span className="ck-grupo-nome">{s.nome}</span><span className="ck-grupo-qtd">{anotacoes.filter((a) => a.sessaoId === s.id).length}</span></button>}
-            <button type="button" className="ck-mais" onClick={() => abrirNovaAnotacao(s.id)} title={`Nova anotação em ${s.nome}`} aria-label={`Nova anotação em ${s.nome}`}><IconeMais /></button>
+            /> : <button type="button" className="ck-grupo-titulo" aria-expanded={s.aberta !== false} onClick={() => setSessoesAnotacoes((atual) => atual.map((x) => x.id === s.id ? { ...x, aberta: x.aberta === false } : x))}><span className={`ck-seta ${s.aberta !== false ? "aberta" : ""}`}>›</span><IconeSessao icone={s.icone} monocromatico /><span className="ck-grupo-nome">{s.nome}</span><span className="ck-grupo-qtd">{anotacoes.filter((a) => a.sessaoId === s.id).length}</span></button>}
+            {sessaoEmEdicao?.tipo !== "anotacoes" || sessaoEmEdicao.id !== s.id ? <button type="button" className="ck-mais" onClick={() => abrirNovaAnotacao(s.id)} title={`Nova anotação em ${s.nome}`} aria-label={`Nova anotação em ${s.nome}`}><IconeMais /></button> : null}
             {sessaoEmEdicao?.tipo !== "anotacoes" || sessaoEmEdicao.id !== s.id ? <button type="button" className="ck-icone" title="Editar sessão" aria-label={`Editar sessão ${s.nome}`} onClick={() => iniciarEdicaoSessao("anotacoes", s)}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" /></svg></button> : null}
-            <BotaoApagar nome={`sessão ${s.nome}`} onClick={() => { if (window.confirm(`Apagar a sessão "${s.nome}"? As anotações vão para Sem sessão.`)) { setSessoesAnotacoes((xs) => xs.filter((x) => x.id !== s.id)); setAnotacoes((xs) => xs.map((a) => a.sessaoId === s.id ? { ...a, sessaoId: null } : a)); } }} />
+            {sessaoEmEdicao?.tipo !== "anotacoes" || sessaoEmEdicao.id !== s.id ? <BotaoApagar nome={`sessão ${s.nome}`} onClick={() => { if (window.confirm(`Apagar a sessão "${s.nome}"? As anotações vão para Sem sessão.`)) { setSessoesAnotacoes((xs) => xs.filter((x) => x.id !== s.id)); setAnotacoes((xs) => xs.map((a) => a.sessaoId === s.id ? { ...a, sessaoId: null } : a)); } }} /> : null}
           </div>
           {formAnotacao?.sessaoId === s.id && <FormularioAnotacao form={formAnotacao} onSalvar={salvarAnotacao} onChange={setFormAnotacao} onCancelar={() => setFormAnotacao(null)} />}
           {s.aberta !== false && anotacoes.filter((a) => a.sessaoId === s.id).map((a) => <article className={`ck-anotacao${ordem.sobre === a.id && ordem.arrastando?.tipo === "anotacao" ? " alvo" : ""}`} key={a.id} {...alvoProps(ordem, "anotacao", a.id, s.id)}>
@@ -3141,7 +3365,7 @@ function Checklist({ usuario }) {
         <span aria-hidden="true"> · </span>
         <Contato />
                 <span aria-hidden="true"> · </span>
-                <span aria-hidden="true"> V0.72 </span>
+                <span aria-hidden="true"> V0.74 </span>
       </footer>
     </main>
 

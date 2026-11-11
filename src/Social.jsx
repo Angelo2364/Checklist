@@ -10,6 +10,12 @@ const ERROS_SOCIAL = {
   request_not_found: "Esse pedido já foi respondido ou não está mais disponível.",
 };
 
+const nomeVisivel = (nome = "") => {
+  const caracteres = Array.from(nome);
+  if (!caracteres.length) return nome;
+  return caracteres[0].toLocaleUpperCase("pt-BR") + caracteres.slice(1).join("");
+};
+
 function mensagemErro(error, fallback) {
   const detalhe = error?.message || "";
   const codigo = Object.keys(ERROS_SOCIAL).find((item) => detalhe.includes(item));
@@ -151,7 +157,7 @@ export default function Social({ user, view = "tasks", onManage }) {
     if (sendError) {
       setError(mensagemErro(sendError, "Não consegui enviar o pedido."));
     } else {
-      setNotice("Pedido enviado para " + foundUser.display_name + ".");
+      setNotice("Pedido enviado para " + nomeVisivel(foundUser.display_name) + ".");
       setFoundUser(null);
       setQuery("");
       await refresh();
@@ -165,7 +171,7 @@ export default function Social({ user, view = "tasks", onManage }) {
     const { error: responseError } = await supabase.rpc("social_respond_request", { p_request_id: request.request_id, p_accept: accept });
     if (responseError) setError(mensagemErro(responseError, "Não consegui responder a esse pedido."));
     else {
-      setNotice(accept ? "Agora você e " + request.display_name + " são amigos." : "Pedido recusado.");
+      setNotice(accept ? "Agora você e " + nomeVisivel(request.display_name) + " são amigos." : "Pedido recusado.");
       await refresh();
     }
     setBusyId("");
@@ -227,20 +233,20 @@ export default function Social({ user, view = "tasks", onManage }) {
         <div><input id="ck-social-query" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Nome de usuário ou email" autoCapitalize="none" autoCorrect="off" /><button type="submit" disabled={searching || !query.trim()}>{searching ? "Buscando…" : "Buscar"}</button></div>
         <small>Use o nome de usuário ou o email exato da conta.</small>
       </form>
-      {foundUser && <div className="ck-social-result"><span>{foundUser.display_name}</span><button type="button" onClick={sendRequest} disabled={busyId === foundUser.user_id}>{busyId === foundUser.user_id ? "Enviando…" : "Adicionar"}</button></div>}
+      {foundUser && <div className="ck-social-result"><span>{nomeVisivel(foundUser.display_name)}</span><button type="button" onClick={sendRequest} disabled={busyId === foundUser.user_id}>{busyId === foundUser.user_id ? "Enviando…" : "Adicionar"}</button></div>}
       {notice && <p className="ck-social-message" role="status">{notice}</p>}
       {error && <p className="ck-social-message erro" role="alert">{error}</p>}
       <section className="ck-social-list">
         <h3>Pedidos recebidos {requests.filter((item) => item.direction === "incoming").length > 0 && <span>{requests.filter((item) => item.direction === "incoming").length}</span>}</h3>
-        {loading ? <p>Carregando…</p> : requests.filter((item) => item.direction === "incoming").length === 0 ? <p className="ck-social-empty">Nenhum pedido recebido.</p> : requests.filter((item) => item.direction === "incoming").map((item) => <div className="ck-social-person" key={item.request_id}><span>{item.display_name}</span><div><button type="button" disabled={busyId === item.request_id} onClick={() => respond(item, true)}>Aceitar</button><button type="button" className="secundario" disabled={busyId === item.request_id} onClick={() => respond(item, false)}>Recusar</button></div></div>)}
+        {loading ? <p>Carregando…</p> : requests.filter((item) => item.direction === "incoming").length === 0 ? <p className="ck-social-empty">Nenhum pedido recebido.</p> : requests.filter((item) => item.direction === "incoming").map((item) => <div className="ck-social-person" key={item.request_id}><span>{nomeVisivel(item.display_name)}</span><div><button type="button" disabled={busyId === item.request_id} onClick={() => respond(item, true)}>Aceitar</button><button type="button" className="secundario" disabled={busyId === item.request_id} onClick={() => respond(item, false)}>Recusar</button></div></div>)}
       </section>
       <section className="ck-social-list">
         <h3>Pedidos enviados</h3>
-        {loading ? <p>Carregando…</p> : requests.filter((item) => item.direction === "outgoing").length === 0 ? <p className="ck-social-empty">Nenhum pedido pendente.</p> : requests.filter((item) => item.direction === "outgoing").map((item) => <div className="ck-social-person" key={item.request_id}><span>{item.display_name}</span><small>Aguardando resposta</small></div>)}
+        {loading ? <p>Carregando…</p> : requests.filter((item) => item.direction === "outgoing").length === 0 ? <p className="ck-social-empty">Nenhum pedido pendente.</p> : requests.filter((item) => item.direction === "outgoing").map((item) => <div className="ck-social-person" key={item.request_id}><span>{nomeVisivel(item.display_name)}</span><small>Aguardando resposta</small></div>)}
       </section>
       <section className="ck-social-list">
         <h3>Amigos {friends.length > 0 && <span>{friends.length}</span>}</h3>
-        {loading ? <p>Carregando…</p> : friends.length === 0 ? <p className="ck-social-empty">Quando alguém aceitar seu pedido, aparecerá aqui.</p> : friends.map((friend) => <div className="ck-social-person" key={friend.friendship_id}><span><IconePessoa />{friend.display_name}</span><small>Amigos desde {new Date(friend.created_at).toLocaleDateString("pt-BR")}</small></div>)}
+        {loading ? <p>Carregando…</p> : friends.length === 0 ? <p className="ck-social-empty">Quando alguém aceitar seu pedido, aparecerá aqui.</p> : friends.map((friend) => <div className="ck-social-person" key={friend.friendship_id}><span><IconePessoa />{nomeVisivel(friend.display_name)}</span><small>Amigos desde {new Date(friend.created_at).toLocaleDateString("pt-BR")}</small></div>)}
       </section>
     </section>;
   }
@@ -255,7 +261,7 @@ export default function Social({ user, view = "tasks", onManage }) {
       const friendTasks = tasks.filter((task) => task.friendship_id === friend.friendship_id);
       const openForm = addingFor === friend.friendship_id;
       return <section className="ck-social-friend-group" key={friend.friendship_id}>
-        <div className="ck-social-friend-heading"><strong>Tarefas com {friend.display_name}</strong><button type="button" className="ck-mais ck-mais-circular" onClick={() => setAddingFor(openForm ? "" : friend.friendship_id)} aria-expanded={openForm} aria-label={"Adicionar tarefa com " + friend.display_name} title="Nova tarefa compartilhada"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M8 3v10M3 8h10" /></svg></button></div>
+        <div className="ck-social-friend-heading"><strong>Tarefas com {nomeVisivel(friend.display_name)}</strong><button type="button" className="ck-mais ck-mais-circular" onClick={() => setAddingFor(openForm ? "" : friend.friendship_id)} aria-expanded={openForm} aria-label={"Adicionar tarefa com " + nomeVisivel(friend.display_name)} title="Nova tarefa compartilhada"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M8 3v10M3 8h10" /></svg></button></div>
         {openForm && <TaskEditor busy={savingTask} onCancel={() => setAddingFor("")} onSave={(fields) => saveTask(friend, fields)} />}
         {friendTasks.length === 0 && !openForm ? <p className="ck-social-empty">Nenhuma tarefa compartilhada ainda.</p> : friendTasks.map((task) => <TarefaCompartilhada key={task.id} task={task} busy={savingTask} onToggle={toggleTask} onEdit={(id, fields) => editTask(id, fields)} onDelete={deleteTask} />)}
       </section>;

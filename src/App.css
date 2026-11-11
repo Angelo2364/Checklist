@@ -438,6 +438,36 @@ button.secundario:hover {
   font-size: 14px;
 }
 
+.ck-form-grupo .ck-tarefa-form-rodape {
+  display: grid;
+  flex: 1 1 100%;
+  grid-template-columns: auto minmax(0, 1fr) 30px;
+  align-items: end;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+.ck-tarefa-form-botoes { grid-column: 1; grid-row: 1; display: flex; align-items: center; min-width: 0; }
+.ck-form-grupo .ck-comentario-botao {
+  grid-column: 3;
+  grid-row: 1;
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  font-size: inherit;
+  color: var(--suave);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  cursor: pointer;
+}
+.ck-comentario-botao:hover,
+.ck-comentario-botao[aria-expanded="true"] { color: var(--tinta); background: var(--fundo-hover); border-color: var(--linha); }
+.ck-form-grupo .ck-comentario-input { grid-column: 2; grid-row: 1; flex: none; width: 100%; min-width: 0; min-height: 42px; box-sizing: border-box; border-radius: 12px; }
+
 /* ---------- divisões ---------- */
 .ck-grupo {
   border-bottom: 8px solid var(--fundo-hover);
@@ -960,10 +990,13 @@ a.ck-apagar:hover {
 }
 
 .ck-editar-sessao {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 30px 30px;
+  grid-template-rows: auto auto;
   flex: 1 1 auto;
   align-items: center;
-  gap: 4px;
+  column-gap: 4px;
+  row-gap: 8px;
   min-width: 0;
   padding-left: 16px;
 }
@@ -1527,10 +1560,7 @@ a.ck-ev-mapa:hover {
 .ck-configuracoes { min-height: 320px; padding: 16px; }
 .ck-config-titulo { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
 .ck-config-titulo h2 { margin: 0; font-size: 20px; }
-.ck-configuracoes > .ck-abas { margin-bottom: 18px; overflow: hidden; border: 1px solid var(--linha); border-top: 0; border-radius: 12px; background: color-mix(in srgb, var(--fundo-hover) 55%, transparent); }
-.ck-configuracoes > .ck-abas .ck-aba { border-right: 1px solid var(--linha); border-bottom: 0; }
-.ck-configuracoes > .ck-abas .ck-aba:last-child { border-right: 0; }
-.ck-configuracoes > .ck-abas .ck-aba[aria-selected="true"] { background: color-mix(in srgb, var(--rosa) 28%, transparent); box-shadow: inset 0 -3px var(--rosa); }
+.ck-configuracoes > .ck-abas-principais { margin: 10px 0 18px; }
 .ck-config-preferencias { display: grid; gap: 14px; padding-top: 18px; }
 .ck-pref-card, .ck-conta-identidade, .ck-backup-card { padding: 16px; border: 1px solid var(--linha); border-radius: 14px; background: color-mix(in srgb, var(--fundo) 75%, var(--fundo-hover)); box-shadow: 0 3px 12px color-mix(in srgb, var(--tinta) 5%, transparent); }
 .ck-pref-card h3, .ck-backup-card h3 { margin: 0 0 5px; font-size: 15px; }
@@ -1955,11 +1985,6 @@ body {
   opacity: 0.78;
 }
 
-:root[data-tema="claro"] .ck-configuracoes > .ck-abas .ck-aba[aria-selected="true"] {
-  background: color-mix(in srgb, var(--rosa) 56%, var(--fundo));
-  box-shadow: inset 0 -3px var(--azul-forte);
-}
-
 :root[data-tema="claro"] .ck-aba[aria-selected="true"] {
   border-bottom-color: var(--azul-forte);
 }
@@ -2202,6 +2227,20 @@ body {
   gap: 2px 10px;
   margin-top: 2px;
 }
+
+.ck-tarefa-comentario {
+  display: flex;
+  flex: 1 1 100%;
+  align-items: flex-start;
+  gap: 5px;
+  min-width: 0;
+  color: var(--suave);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ck-tarefa-comentario svg { flex: none; margin-top: 1px; }
 
 .ck-ev-horas {
   display: flex;
@@ -2955,4 +2994,140 @@ body {
   .ck-social-person { align-items: flex-start; flex-direction: column; }
   .ck-social-person > div { width: 100%; }
   .ck-social-person > div button { flex: 1; }
+}
+
+/* Melhorias da rodada de novembro */
+.ck-aviso-link {
+  display: inline;
+  padding: 0;
+  margin-left: 4px;
+  color: var(--azul-forte);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font: inherit;
+  font-weight: 700;
+}
+.ck-aviso-link:hover { color: var(--tinta); background: transparent; }
+.ck-aviso-usuario { border-color: color-mix(in srgb, var(--azul-forte) 36%, var(--linha)); }
+.ck-prazo-campos {
+  flex: 1 1 100%;
+  flex-wrap: nowrap;
+  align-items: center;
+  min-width: 100%;
+  margin-top: 3px;
+  padding-top: 7px;
+  border-top: 1px solid color-mix(in srgb, var(--linha) 72%, transparent);
+}
+.ck-rotina-frequencia {
+  display: grid;
+  flex: 1 1 100%;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.ck-rotina-frequencia > select:first-child { grid-column: 1; grid-row: 1; width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.ck-rotina-frequencia > .ck-hora24 { grid-column: 2; grid-row: 1; margin: 0; }
+.ck-rotina-frequencia > .ck-repeticao-personalizada { grid-column: 1 / -1; grid-row: 2; flex: none; width: auto; }
+.ck-form-data .ck-hora24 input[type="text"] { border-radius: 999px; }
+.ck-repeticao-personalizada {
+  display: flex;
+  flex: 1 1 270px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--linha);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--fundo-hover) 58%, transparent);
+}
+.ck-repeticao-tipo, .ck-repeticao-intervalo { display: inline-flex; align-items: center; gap: 7px; color: var(--suave); font-size: 12px; }
+.ck-repeticao-tipo select { width: auto; }
+.ck-repeticao-intervalo input { flex: none; width: 48px; min-width: 48px; box-sizing: border-box; padding: 7px 6px; color: var(--tinta); background: var(--fundo); border: 1px solid var(--linha); border-radius: 9px; font: inherit; }
+.ck-form-grupo .ck-repeticao-personalizada + .ck-hora24 { margin-left: auto; }
+.ck-dias-semana { display: flex; flex: 1 1 100%; flex-wrap: wrap; gap: 6px; min-width: 0; }
+.ck-dias-semana label { display: inline-flex; flex: none; align-items: center; gap: 5px; box-sizing: border-box; padding: 5px 8px; color: var(--tinta); border: 1px solid var(--linha); border-radius: 999px; background: color-mix(in srgb, var(--fundo) 70%, transparent); font-size: 11px; line-height: 1.2; white-space: nowrap; cursor: pointer; transition: color .15s, border-color .15s, background .15s, box-shadow .15s; }
+.ck-dias-semana label:hover { border-color: var(--azul-forte); background: color-mix(in srgb, var(--azul-forte) 12%, var(--fundo)); }
+.ck-dias-semana label.selecionado { border-color: var(--azul-forte); background: color-mix(in srgb, var(--azul-forte) 28%, var(--fundo)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--azul-forte) 40%, transparent); }
+.ck-dias-semana input[type="checkbox"] { flex: none; width: 14px; height: 14px; min-width: 14px; margin: 0; padding: 0; accent-color: var(--azul-forte); cursor: pointer; }
+.ck-grupo-titulo .ck-sessao-icone { flex: none; color: var(--suave); }
+.ck-sessao-icone {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 19px;
+  height: 19px;
+  color: var(--azul-forte);
+  font-size: 18px;
+  line-height: 1;
+  object-fit: contain;
+}
+.ck-sessao-icone.logo { filter: brightness(0) invert(1); }
+:root[data-tema="claro"] .ck-sessao-icone.logo { filter: brightness(0) saturate(100%); }
+.ck-sessao-icone.logo.monocromatico { background-color: currentColor; filter: none; mask-repeat: no-repeat; mask-position: center; mask-size: contain; }
+.ck-seletor-icones {
+  display: flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding-bottom: 2px;
+}
+.ck-opcao-icone {
+  display: grid;
+  place-items: center;
+  width: 31px;
+  height: 31px;
+  padding: 4px;
+  color: var(--tinta);
+  background: color-mix(in srgb, var(--fundo) 78%, transparent);
+  border: 1px solid var(--linha);
+  border-radius: 9px;
+}
+.ck-opcao-icone[aria-pressed="true"] { border-color: var(--azul-forte); background: color-mix(in srgb, var(--azul) 24%, var(--fundo)); box-shadow: 0 0 0 1px var(--azul-forte); }
+.ck-opcao-icone .ck-sessao-icone { width: 18px; height: 18px; }
+.ck-editar-sessao .ck-seletor-icones { grid-column: 1; grid-row: 1; justify-content: space-between; gap: 4px; width: 100%; padding: 0; }
+.ck-editar-sessao .ck-opcao-icone { flex: none; width: 31px; height: 31px; min-width: 31px; color: var(--suave); }
+.ck-editar-sessao .ck-opcao-icone .ck-sessao-icone { color: var(--suave); }
+.ck-editar-sessao input { grid-column: 1; grid-row: 2; width: 100%; min-width: 0; box-sizing: border-box; }
+.ck-editar-sessao button[type="submit"] { grid-column: 2; grid-row: 2; }
+.ck-editar-sessao button[type="button"] { grid-column: 3; grid-row: 2; }
+.ck-painel .ck-rotinas ul { display: grid; gap: 9px; margin: 0; padding: 0 12px 14px; }
+.ck-painel .ck-rotinas li {
+  min-height: 62px;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--linha);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--fundo) 78%, transparent);
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--tinta) 5%, transparent);
+}
+.ck-painel .ck-rotinas li + li { border-top: 1px solid var(--linha); }
+.ck-painel .ck-rotinas li:hover { background: color-mix(in srgb, var(--fundo-hover) 88%, transparent); }
+.ck-painel .ck-rotinas .ck-rot-texto { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.ck-painel .ck-rotinas .ck-vencimento { margin-top: 5px; }
+.ck-painel .ck-contas .ck-lista { display: grid; gap: 9px; padding: 0 12px; }
+.ck-painel .ck-contas .ck-lista li {
+  min-height: 64px;
+  gap: 7px;
+  padding: 8px;
+  border: 1px solid var(--linha);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--fundo) 78%, transparent);
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--tinta) 5%, transparent);
+}
+.ck-painel .ck-contas .ck-lista li:hover { background: color-mix(in srgb, var(--fundo-hover) 88%, transparent); }
+.ck-painel .ck-contas .ck-lista li label { gap: 8px; padding: 5px 3px; }
+.ck-painel .ck-contas .ck-vazio-cal { padding: 12px; }
+.ck-painel .ck-resumo { margin: 12px; padding: 12px; border: 1px solid var(--linha); border-radius: 13px; background: color-mix(in srgb, var(--grupo-bg) 36%, transparent); }
+.ck-painel .ck-contas .ck-lista li + li { border-top: 1px solid var(--linha); }
+:root[data-tema="claro"] .ck-painel .ck-rotinas li,
+:root[data-tema="claro"] .ck-painel .ck-contas .ck-lista li { background: color-mix(in srgb, var(--fundo) 90%, transparent); }
+@media (max-width: 520px) {
+  .ck-repeticao-personalizada { align-items: flex-start; }
+  .ck-painel .ck-rotinas li,
+  .ck-painel .ck-contas .ck-lista li { gap: 5px; padding: 7px; }
 }
