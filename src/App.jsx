@@ -29,6 +29,7 @@ const NOME_SECRETO = "Luna";
 const EMAIL_CONTATO = "sayaokaua@gmail.com";
 const STORAGE_INTERVALO = "checklist:intervaloAviso"; // minutos entre os lembretes
 const STORAGE_JANELA_AVISOS = "checklist:janelaAvisos";
+const STORAGE_EXCLUIR_SEM_CONFIRMAR = "checklist:excluirSemConfirmar";
 const STORAGE_AVISOS_AGENDA_FECHADOS = "checklist:avisosAgendaFechados";
 const JANELA_AVISOS_PADRAO = { ativa: false, inicio: "08:00", fim: "22:00" };
 const INTERVALOS_AVISO = [15, 30, 60, 120, 180];
@@ -58,9 +59,9 @@ function horarioPermiteAvisos(janela, agora = new Date()) {
 
 // o que vai pra nuvem (mesma forma do arquivo exportado, sem o cabeçalho)
 const listaObjs = (v) => (Array.isArray(v) ? v.filter((x) => x && typeof x === "object") : []);
-const empacotar = (tarefas, grupos, eventos, rotinas, contas, anotacoes = [], sessoesAnotacoes = [], janelaAvisos = JANELA_AVISOS_PADRAO) => ({ tarefas, grupos, eventos, rotinas, contas, anotacoes, sessoesAnotacoes, janelaAvisos: normalizarJanelaAvisos(janelaAvisos) });
+const empacotar = (tarefas, grupos, eventos, rotinas, contas, anotacoes = [], sessoesAnotacoes = [], janelaAvisos = JANELA_AVISOS_PADRAO, excluirSemConfirmacao = true) => ({ tarefas, grupos, eventos, rotinas, contas, anotacoes, sessoesAnotacoes, janelaAvisos: normalizarJanelaAvisos(janelaAvisos), excluirSemConfirmacao: excluirSemConfirmacao !== false });
 const empacotarNuvem = (d) =>
-  empacotar(listaObjs(d?.tarefas), listaObjs(d?.grupos), listaObjs(d?.eventos), listaObjs(d?.rotinas), listaObjs(d?.contas), listaObjs(d?.anotacoes), listaObjs(d?.sessoesAnotacoes), d?.janelaAvisos);
+  empacotar(listaObjs(d?.tarefas), listaObjs(d?.grupos), listaObjs(d?.eventos), listaObjs(d?.rotinas), listaObjs(d?.contas), listaObjs(d?.anotacoes), listaObjs(d?.sessoesAnotacoes), d?.janelaAvisos, d?.excluirSemConfirmacao);
 // papel de parede padrão: coloque o arquivo bg.png dentro da pasta public/
 const FUNDO_PADRAO = `${import.meta.env.BASE_URL}bg.png`;
 const STORAGE_BG_AJUSTE = "checklist:ajusteFundo";
@@ -935,6 +936,17 @@ function BotaoApagar({ nome, onClick }) {
   </button>;
 }
 
+function ConfirmacaoChecklist({ dialog, onCancel, onConfirm }) {
+  if (!dialog) return null;
+  return <div className="ck-social-modal-backdrop" onPointerDown={(event) => { if (event.target === event.currentTarget) onCancel(); }}>
+    <section className="ck-social-modal" role="alertdialog" aria-modal="true" aria-labelledby="ck-checklist-confirm-title" aria-describedby="ck-checklist-confirm-message">
+      <h2 id="ck-checklist-confirm-title">{dialog.title}</h2>
+      <p id="ck-checklist-confirm-message">{dialog.message}</p>
+      <div><button type="button" autoFocus className="ck-social-danger" onClick={onConfirm}>{dialog.action || "Excluir"}</button><button type="button" className="secundario" onClick={onCancel}>Cancelar</button></div>
+    </section>
+  </div>;
+}
+
 function FormularioConta({ conta, onSalvar, onCancelar }) {
   const [nome, setNome] = useState(conta.nome);
   const [valor, setValor] = useState(conta.valor ? String(conta.valor).replace(".", ",") : "");
@@ -1417,7 +1429,7 @@ function NovaTarefa({ onAdd, placeholder, onFechar, idCampo, modoAgenda = false,
 }
 
 /* Alça com bolinhas: arraste ou use as setas ↑ ↓ com ela em foco */
-function Alca({ id, tipo, grupo, ordem, imagem }) {
+function Alca({ id, tipo, grupo, ordem, imagem, taskData }) {
   return (
     <>
     <span
@@ -1429,13 +1441,23 @@ function Alca({ id, tipo, grupo, ordem, imagem }) {
       title="Arraste para reordenar (ou use as setas ↑ ↓)"
       aria-label="Reordenar: arraste ou use as setas para cima e para baixo"
       onDragStart={(e) => {
-        e.dataTransfer.effectAllowed = "move";
+        if (tipo === "tarefa" && taskData && !taskData.feita) e.dataTransfer.setData("application/x-crysalis-task", JSON.stringify(taskData));
+        e.dataTransfer.effectAllowed = tipo === "tarefa" && taskData && !taskData.feita ? "copyMove" : "move";
         e.dataTransfer.setData("text/plain", String(id));
         const el = e.currentTarget.closest(imagem);
         if (el) e.dataTransfer.setDragImage(el, 0, 0);
         setTimeout(() => ordem.setArrastando({ tipo, id, grupo }), 0);
       }}
       onDragEnd={ordem.fim}
+      onPointerDown={(e) => {
+        if (e.pointerType !== "touch" || tipo !== "tarefa" || !taskData || taskData.feita) return;
+        e.preventDefault();
+        const x = e.clientX; const y = e.clientY;
+        const timer = window.setTimeout(() => window.dispatchEvent(new CustomEvent("crysalis:share-task-drag-start", { detail: { task: taskData, x, y } })), 320);
+        const limpar = () => { window.clearTimeout(timer); window.removeEventListener("pointerup", limpar); window.removeEventListener("pointercancel", limpar); };
+        window.addEventListener("pointerup", limpar, { once: true });
+        window.addEventListener("pointercancel", limpar, { once: true });
+      }}
       onKeyDown={(e) => {
         if (e.key === "ArrowUp" || e.key === "ArrowDown") {
           e.preventDefault();
@@ -1620,7 +1642,7 @@ function ListaTarefas({ tarefas, alternar, apagar, mudarPrioridade, ordem, edica
           className={`${t.feita ? "feita" : ""}${ordem.arrastando?.id === t.id ? " arrastando" : ""}${ordem.sobre === t.id && ordem.arrastando?.tipo === "tarefa" ? " alvo" : ""}`}
           {...alvoProps(ordem, "tarefa", t.id, t.grupoId || null)}
         >
-          <Alca id={t.id} tipo="tarefa" grupo={t.grupoId || null} ordem={ordem} imagem="li" />
+          <Alca id={t.id} tipo="tarefa" grupo={t.grupoId || null} ordem={ordem} imagem="li" taskData={t} />
           <label
             title={t.feita ? "Feita" : t.meio ? "Meio feita" : "Pendente"}
           >
@@ -1697,7 +1719,7 @@ function FormularioAnotacao({ form, onSalvar, onChange, onCancelar }) {
   );
 }
 
-function ConfiguracoesVisuais({ tema, setTema, desfoque, setDesfoque, ajusteFundo, setAjusteFundo, escolherFundo, fundo, removerFundo, erroFundo, janelaAvisos, setJanelaAvisos, iniciarTutorial }) {
+function ConfiguracoesVisuais({ tema, setTema, desfoque, setDesfoque, ajusteFundo, setAjusteFundo, escolherFundo, fundo, removerFundo, erroFundo, janelaAvisos, setJanelaAvisos, excluirSemConfirmacao, setExcluirSemConfirmacao, iniciarTutorial }) {
   return <div className="ck-config-preferencias">
     <section className="ck-pref-card">
       <h3>Tema</h3>
@@ -1710,6 +1732,14 @@ function ConfiguracoesVisuais({ tema, setTema, desfoque, setDesfoque, ajusteFund
       <h3>Guia rápido</h3>
       <p>Veja novamente onde ficam os principais recursos do Crysalis.</p>
       <button type="button" className="secundario" onClick={iniciarTutorial}>Rever tutorial</button>
+    </section>
+    <section className="ck-pref-card">
+      <h3>Exclusão de tarefas</h3>
+      <p>Escolha se é necessário confirmar antes de excluir tarefas. A exclusão de sessões sempre pede confirmação.</p>
+      <label className="ck-limite-horario">
+        <input type="checkbox" checked={excluirSemConfirmacao} onChange={(e) => setExcluirSemConfirmacao(e.target.checked)} />
+        <span>Excluir tarefas sem confirmação</span>
+      </label>
     </section>
     <section className="ck-pref-card">
       <h3>Horário dos lembretes</h3>
@@ -1872,9 +1902,9 @@ function ConfiguracaoNomeUsuario({ usuario, onNomeSalvo }) {
   async function salvar(e) {
     e.preventDefault();
     setMensagem("");
-    const nomeNormalizado = nome.trim().toLowerCase();
-    if (!/^[a-z0-9_]{3,20}$/.test(nomeNormalizado)) {
-      setMensagem("Use de 3 a 20 letras sem acento, números ou _.");
+    const nomeNormalizado = nome.trim().toLowerCase().replace(/\s+/g, " ");
+    if (nomeNormalizado.length < 3 || nomeNormalizado.length > 20 || !/^[a-z0-9_]+(?: [a-z0-9_]+)*$/.test(nomeNormalizado)) {
+      setMensagem("Use de 3 a 20 caracteres: letras sem acento, números, espaços ou _.");
       setErro(true);
       return;
     }
@@ -1912,14 +1942,14 @@ function ConfiguracaoNomeUsuario({ usuario, onNomeSalvo }) {
         spellCheck="false"
         minLength={3}
         maxLength={20}
-        pattern="[A-Za-z0-9_]{3,20}"
-        placeholder="seunome"
+        pattern="[A-Za-z0-9_]+( [A-Za-z0-9_]+)*"
+        placeholder="seu nome"
         value={nome}
-        onChange={(e) => setNome(e.target.value)}
+        onChange={(e) => setNome(e.target.value.replace(/\s+/g, " "))}
         disabled={carregando || salvando}
         required
       />
-      <small className="ck-usuario-dica">3–20 caracteres: letras sem acento, números ou _.</small>
+      <small className="ck-usuario-dica">3–20 caracteres: letras sem acento. Números, espaços ou _ são permitidos.</small>
       <button type="submit" className="secundario" disabled={carregando || salvando}>
         {carregando ? "Carregando…" : salvando ? "Salvando…" : "Salvar nome de usuário"}
       </button>
@@ -1959,12 +1989,14 @@ function Checklist({ usuario }) {
     return INTERVALOS_AVISO.includes(v) ? v : 30;
   });
   const [janelaAvisos, setJanelaAvisos] = useState(() => normalizarJanelaAvisos(lerStorage(STORAGE_JANELA_AVISOS, JANELA_AVISOS_PADRAO)));
+  const [excluirSemConfirmacao, setExcluirSemConfirmacao] = useState(() => lerStorage(STORAGE_EXCLUIR_SEM_CONFIRMAR, true) !== false);
   const [tema, setTema] = useState(() => (lerStorage(STORAGE_TEMA, "escuro") === "claro" ? "claro" : "escuro"));
   useEffect(() => {
     document.documentElement.dataset.tema = tema;
     salvarStorage(STORAGE_TEMA, tema);
   }, [tema]);
   const [msgDados, setMsgDados] = useState({ texto: "", erro: false });
+  const [confirmacaoExcluir, setConfirmacaoExcluir] = useState(null);
   const [, setTick] = useState(0);
   const [erroFundo, setErroFundo] = useState("");
   const [editando, setEditando] = useState(null); // id da tarefa em edição
@@ -2001,6 +2033,7 @@ function Checklist({ usuario }) {
   const anotacoesRef = useRef([]);
   const sessoesAnotacoesRef = useRef([]);
   const janelaAvisosRef = useRef(janelaAvisos);
+  const excluirSemConfirmacaoRef = useRef(excluirSemConfirmacao);
   tarefasRef.current = tarefas;
   gruposRef.current = grupos;
   eventosRef.current = eventos;
@@ -2009,6 +2042,7 @@ function Checklist({ usuario }) {
   anotacoesRef.current = anotacoes;
   sessoesAnotacoesRef.current = sessoesAnotacoes;
   janelaAvisosRef.current = janelaAvisos;
+  excluirSemConfirmacaoRef.current = excluirSemConfirmacao;
 
   // ---------- sincronização com o Supabase ----------
   const [sync, setSync] = useState("carregando"); // carregando | salvo | salvando | erro | conflito | erro-carregar
@@ -2019,7 +2053,7 @@ function Checklist({ usuario }) {
   const salvandoAgora = useRef(false);
   const bloqueado = useRef(false); // true enquanto há conflito pendente
 
-  const jsonAtual = JSON.stringify(empacotar(tarefas, grupos, eventos, rotinas, contas, anotacoes, sessoesAnotacoes, janelaAvisos));
+  const jsonAtual = JSON.stringify(empacotar(tarefas, grupos, eventos, rotinas, contas, anotacoes, sessoesAnotacoes, janelaAvisos, excluirSemConfirmacao));
   const jsonAtualRef = useRef(jsonAtual);
   jsonAtualRef.current = jsonAtual;
 
@@ -2033,6 +2067,7 @@ function Checklist({ usuario }) {
     setAnotacoes(l.anotacoes);
     setSessoesAnotacoes(l.sessoesAnotacoes);
     setJanelaAvisos(l.janelaAvisos);
+    setExcluirSemConfirmacao(l.excluirSemConfirmacao);
     return JSON.stringify(l);
   }
 
@@ -2053,8 +2088,8 @@ function Checklist({ usuario }) {
           // cache local de outra conta nunca sobe pra esta
           const dono = lerStorage(STORAGE_DONO, null);
           const inicial = dono && dono !== usuario.id
-            ? empacotar([], [], [], [], [], [], [], JANELA_AVISOS_PADRAO)
-            : empacotar(tarefasRef.current, gruposRef.current, eventosRef.current, rotinasRef.current, contasRef.current, anotacoesRef.current, sessoesAnotacoesRef.current, janelaAvisosRef.current);
+            ? empacotar([], [], [], [], [], [], [], JANELA_AVISOS_PADRAO, true)
+            : empacotar(tarefasRef.current, gruposRef.current, eventosRef.current, rotinasRef.current, contasRef.current, anotacoesRef.current, sessoesAnotacoesRef.current, janelaAvisosRef.current, excluirSemConfirmacaoRef.current);
           jsonSalvo.current = aplicarDados(inicial);
           try {
             versaoNuvem.current = await criarDados(usuario.id, inicial);
@@ -2083,7 +2118,7 @@ function Checklist({ usuario }) {
   async function salvarNaNuvem(forcar = false) {
     while (salvandoAgora.current) await new Promise((r) => setTimeout(r, 200));
     if (bloqueado.current && !forcar) return;
-    const dados = empacotar(tarefasRef.current, gruposRef.current, eventosRef.current, rotinasRef.current, contasRef.current, anotacoesRef.current, sessoesAnotacoesRef.current, janelaAvisosRef.current);
+    const dados = empacotar(tarefasRef.current, gruposRef.current, eventosRef.current, rotinasRef.current, contasRef.current, anotacoesRef.current, sessoesAnotacoesRef.current, janelaAvisosRef.current, excluirSemConfirmacaoRef.current);
     const json = JSON.stringify(dados);
     if (json === jsonSalvo.current && !forcar) return;
     salvandoAgora.current = true;
@@ -2181,7 +2216,7 @@ function Checklist({ usuario }) {
       /* ignora */
     }
     // limpa o cache local pra não deixar suas tarefas num computador compartilhado
-    [STORAGE_TASKS, STORAGE_GROUPS, STORAGE_EVENTS, STORAGE_ROUTINES, STORAGE_BILLS, STORAGE_NOTES, STORAGE_NOTE_GROUPS, STORAGE_JANELA_AVISOS, STORAGE_DONO, STORAGE_PRAZOS, STORAGE_LAST].forEach((k) => {
+    [STORAGE_TASKS, STORAGE_GROUPS, STORAGE_EVENTS, STORAGE_ROUTINES, STORAGE_BILLS, STORAGE_NOTES, STORAGE_NOTE_GROUPS, STORAGE_JANELA_AVISOS, STORAGE_EXCLUIR_SEM_CONFIRMAR, STORAGE_DONO, STORAGE_PRAZOS, STORAGE_LAST].forEach((k) => {
       try {
         localStorage.removeItem(k);
       } catch {
@@ -2213,6 +2248,7 @@ function Checklist({ usuario }) {
   useEffect(() => { salvarStorage(STORAGE_NOTES, anotacoes); }, [anotacoes]);
   useEffect(() => { salvarStorage(STORAGE_NOTE_GROUPS, sessoesAnotacoes); }, [sessoesAnotacoes]);
   useEffect(() => { salvarStorage(STORAGE_JANELA_AVISOS, janelaAvisos); }, [janelaAvisos]);
+  useEffect(() => { salvarStorage(STORAGE_EXCLUIR_SEM_CONFIRMAR, excluirSemConfirmacao); }, [excluirSemConfirmacao]);
 
   useEffect(() => {
     let url = null;
@@ -2646,7 +2682,25 @@ function Checklist({ usuario }) {
   }
 
   function apagar(id) {
-    setTarefas((atual) => atual.filter((t) => t.id !== id));
+    const tarefa = tarefas.find((item) => item.id === id);
+    if (!tarefa) return;
+    if (excluirSemConfirmacao) {
+      setTarefas((atual) => atual.filter((item) => item.id !== id));
+      return;
+    }
+    setConfirmacaoExcluir({
+      title: "Excluir tarefa?",
+      message: `Deseja mesmo excluir “${tarefa.texto}” da sua checklist?`,
+      action: "Excluir tarefa",
+      confirm: () => setTarefas((atual) => atual.filter((item) => item.id !== id)),
+    });
+  }
+
+  function moverTarefaParaSocial(id) {
+    const tarefa = tarefas.find((item) => item.id === id);
+    if (!tarefa) return;
+    setTarefas((atual) => atual.filter((item) => item.id !== id));
+    if (tarefa.rotinaId) setRotinas((atual) => atual.filter((rotina) => rotina.id !== tarefa.rotinaId));
   }
 
   /* ordem: mover item para a posição de outro (mesma lista) */
@@ -2837,6 +2891,7 @@ function Checklist({ usuario }) {
       anotacoes,
       sessoesAnotacoes,
       janelaAvisos,
+      excluirSemConfirmacao,
     };
     const blob = new Blob([JSON.stringify(dados, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -2866,6 +2921,7 @@ function Checklist({ usuario }) {
       const an = lista(dados.anotacoes);
       const san = lista(dados.sessoesAnotacoes);
       const ja = normalizarJanelaAvisos(dados.janelaAvisos);
+      const excluirSemConfirmacaoImportado = dados.excluirSemConfirmacao !== false;
       const quando = dados.exportadoEm ? new Date(dados.exportadoEm).toLocaleString("pt-BR") : "data desconhecida";
       const ok = window.confirm(
         `Importar "${arquivo.name}" (exportado em ${quando})?\n\n` +
@@ -2881,6 +2937,7 @@ function Checklist({ usuario }) {
       setAnotacoes(an);
       setSessoesAnotacoes(san);
       setJanelaAvisos(ja);
+      setExcluirSemConfirmacao(excluirSemConfirmacaoImportado);
       setMsgDados({ texto: `Importado: ${t.length} tarefas, ${g.length} sessões, ${ev.length} eventos, ${ro.length} rotinas, ${co.length} contas.`, erro: false });
     } catch {
       setMsgDados({ texto: "Não consegui ler esse arquivo. Use um arquivo exportado por este app (.json).", erro: true });
@@ -2940,14 +2997,18 @@ function Checklist({ usuario }) {
 
   function apagarGrupo(grupo) {
     const qtd = tarefas.filter((t) => t.grupoId === grupo.id).length;
-    const aviso =
-      qtd > 0
-        ? `Apagar a sessão "${grupo.nome}" e as ${qtd} tarefas dentro dela?`
-        : `Apagar a sessão "${grupo.nome}"?`;
-    if (!window.confirm(aviso)) return;
-    setGrupos((atual) => atual.filter((g) => g.id !== grupo.id));
-    setTarefas((atual) => atual.filter((t) => t.grupoId !== grupo.id));
-    setRotinas((atual) => atual.map((r) => r.grupoId === grupo.id ? { ...r, grupoId: null } : r));
+    setConfirmacaoExcluir({
+      title: "Excluir sessão?",
+      message: qtd > 0
+        ? `Deseja excluir “${grupo.nome}”? As ${qtd} tarefa${qtd === 1 ? "" : "s"} atuais e as próximas repetições serão movidas para “Sem sessão”.`
+        : `Deseja excluir “${grupo.nome}”?`,
+      action: "Excluir sessão",
+      confirm: () => {
+        setGrupos((atual) => atual.filter((item) => item.id !== grupo.id));
+        setTarefas((atual) => atual.map((item) => item.grupoId === grupo.id ? { ...item, grupoId: null } : item));
+        setRotinas((atual) => atual.map((item) => item.grupoId === grupo.id ? { ...item, grupoId: null } : item));
+      },
+    });
   }
 
   function agendarTarefa(texto, data, repetirDias = 0, hora = "00:00", prazo = {}) {
@@ -3088,7 +3149,7 @@ function Checklist({ usuario }) {
           <button type="button" role="tab" className="ck-aba" aria-selected={abaConfiguracoes === "preferencias"} onClick={() => setAbaConfiguracoes("preferencias")}>Preferências</button>
           <button type="button" role="tab" className="ck-aba" aria-selected={abaConfiguracoes === "conta"} onClick={() => setAbaConfiguracoes("conta")}>Conta</button>
         </div>
-        {abaConfiguracoes === "preferencias" ? <ConfiguracoesVisuais tema={tema} setTema={setTema} desfoque={desfoque} setDesfoque={setDesfoque} ajusteFundo={ajusteFundo} setAjusteFundo={setAjusteFundo} escolherFundo={escolherFundo} fundo={fundo} removerFundo={removerFundo} erroFundo={erroFundo} janelaAvisos={janelaAvisos} setJanelaAvisos={setJanelaAvisos} iniciarTutorial={iniciarTutorial} /> : <section className="ck-conta-config">
+        {abaConfiguracoes === "preferencias" ? <ConfiguracoesVisuais tema={tema} setTema={setTema} desfoque={desfoque} setDesfoque={setDesfoque} ajusteFundo={ajusteFundo} setAjusteFundo={setAjusteFundo} escolherFundo={escolherFundo} fundo={fundo} removerFundo={removerFundo} erroFundo={erroFundo} janelaAvisos={janelaAvisos} setJanelaAvisos={setJanelaAvisos} excluirSemConfirmacao={excluirSemConfirmacao} setExcluirSemConfirmacao={setExcluirSemConfirmacao} iniciarTutorial={iniciarTutorial} /> : <section className="ck-conta-config">
           <div className="ck-conta-identidade"><span className="ck-conta-avatar" aria-hidden="true">{(usuario.email || "?").slice(0, 1).toUpperCase()}</span><div><small>Conta conectada</small><strong>{usuario.email}</strong></div></div>
           <ConfiguracaoNomeUsuario usuario={usuario} onNomeSalvo={setNomeUsuarioDefinido} />
           <button type="button" className="ck-sair-conta" onClick={sair}><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"><path d="M6.5 2.5H4a1.5 1.5 0 0 0-1.5 1.5v8A1.5 1.5 0 0 0 4 13.5h2.5"/><path d="M10 5l3 3-3 3M13 8H6.5"/></svg>Sair da conta</button>
@@ -3255,7 +3316,7 @@ function Checklist({ usuario }) {
         />
       )}
 
-      <Social user={usuario} view="tasks" onManage={() => setPagina("social")} />
+      <Social user={usuario} view="tasks" onManage={() => setPagina("social")} onMovePersonalTask={moverTarefaParaSocial} />
 
       {feitas > 0 && (
         <button type="button" className="ck-link" onClick={limparFeitas}>
@@ -3365,7 +3426,7 @@ function Checklist({ usuario }) {
         <span aria-hidden="true"> · </span>
         <Contato />
                 <span aria-hidden="true"> · </span>
-                <span aria-hidden="true"> V0.74 </span>
+                <span aria-hidden="true"> V0.78 </span>
       </footer>
     </main>
 
@@ -3388,6 +3449,7 @@ function Checklist({ usuario }) {
         )}
       </section>
     </aside>
+    <ConfirmacaoChecklist dialog={confirmacaoExcluir} onCancel={() => setConfirmacaoExcluir(null)} onConfirm={() => { confirmacaoExcluir?.confirm(); setConfirmacaoExcluir(null); }} />
     {tutorialAtivo && <TutorialGuia onEncerrar={encerrarTutorial} />}
     </div>
   );

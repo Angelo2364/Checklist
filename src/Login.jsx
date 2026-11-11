@@ -57,9 +57,9 @@ export default function Login() {
     e.preventDefault();
     setErro("");
     setInfo("");
-    const nomeUsuarioLimpo = nomeUsuario.trim().toLowerCase();
-    if (modo === "criar" && !/^[a-z0-9_]{3,20}$/.test(nomeUsuarioLimpo)) {
-      setErro("Use de 3 a 20 letras sem acento, números ou _.");
+    const nomeUsuarioLimpo = nomeUsuario.trim().toLowerCase().replace(/\s+/g, " ");
+    if (modo === "criar" && (nomeUsuarioLimpo.length < 3 || nomeUsuarioLimpo.length > 20 || !/^[a-z0-9_]+(?: [a-z0-9_]+)*$/.test(nomeUsuarioLimpo))) {
+      setErro("Use de 3 a 20 caracteres: letras sem acento, números, espaços ou _.");
       return;
     }
     setCarregando(true);
@@ -126,15 +126,15 @@ export default function Login() {
             autoCapitalize="none"
             spellCheck="false"
             value={nomeUsuario}
-            onChange={(e) => setNomeUsuario(e.target.value)}
+            onChange={(e) => setNomeUsuario(e.target.value.replace(/\s+/g, " "))}
             minLength={3}
             maxLength={20}
-            pattern="[A-Za-z0-9_]{3,20}"
-            title="Use de 3 a 20 letras sem acento, números ou _."
-            placeholder="seunome"
+            pattern="[A-Za-z0-9_]+( [A-Za-z0-9_]+)*"
+            title="Use de 3 a 20 caracteres: letras sem acento, números, espaços ou _."
+            placeholder="seu nome"
             required
           />
-          <small className="ck-login-usuario-hint">3–20 caracteres: letras sem acento, números ou _.</small>
+          <small className="ck-login-usuario-hint">3–20 caracteres: letras sem acento. Números, espaços ou _ são permitidos.</small>
         </label>
       )}
 
