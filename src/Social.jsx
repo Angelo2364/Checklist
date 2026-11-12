@@ -127,6 +127,8 @@ export function AnotacoesCompartilhadas({ tipo, escopoId }) {
   const [groupForm, setGroupForm] = useState(null);
   const [fechadas, setFechadas] = useState({});
   const [error, setError] = useState("");
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const [draggingNote, setDraggingNote] = useState("");
   const [noteDropTarget, setNoteDropTarget] = useState(null);
   const noteDragRef = useRef(null);
@@ -239,15 +241,20 @@ export function AnotacoesCompartilhadas({ tipo, escopoId }) {
   }
 
   async function deleteNote(note) {
-    if (!window.confirm(`Excluir a anotação “${note.title}” para todos?`)) return;
-    const { error: deleteError } = await supabase.from("shared_notes").delete().eq("id", note.id);
-    if (deleteError) setError("Não consegui excluir a anotação."); else await load();
+    setDeleteConfirm({ title: "Excluir anotação?", message: `“${note.title}” será removida para todos os integrantes.`, action: "Excluir para todos", table: "shared_notes", id: note.id, errorMessage: "Não consegui excluir a anotação." });
   }
 
   async function deleteGroup(group) {
-    if (!window.confirm(`Excluir a sessão “${group.name}”? As anotações vão para Sem sessão.`)) return;
-    const { error: deleteError } = await supabase.from("shared_note_groups").delete().eq("id", group.id);
-    if (deleteError) setError("Não consegui excluir a sessão."); else await load();
+    setDeleteConfirm({ title: "Excluir sessão?", message: `“${group.name}” será removida. As anotações vão para Sem sessão.`, action: "Excluir sessão", table: "shared_note_groups", id: group.id, errorMessage: "Não consegui excluir a sessão." });
+  }
+
+  async function confirmDelete() {
+    if (!deleteConfirm || deleteBusy) return;
+    setDeleteBusy(true);
+    const { error: deleteError } = await supabase.from(deleteConfirm.table).delete().eq("id", deleteConfirm.id);
+    setDeleteBusy(false);
+    setDeleteConfirm(null);
+    if (deleteError) setError(deleteConfirm.errorMessage); else await load();
   }
 
   async function reorderNote(noteId, targetGroupId, targetId = null, after = false) {
@@ -286,6 +293,7 @@ export function AnotacoesCompartilhadas({ tipo, escopoId }) {
 
   function noteRow(note) {
     const descriptionOpen = !fechadas[note.id];
+    if (noteForm?.id === note.id) return <article key={note.id} data-shared-note-id={note.id} data-shared-note-group-id={note.group_id || ""} className="ck-anotacao ck-team-note-edit-row"><NoteFormInline form={noteForm} setForm={setNoteForm} onSubmit={saveNote} onCancel={() => setNoteForm(null)} /></article>;
     return <article key={note.id} data-shared-note-id={note.id} data-shared-note-group-id={note.group_id || ""} className={`ck-anotacao ck-team-note-row${draggingNote === note.id ? " arrastando" : ""}${noteDropTarget?.noteId === note.id ? " alvo" : ""}`}>
       <span className="ck-alca ck-shared-note-handle" role="button" tabIndex={0} aria-label="Mover anotação; use as setas para cima e para baixo" title="Arraste para mudar a posição" onPointerDown={(event) => startNoteDrag(event, note)} onKeyDown={(event) => { if (event.key === "ArrowUp" || event.key === "ArrowDown") { event.preventDefault(); moveNoteByKeyboard(note, event.key === "ArrowUp" ? -1 : 1); } }}><svg viewBox="0 0 12 18" width="12" height="18" aria-hidden="true" fill="currentColor"><circle cx="3" cy="3" r="1.2"/><circle cx="9" cy="3" r="1.2"/><circle cx="3" cy="9" r="1.2"/><circle cx="9" cy="9" r="1.2"/><circle cx="3" cy="15" r="1.2"/><circle cx="9" cy="15" r="1.2"/></svg></span>
       <div className="ck-anotacao-corpo"><div><strong>{note.title}</strong>{(note.note_date === undefined ? note.created_at?.slice(0, 10) : note.note_date) && <time>{new Date(((note.note_date === undefined ? note.created_at?.slice(0, 10) : note.note_date) || "") + "T00:00").toLocaleDateString("pt-BR")}</time>}</div>{note.body && descriptionOpen && <p>{note.body}</p>}</div>
@@ -298,23 +306,30 @@ export function AnotacoesCompartilhadas({ tipo, escopoId }) {
   return <div className="ck-shared-notes">
     {error && <p className="ck-social-message erro" role="alert">{error}</p>}
     <div className="ck-barras-topo"><button type="button" className="ck-barra-mais" onClick={() => beginNote()}><span className="ck-mais" aria-hidden="true">+</span><span>Adicionar anotação</span><kbd className="ck-atalho">Ctrl F</kbd></button><button type="button" className="ck-barra-mais" onClick={() => { setGroupForm((value) => value && !value.group ? null : { group: null }); setNoteForm(null); }}><span className="ck-mais" aria-hidden="true">+</span><span>Adicionar sessão</span><kbd className="ck-atalho">Ctrl D</kbd></button></div>
-    {noteForm && !noteForm.groupId && <form className="ck-form-grupo ck-form-anotacao ck-shared-note-editor" onSubmit={saveNote}><div className="ck-anotacao-titulo-data"><input autoFocus maxLength={100} required value={noteForm.title} onChange={(event) => setNoteForm((value) => ({ ...value, title: event.target.value }))} placeholder="Título" aria-label="Título da anotação"/><DataDiaMes value={noteForm.date || ""} onChange={(date) => setNoteForm((value) => ({ ...value, date }))} rotulo="Data da anotação (opcional): dia e mês" /></div><textarea className="ck-campo-largo" rows={3} maxLength={5000} value={noteForm.body} onChange={(event) => setNoteForm((value) => ({ ...value, body: event.target.value }))} placeholder="Anotação (opcional)" aria-label="Anotação (opcional)"/><div className="ck-edit-acoes"><button type="submit" disabled={!noteForm.title.trim()}>{noteForm.id ? "Salvar" : "Adicionar"}</button><button type="button" className="ck-icone" onClick={() => setNoteForm(null)} aria-label="Cancelar">×</button></div></form>}
+    {noteForm && !noteForm.id && !noteForm.groupId && <NoteFormInline form={noteForm} setForm={setNoteForm} onSubmit={saveNote} onCancel={() => setNoteForm(null)} />}
     {groupForm && !groupForm.group && <GroupEditor onCancel={() => setGroupForm(null)} onSave={(fields) => saveGroup(fields, null)} />}
     {groups.map((group) => {
       const groupNotes = notesFor(group.id);
       const collapsed = Boolean(fechadas[`group:${group.id}`]);
       return <section data-shared-note-group={group.id} key={group.id} className={`ck-grupo ck-social-note-group${collapsed ? " recolhida" : ""}${noteDropTarget && !noteDropTarget.noteId && noteDropTarget.groupId === group.id ? " alvo" : ""}`} onDragOver={(event) => { if (draggingNote) event.preventDefault(); }} onDrop={(event) => { if (draggingNote) { event.preventDefault(); reorderNote(draggingNote, group.id); setDraggingNote(""); } }}>
         <header className="ck-grupo-topo"><button type="button" className="ck-grupo-titulo" aria-expanded={!collapsed} onClick={() => setFechadas((value) => ({ ...value, [`group:${group.id}`]: !value[`group:${group.id}`] }))}><span className={`ck-seta ${!collapsed ? "aberta" : ""}`}>›</span><IconeGrupo tipo={group.icon}/><span className="ck-grupo-nome">{group.name}</span><span className="ck-grupo-qtd">{groupNotes.length}</span></button>{groupForm?.group?.id !== group.id && <><button type="button" className="ck-mais ck-mais-circular" title="Adicionar anotação nesta sessão" aria-label={`Adicionar anotação em ${group.name}`} onClick={() => { setFechadas((value) => ({ ...value, ["group:" + group.id]: false })); beginNote(null, group.id); }}><IconeGrupoMais/></button><button type="button" className="ck-icone" title="Editar sessão" aria-label={`Editar sessão ${group.name}`} onClick={() => { setFechadas((value) => ({ ...value, ["group:" + group.id]: false })); setGroupForm({ group }); setNoteForm(null); }}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z"/></svg></button><button type="button" className="ck-icone ck-social-remove" title="Apagar sessão" aria-label={`Apagar sessão ${group.name}`} onClick={() => deleteGroup(group)}>×</button></>}</header>
-        {!collapsed && <>{groupForm?.group?.id === group.id && <GroupEditor group={group} onCancel={() => setGroupForm(null)} onSave={(fields) => saveGroup(fields, group)}/ >}{noteForm?.groupId === group.id && <NoteFormInline form={noteForm} setForm={setNoteForm} onSubmit={saveNote} onCancel={() => setNoteForm(null)}/ >}{groupNotes.map(noteRow)}{!groupNotes.length && !groupForm?.group && !noteForm?.groupId && <p className="ck-vazio-grupo">Nenhuma anotação nesta sessão.</p>}</>}
+        {!collapsed && <>{groupForm?.group?.id === group.id && <GroupEditor group={group} onCancel={() => setGroupForm(null)} onSave={(fields) => saveGroup(fields, group)}/ >}{noteForm && !noteForm.id && noteForm.groupId === group.id && <NoteFormInline form={noteForm} setForm={setNoteForm} onSubmit={saveNote} onCancel={() => setNoteForm(null)}/ >}{groupNotes.map(noteRow)}{!groupNotes.length && !groupForm?.group && !noteForm?.groupId && <p className="ck-vazio-grupo">Nenhuma anotação nesta sessão.</p>}</>}
       </section>;
     })}
-    {notesFor(null).length > 0 && <section data-shared-note-group="" className="ck-grupo ck-social-note-unfiled"><h2 className="ck-secao">Sem sessão</h2>{notesFor(null).map(noteRow)}</section>}
+    {<section data-shared-note-group="" className={"ck-grupo ck-social-note-unfiled" + (noteDropTarget && !noteDropTarget.noteId && noteDropTarget.groupId == null ? " alvo" : "")}><h2 className="ck-secao">Sem sessão</h2>{notesFor(null).map(noteRow)}</section>}
     {!groups.length && !notes.length && !noteForm && <p className="ck-vazio">Adicione uma anotação ou crie uma sessão.</p>}
+    <ConfirmacaoSocial confirm={deleteConfirm} busy={deleteBusy} onCancel={() => setDeleteConfirm(null)} onConfirm={confirmDelete} />
   </div>;
 }
 
 function NoteFormInline({ form, setForm, onSubmit, onCancel }) {
-  return <form className="ck-form-grupo ck-form-anotacao ck-shared-note-editor" onSubmit={onSubmit}><div className="ck-anotacao-titulo-data"><input autoFocus maxLength={100} required value={form.title} onChange={(event) => setForm((value) => ({ ...value, title: event.target.value }))} placeholder="Título" aria-label="Título da anotação"/><DataDiaMes value={form.date || ""} onChange={(date) => setForm((value) => ({ ...value, date }))} rotulo="Data da anotação (opcional): dia e mês" /></div><textarea className="ck-campo-largo" rows={3} maxLength={5000} value={form.body} onChange={(event) => setForm((value) => ({ ...value, body: event.target.value }))} placeholder="Anotação (opcional)" aria-label="Anotação (opcional)"/><div className="ck-edit-acoes"><button type="submit" disabled={!form.title.trim()}>Adicionar</button><button type="button" className="ck-icone" onClick={onCancel} aria-label="Cancelar">×</button></div></form>;
+  const formRef = useRef(null);
+  useEffect(() => {
+    function closeOutside(event) { const owner = formRef.current?.closest("article") || formRef.current; if (owner && !owner.contains(event.target)) onCancel(); }
+    document.addEventListener("pointerdown", closeOutside, true);
+    return () => document.removeEventListener("pointerdown", closeOutside, true);
+  }, [onCancel]);
+  return <form ref={formRef} className="ck-form-grupo ck-form-anotacao ck-shared-note-editor" onSubmit={onSubmit} onKeyDown={(event) => { if (event.key === "Escape") onCancel(); else if (event.key === "Enter" && event.target.tagName === "TEXTAREA" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.requestSubmit(); } }}><div className="ck-anotacao-titulo-data"><input autoFocus maxLength={100} required value={form.title} onChange={(event) => setForm((value) => ({ ...value, title: event.target.value }))} placeholder="Título" aria-label="Título da anotação"/><DataDiaMes value={form.date || ""} onChange={(date) => setForm((value) => ({ ...value, date }))} rotulo="Data da anotação (opcional): dia e mês" /></div><textarea className="ck-campo-largo" rows={3} maxLength={5000} value={form.body} onChange={(event) => setForm((value) => ({ ...value, body: event.target.value }))} placeholder="Anotação (opcional)" aria-label="Anotação (opcional)"/><div className="ck-edit-acoes"><button type="submit" disabled={!form.title.trim()}>{form.id ? "Salvar" : "Adicionar"}</button><button type="button" className="ck-icone" onClick={onCancel} aria-label="Cancelar">×</button></div></form>;
 }
 
 function IconeGrupoMais() {

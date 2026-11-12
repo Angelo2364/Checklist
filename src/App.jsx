@@ -101,6 +101,20 @@ function fecharAoClicarFora(e, fechar) {
     if (!formulario.contains(document.activeElement)) fechar();
   }, 50);
 }
+function useFecharFora(ref, ativo, fechar, seletorArea = "", seletorIgnorado = "") {
+  const fecharRef = useRef(fechar);
+  useEffect(() => { fecharRef.current = fechar; }, [fechar]);
+  useEffect(() => {
+    if (!ativo) return undefined;
+    const fecharSeNecessario = (event) => {
+      if (seletorIgnorado && event.target.closest?.(seletorIgnorado)) return;
+      const area = seletorArea ? ref.current?.closest(seletorArea) : ref.current;
+      if (area && !area.contains(event.target)) fecharRef.current?.();
+    };
+    document.addEventListener("pointerdown", fecharSeNecessario, true);
+    return () => document.removeEventListener("pointerdown", fecharSeNecessario, true);
+  }, [ativo, ref, seletorArea, seletorIgnorado]);
+}
 const iso = (d) => `${d.getFullYear()}-${z2(d.getMonth() + 1)}-${z2(d.getDate())}`;
 function somarDias(dataISO, n) {
   const [a, m, d] = dataISO.split("-").map(Number);
@@ -634,6 +648,7 @@ function Calendario({ eventos, tarefasAgendadas, adicionar, editar, apagar, agen
   const [dataEdit, setDataEdit] = useState("");
   const [abrindoTarefa, setAbrindoTarefa] = useState(false);
   const [editandoTarefaId, setEditandoTarefaId] = useState(null);
+  const eventoFormRef = useRef(null);
 
   const ano = mes.getFullYear();
   const m = mes.getMonth();
@@ -659,6 +674,7 @@ function Calendario({ eventos, tarefasAgendadas, adicionar, editar, apagar, agen
     setEditandoId(null);
     limparCampos();
   }
+  useFecharFora(eventoFormRef, abrindo, cancelar);
 
   function comecarEdicao(ev) {
     setEditandoId(ev.id);
@@ -792,11 +808,9 @@ function Calendario({ eventos, tarefasAgendadas, adicionar, editar, apagar, agen
 
       {abrindo ? (
         <form
+          ref={eventoFormRef}
           className="ck-form-grupo"
           onSubmit={enviar}
-          onBlur={(e) => {
-            if (!editandoId && !e.currentTarget.contains(e.relatedTarget) && !titulo.trim()) setAbrindo(false);
-          }}
         >
           <input
             id="campo-evento"
@@ -958,10 +972,12 @@ function ConfirmacaoChecklist({ dialog, onCancel, onConfirm }) {
 }
 
 function FormularioConta({ conta, onSalvar, onCancelar }) {
+  const formRef = useRef(null);
   const [nome, setNome] = useState(conta.nome);
   const [valor, setValor] = useState(conta.valor ? String(conta.valor).replace(".", ",") : "");
   const [dia, setDia] = useState(String(conta.dia));
   const [parcelas, setParcelas] = useState(conta.total ? String(conta.total) : "");
+  useFecharFora(formRef, true, onCancelar, "li.ck-item-editando");
 
   function enviar(e) {
     e.preventDefault();
@@ -974,7 +990,7 @@ function FormularioConta({ conta, onSalvar, onCancelar }) {
     });
   }
 
-  return <form className="ck-form-grupo ck-form-conta" onSubmit={enviar} onBlur={(e) => fecharAoClicarFora(e, onCancelar)} onKeyDown={(e) => e.key === "Escape" && onCancelar()}>
+  return <form ref={formRef} className="ck-form-grupo ck-form-conta" onSubmit={enviar} onKeyDown={(e) => e.key === "Escape" && onCancelar()}>
     <input autoFocus type="text" className="ck-campo-largo" value={nome} onChange={(e) => setNome(e.target.value)} placeholder="Nome da conta" aria-label="Nome da conta" maxLength={80} required />
     <input type="text" inputMode="decimal" className="ck-num ck-num-v" value={valor} onChange={(e) => setValor(e.target.value)} placeholder="Valor (R$)" aria-label="Valor da conta" />
     <input type="number" className="ck-num" min="1" max="31" value={dia} onChange={(e) => setDia(e.target.value)} placeholder="Vence dia" aria-label="Dia do vencimento" />
@@ -991,6 +1007,7 @@ function vencimento(c) {
 
 function Contas({ contas, adicionar, alternar, apagar, definirValor, editar }) {
   const [abrindo, setAbrindo] = useState(false);
+  const addFormRef = useRef(null);
   const [editandoId, setEditandoId] = useState(null);
   const [nome, setNome] = useState("");
   const [dia, setDia] = useState("");
@@ -1000,6 +1017,11 @@ function Contas({ contas, adicionar, alternar, apagar, definirValor, editar }) {
   hoje.setHours(0, 0, 0, 0);
   const total = contas.reduce((soma, c) => soma + (c.valor || 0), 0);
   const pago = contas.filter((c) => c.pago).reduce((soma, c) => soma + (c.valor || 0), 0);
+
+  function fecharFormulario() {
+    setAbrindo(false); setNome(""); setDia(""); setParcelas(""); setValor("");
+  }
+  useFecharFora(addFormRef, abrindo, fecharFormulario, "", ".ck-conta-adicionar");
 
   function enviar(e) {
     e.preventDefault();
@@ -1069,12 +1091,10 @@ function Contas({ contas, adicionar, alternar, apagar, definirValor, editar }) {
 
       {abrindo ? (
         <form
+          ref={addFormRef}
           className="ck-form-grupo"
           onSubmit={enviar}
-          onBlur={(e) => {
-            if (!e.currentTarget.contains(e.relatedTarget) && !nome.trim()) setAbrindo(false);
-          }}
-          onKeyDown={(e) => e.key === "Escape" && setAbrindo(false)}
+          onKeyDown={(e) => e.key === "Escape" && fecharFormulario()}
         >
           <input
             type="text"
@@ -1628,9 +1648,11 @@ function SeletorIconeSessao({ value, onChange }) {
 }
 
 function EditarNomeSessao({ sessao, onSalvar, onCancelar }) {
+  const formRef = useRef(null);
   const [nome, setNome] = useState(sessao.nome);
   const [icone, setIcone] = useState(sessao.icone || "butterfly");
-  return <form className="ck-editar-sessao" onSubmit={(e) => { e.preventDefault(); if (nome.trim()) onSalvar(nome.trim(), icone); }} onBlur={(e) => fecharAoClicarFora(e, onCancelar)} onKeyDown={(e) => { if (e.key === "Escape") onCancelar(); }}>
+  useFecharFora(formRef, true, onCancelar);
+  return <form ref={formRef} className="ck-editar-sessao" onSubmit={(e) => { e.preventDefault(); if (nome.trim()) onSalvar(nome.trim(), icone); }} onKeyDown={(e) => { if (e.key === "Escape") onCancelar(); }}>
     <SeletorIconeSessao value={icone} onChange={setIcone} />
     <input autoFocus type="text" value={nome} onChange={(e) => setNome(e.target.value)} maxLength={60} required aria-label="Nome da sessão" />
     <button type="submit" className="ck-icone" title="Salvar nome da sessão" aria-label="Salvar nome da sessão" disabled={!nome.trim()}><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m3 8 3.2 3.2L13 4.5" /></svg></button>
@@ -1718,8 +1740,10 @@ function ListaTarefas({ tarefas, alternar, apagar, mudarPrioridade, ordem, edica
 }
 
 function FormularioAnotacao({ form, onSalvar, onChange, onCancelar }) {
+  const formRef = useRef(null);
+  useFecharFora(formRef, true, onCancelar);
   return (
-    <form className="ck-form-grupo ck-form-anotacao" onSubmit={onSalvar} onBlur={(e) => fecharAoClicarFora(e, onCancelar)}>
+    <form ref={formRef} className="ck-form-grupo ck-form-anotacao" onSubmit={onSalvar} onKeyDown={(e) => e.key === "Escape" && onCancelar()}>
       <div className="ck-anotacao-titulo-data"><input id="campo-titulo-anotacao" autoFocus type="text" maxLength={100} placeholder="Título" aria-label="Título da anotação" value={form.titulo} onChange={(e) => onChange((atual) => ({ ...atual, titulo: e.target.value }))} required /><DiaMes value={form.data || ""} onChange={(data) => onChange((atual) => ({ ...atual, data }))} rotulo="Data da anotação (opcional)" /></div>
       <textarea className="ck-campo-largo" rows={4} placeholder="Anotação (opcional)" aria-label="Anotação (opcional)" value={form.texto} onChange={(e) => onChange((atual) => ({ ...atual, texto: e.target.value }))} onKeyDown={(e) => { if (e.key === "Escape") onCancelar(); else enviarAoEnter(e); }} />
       <button type="submit" disabled={!form.titulo.trim()}>Salvar</button>
@@ -1994,6 +2018,7 @@ function Checklist({ usuario }) {
   const [iconeSessaoAnotacao, setIconeSessaoAnotacao] = useState("butterfly");
   const [criandoSessaoAnotacao, setCriandoSessaoAnotacao] = useState(false);
   const [formAnotacao, setFormAnotacao] = useState(null);
+  const sessaoAnotacaoNovaRef = useRef(null);
   const [descricoesAnotacaoFechadas, setDescricoesAnotacaoFechadas] = useState({});
   const [aba, setAba] = useState("rotinas");
   const [fundo, setFundo] = useState(null); // URL (blob:) do papel de parede, carregado do IndexedDB
@@ -2025,7 +2050,10 @@ function Checklist({ usuario }) {
   const [sessaoEmEdicao, setSessaoEmEdicao] = useState(null);
   const [criandoSolta, setCriandoSolta] = useState(false);
   const [criandoGrupo, setCriandoGrupo] = useState(false);
+  const sessaoChecklistNovaRef = useRef(null);
   const [grupoAdd, setGrupoAdd] = useState(null); // sessão com campo aberto
+  useFecharFora(sessaoChecklistNovaRef, criandoGrupo, () => { setCriandoGrupo(false); setNomeGrupo(""); });
+  useFecharFora(sessaoAnotacaoNovaRef, criandoSessaoAnotacao, () => { setCriandoSessaoAnotacao(false); setNomeSessaoAnotacao(""); });
   const [notificar, setNotificar] = useState(() =>
     lerStorage(STORAGE_NOTIFY, false)
   );
@@ -3219,14 +3247,9 @@ function Checklist({ usuario }) {
 
       {criandoGrupo ? (
         <form
+          ref={sessaoChecklistNovaRef}
           className="ck-nova-divisao"
           onSubmit={criarGrupo}
-          onBlur={(e) => {
-            fecharAoClicarFora(e, () => {
-              setCriandoGrupo(false);
-              setNomeGrupo("");
-            });
-          }}
         >
           <SeletorIconeSessao value={iconeGrupo} onChange={setIconeGrupo} />
           <input
@@ -3422,10 +3445,10 @@ function Checklist({ usuario }) {
           </>
         )}
       </section>
-      </> : pagina === "social" ? <section className="ck-social-page-wrap"><Social user={usuario} view="manage" /></section> : pagina === "equipes" ? <section className="ck-social-page-wrap ck-social-detail-page"><Equipes user={usuario} /></section> : pagina === "anotacoes" ? <section className="ck-anotacoes">
+      </> : pagina === "social" ? <section className="ck-social-page-wrap"><Social user={usuario} view="manage" /></section> : pagina === "equipes" ? <section className="ck-social-page-wrap ck-social-detail-page"><Equipes user={usuario} excluirSemConfirmacao={excluirSemConfirmacao} /></section> : pagina === "anotacoes" ? <section className="ck-anotacoes">
         <div className="ck-barras-topo">
           {formAnotacao && !formAnotacao.id && (!formAnotacao.sessaoId || !sessoesAnotacoes.some((s) => s.id === formAnotacao.sessaoId)) ? <FormularioAnotacao form={formAnotacao} onSalvar={salvarAnotacao} onChange={setFormAnotacao} onCancelar={() => setFormAnotacao(null)} /> : <BarraMais rotulo="Adicionar anotação" atalho={ATALHO_TAREFA} onClick={() => abrirNovaAnotacao()} />}
-          {criandoSessaoAnotacao ? <form className="ck-nova-divisao" onSubmit={criarSessaoAnotacao} onBlur={(e) => fecharAoClicarFora(e, () => { setCriandoSessaoAnotacao(false); setNomeSessaoAnotacao(""); })}>
+          {criandoSessaoAnotacao ? <form ref={sessaoAnotacaoNovaRef} className="ck-nova-divisao" onSubmit={criarSessaoAnotacao}>
             <SeletorIconeSessao value={iconeSessaoAnotacao} onChange={setIconeSessaoAnotacao} />
             <input id="campo-sessao-anotacao" autoFocus value={nomeSessaoAnotacao} onChange={(e) => setNomeSessaoAnotacao(e.target.value)} placeholder="Nome da sessão (ex: Ideias)" aria-label="Nome da sessão de anotações" maxLength={60} onKeyDown={(e) => { if (e.key === "Escape") { setCriandoSessaoAnotacao(false); setNomeSessaoAnotacao(""); } }} />
             <button type="submit" disabled={!nomeSessaoAnotacao.trim()}>Criar</button>
@@ -3462,7 +3485,7 @@ function Checklist({ usuario }) {
         <span aria-hidden="true"> · </span>
         <Contato />
                 <span aria-hidden="true"> · </span>
-                <span aria-hidden="true"> V0.85 </span>
+                <span aria-hidden="true"> V0.87 </span>
       </footer>
     </main>
 

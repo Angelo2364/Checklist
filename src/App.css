@@ -3216,7 +3216,7 @@ body {
 .ck-dias-semana label { display: inline-flex; flex: none; align-items: center; gap: 5px; box-sizing: border-box; padding: 5px 8px; color: var(--tinta); border: 1px solid var(--linha); border-radius: 999px; background: color-mix(in srgb, var(--fundo) 70%, transparent); font-size: 11px; line-height: 1.2; white-space: nowrap; cursor: pointer; transition: color .15s, border-color .15s, background .15s, box-shadow .15s; }
 .ck-dias-semana label:hover { border-color: var(--azul-forte); background: color-mix(in srgb, var(--azul-forte) 12%, var(--fundo)); }
 .ck-dias-semana label.selecionado { border-color: var(--azul-forte); background: color-mix(in srgb, var(--azul-forte) 28%, var(--fundo)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--azul-forte) 40%, transparent); }
-.ck-dias-semana input[type="checkbox"] { flex: none; width: 14px; height: 14px; min-width: 14px; margin: 0; padding: 0; accent-color: var(--azul-forte); cursor: pointer; }
+.ck-dias-semana input[type="checkbox"] { flex: none; width: 16px; height: 16px; min-width: 16px; margin: 0; padding: 0; cursor: pointer; }
 .ck-grupo-titulo .ck-sessao-icone { flex: none; color: var(--suave); }
 .ck-sessao-icone {
   display: inline-grid;
@@ -3310,11 +3310,15 @@ body {
 .ck-team-settings > h4 { margin: 0; color: var(--suave); font-size: 12px; }
 .ck-team-delete { min-height: 34px; padding: 6px 11px; color: var(--perigo); background: transparent; border: 1px solid color-mix(in srgb, var(--perigo) 45%, var(--linha)); border-radius: 10px; }
 .ck-team-delete:hover { background: color-mix(in srgb, var(--perigo) 12%, transparent); }
-.ck-team-create-friends { display: grid; grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)); gap: 6px; margin: 0; padding: 9px; border: 1px solid var(--linha); border-radius: 10px; }
-.ck-team-create-friends legend { padding: 0 5px; color: var(--suave); font-size: 12px; }
-.ck-team-create-friends label { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 5px 7px; border-radius: 8px; background: color-mix(in srgb, var(--fundo) 65%, transparent); cursor: pointer; }
-.ck-team-create-friends label span { overflow-wrap: anywhere; font-size: 12px; }
-.ck-team-create-friends input { accent-color: var(--azul-forte); }
+.ck-team-create-friends { display: grid; gap: 8px; min-width: 0; margin: 2px 0 0; padding: 11px; border: 1px solid var(--linha); border-radius: 13px; background: color-mix(in srgb, var(--fundo) 42%, transparent); }
+.ck-team-create-friends legend { display: flex; justify-content: space-between; gap: 10px; width: 100%; padding: 0 5px; color: var(--suave); font-size: 12px; }
+.ck-team-selected-count { flex: none; color: var(--azul-forte); font-size: 11px; font-weight: 700; }
+.ck-team-create-friends .ck-team-friend-search { width: 100%; min-width: 0; box-sizing: border-box; }
+.ck-team-friend-list { display: grid; gap: 5px; max-height: 100px; min-height: 40px; padding: 2px 3px 2px 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: color-mix(in srgb, var(--azul-forte) 45%, transparent) transparent; }
+.ck-team-create-friends .ck-team-friend-list label { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 8px 10px; border: 1px solid transparent; border-radius: 10px; background: color-mix(in srgb, var(--fundo-hover) 58%, transparent); cursor: pointer; transition: background .15s, border-color .15s, transform .15s; }
+.ck-team-create-friends .ck-team-friend-list label:hover { border-color: color-mix(in srgb, var(--azul-forte) 32%, var(--linha)); background: color-mix(in srgb, var(--azul-forte) 10%, var(--fundo)); }
+.ck-team-create-friends .ck-team-friend-list label.selecionado { border-color: color-mix(in srgb, var(--azul-forte) 48%, var(--linha)); background: color-mix(in srgb, var(--azul-forte) 17%, var(--fundo)); }
+.ck-team-create-friends .ck-team-friend-list label span { min-width: 0; overflow-wrap: anywhere; font-size: 13px; }
 .ck-team-members { display: flex; flex-wrap: wrap; gap: 7px; }
 .ck-team-members > div { display: inline-flex; align-items: center; gap: 5px; padding: 4px 5px 4px 10px; border: 1px solid var(--linha); border-radius: 999px; background: color-mix(in srgb, var(--fundo-hover) 55%, transparent); font-size: 12px; }
 .ck-team-add-member, .ck-team-new-group { display: flex; flex-wrap: wrap; gap: 7px; }
@@ -3325,7 +3329,7 @@ body {
 .ck-team-fields { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
 .ck-team-fields label { display: inline-flex; align-items: center; gap: 5px; color: var(--suave); font-size: 12px; }
 .ck-team-fields input, .ck-team-fields select { max-width: 170px; }
-.ck-team-task-row { display: flex; align-items: center; padding: 7px; }
+.ck-team-task-row { display: flex; align-items: center; min-height: 58px; padding: 10px 9px; }
 .ck-social-task-status { display: grid; flex: none; place-items: center; width: 22px; height: 22px; padding: 0; color: var(--tinta); background: transparent; border: 2px solid color-mix(in srgb, var(--azul-forte) 56%, var(--tinta)); border-radius: 50%; font-weight: 800; }
 .ck-social-task-status.parcial { background: linear-gradient(90deg, var(--azul) 50%, transparent 50%); border-color: var(--azul-forte); }
 .ck-social-task-status.feita { background: var(--azul); border-color: var(--azul); }
@@ -3555,3 +3559,124 @@ body {
   .ck-painel .ck-rotinas li,
   .ck-painel .ck-contas .ck-lista li { gap: 5px; padding: 7px; }
 }
+
+.ck-team-settings-panel { margin: 12px; padding: 14px 16px; border: 1px solid var(--linha); border-radius: 16px; background: color-mix(in srgb, var(--fundo) 76%, transparent); }
+.ck-team-settings-panel > header { min-height: 48px; gap: 16px; font-size: 14px; }
+.ck-team-settings-controls .ck-icone { width: 38px; height: 38px; border: 1px solid var(--linha); border-radius: 12px; background: var(--fundo-hover); font-size: 20px; }
+.ck-team-settings { padding-top: 14px; border-top: 1px solid var(--linha); }
+.ck-team-icon-settings { margin-bottom: 20px; }
+.ck-team-icon-settings .ck-seletor-icones { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 8px; max-width: 330px; }
+.ck-team-icon-settings .ck-opcao-icone { width: 100%; min-height: 36px; }
+.ck-team-detail-heading h2 { display: flex; align-items: center; gap: 8px; }
+.ck-team-work-panel > ul[data-team-group-id=""] { min-height: 45px; margin: 0 10px 12px; border-radius: 12px; }
+@media(max-width:600px) { .ck-team-settings-panel { margin: 10px 8px; padding: 12px; } }
+
+.ck-team-work-panel > ul[data-team-group-id=""] { display: block; min-height: 64px; padding: 8px 10px; box-sizing: border-box; }
+.ck-team-work-panel > ul[data-team-group-id=""] > li + li { margin-top: 7px; }
+.ck-team-work-panel > ul[data-team-group-id=""].alvo { outline: 2px dashed var(--azul-forte); background: color-mix(in srgb,var(--azul) 12%,transparent); }
+
+.ck-team-unfiled-card { margin: 10px 12px; overflow: hidden; border: 1px solid var(--linha); border-radius: 16px; background: color-mix(in srgb, var(--fundo) 86%, var(--fundo-hover)); }
+.ck-team-unfiled-card > .ck-team-unfiled-title { margin: 0; padding: 11px 14px 8px; border: 0; font-size: 11px; text-transform: none; }
+.ck-team-unfiled-card > .ck-social-task-list { min-height: 45px; padding: 7px 9px; }
+.ck-team-unfiled-card > .ck-social-task-list.alvo { outline: 2px dashed var(--azul-forte); outline-offset: -2px; background: color-mix(in srgb,var(--azul) 12%,transparent); }
+.com-fundo .ck-team-unfiled-card { background: color-mix(in srgb, var(--fundo) 76%, transparent); -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4); }
+
+.ck-shared-notes .ck-social-note-unfiled { min-height: 72px; padding-bottom: 7px; }
+
+/* Sem sessão follows the personal checklist: heading and individual cards. */
+.ck-team-unfiled-card,
+.ck-shared-notes .ck-social-note-unfiled,
+.com-fundo .ck-team-unfiled-card,
+.com-fundo .ck-shared-notes .ck-social-note-unfiled {
+  margin: 10px 0;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.ck-team-unfiled-card > .ck-team-unfiled-title,
+.ck-shared-notes .ck-social-note-unfiled > .ck-secao {
+  margin: 0;
+  padding: 14px 24px 12px;
+  border: 0;
+  color: var(--suave);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.ck-team-unfiled-card > .ck-social-task-list {
+  display: grid;
+  gap: 7px;
+  min-height: 48px;
+  margin: 0;
+  padding: 0 8px 8px;
+}
+.ck-team-unfiled-card > .ck-social-task-list > li + li { margin-top: 0; }
+.ck-shared-notes .ck-social-note-unfiled > .ck-anotacao {
+  margin: 0 8px 7px;
+  padding: 11px 10px 11px 0;
+  border-radius: 13px;
+}
+.ck-shared-notes .ck-social-note-unfiled { min-height: 90px; }
+
+/* Custom checkboxes across the app; hidden task inputs retain their custom circles. */
+input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-grid;
+  flex: none;
+  place-content: center;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border: 1.5px solid color-mix(in srgb, var(--azul-forte) 62%, var(--suave));
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--fundo) 82%, transparent);
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--tinta) 10%, transparent);
+  cursor: pointer;
+  transition: background .14s, border-color .14s, box-shadow .14s, transform .14s;
+}
+input[type="checkbox"]::after {
+  width: 8px;
+  height: 4px;
+  border: solid var(--fundo);
+  border-width: 0 0 2px 2px;
+  content: "";
+  transform: rotate(-45deg) scale(0);
+  transition: transform .12s ease-out;
+}
+input[type="checkbox"]:checked {
+  border-color: var(--azul-forte);
+  background: var(--azul-forte);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--azul-forte) 16%, transparent);
+}
+input[type="checkbox"]:checked::after { transform: rotate(-45deg) scale(1); }
+input[type="checkbox"]:hover { border-color: var(--azul-forte); }
+input[type="checkbox"]:active { transform: scale(.94); }
+input[type="checkbox"]:focus-visible { outline: 2px solid color-mix(in srgb, var(--azul-forte) 72%, white); outline-offset: 2px; }
+input[type="checkbox"]:disabled { opacity: .5; cursor: not-allowed; }
+.ck-team-create-friends .ck-team-friend-list label input[type="checkbox"] { width: 19px; height: 19px; border-radius: 6px; }
+.ck-team-create-friends input[type="checkbox"] { min-width: 18px; padding: 0; }
+.ck-team-create-friends .ck-team-friend-list label { font-weight: 600; }
+.ck-dias-semana input[type="checkbox"] { border-radius: 5px; }
+
+.ck-shared-notes .ck-social-note-group > .ck-team-note-edit-row,
+.ck-shared-notes .ck-social-note-unfiled > .ck-team-note-edit-row {
+  display: block;
+  margin: 7px 9px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--azul-forte) 34%, var(--linha));
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--fundo) 92%, var(--fundo-hover));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--azul-forte) 10%, transparent);
+}
+.ck-shared-notes .ck-team-note-edit-row .ck-shared-note-editor { margin: 0; padding: 0; border: 0; background: transparent; }
+.ck-shared-notes .ck-team-note-edit-row .ck-anotacao-titulo-data { margin-bottom: 8px; }
+.ck-shared-notes .ck-team-note-edit-row .ck-campo-largo { width: 100%; box-sizing: border-box; }
+.ck-team-task-edit-row { display: block; padding: 0; overflow: hidden; }
+.ck-team-task-edit-row .ck-team-editor { margin: 0; border: 0; border-radius: 0; background: transparent; }
