@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "./services/supabase";
+import { AnotacoesCompartilhadas, GroupEditor, IconeGrupo } from "./Social";
 
 const z2 = (n) => String(n).padStart(2, "0");
 const nome = (s = "") => s ? s[0].toLocaleUpperCase("pt-BR") + s.slice(1) : s;
@@ -57,12 +58,6 @@ function EditorTarefa({ tarefa, grupos, onSave, onCancel }) {
   </form>;
 }
 
-function EditorNota({ nota, onSave, onCancel }) {
-  const [titulo, setTitulo] = useState(nota?.title || "");
-  const [texto, setTexto] = useState(nota?.body || "");
-  return <form className="ck-form-grupo ck-team-note-editor" onSubmit={(e) => { e.preventDefault(); if (titulo.trim()) onSave({ title: titulo.trim(), body: texto.trim() }); }}><input autoFocus maxLength={100} required value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Título da anotação" /><textarea className="ck-campo-largo" rows={3} maxLength={5000} value={texto} onChange={(e) => setTexto(e.target.value)} placeholder="Anotação (opcional)" /><div className="ck-edit-acoes"><button type="submit">{nota ? "Salvar" : "Adicionar anotação"}</button><button type="button" className="ck-icone" onClick={onCancel} aria-label="Cancelar">×</button></div></form>;
-}
-
 function ConfirmacaoEquipe({ item, onClose, onConfirm }) {
   if (!item) return null;
   return <div className="ck-social-modal-backdrop" onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}><section className="ck-social-modal" role="alertdialog" aria-modal="true" aria-labelledby="ck-team-confirm-title"><h2 id="ck-team-confirm-title">{item.title}</h2><p>{item.message}</p><div><button type="button" className="ck-social-danger" onClick={onConfirm}>{item.action || "Excluir"}</button><button type="button" className="secundario" onClick={onClose}>Cancelar</button></div></section></div>;
@@ -74,21 +69,23 @@ export default function Equipes({ user }) {
   const [members, setMembers] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [groups, setGroups] = useState([]);
-  const [notes, setNotes] = useState([]);
   const [current, setCurrent] = useState("");
   const [teamCreateOpen, setTeamCreateOpen] = useState(false);
   const [teamName, setTeamName] = useState("");
   const [selectedFriendIds, setSelectedFriendIds] = useState([]);
   const [friendToAdd, setFriendToAdd] = useState("");
-  const [groupName, setGroupName] = useState("");
-  const [groupFormOpen, setGroupFormOpen] = useState(false);
+  const [groupEditor, setGroupEditor] = useState(null);
   const [collapsedGroups, setCollapsedGroups] = useState({});
   const [taskEditor, setTaskEditor] = useState(null);
-  const [noteEditor, setNoteEditor] = useState(null);
+  const [draggingTaskId, setDraggingTaskId] = useState("");
+  const [taskDropTarget, setTaskDropTarget] = useState(null);
+  const taskDragRef = useRef(null);
+  const reorderTaskRef = useRef(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState(null);
   const [teamSettingsOpen, setTeamSettingsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("tarefas");
   const team = teams.find((t) => t.id === current);
 
   const refresh = useCallback(async () => {
@@ -98,21 +95,19 @@ export default function Equipes({ user }) {
     ]);
     if (f.error || t.error) { setError("Não consegui carregar as equipes. Confira se a migração do Supabase foi aplicada."); return; }
     setFriends(f.data || []); setTeams(t.data || []);
-    if (!current && t.data?.length) setCurrent(t.data[0].id);
-    if (current && !t.data?.some((x) => x.id === current)) setCurrent(t.data?.[0]?.id || "");
+    if (current && !t.data?.some((x) => x.id === current)) setCurrent("");
   }, [current]);
 
   const loadTeam = useCallback(async (teamId) => {
-    if (!teamId) { setMembers([]); setTasks([]); setGroups([]); setNotes([]); return; }
-    const [m, t, g, n] = await Promise.all([
+    if (!teamId) { setMembers([]); setTasks([]); setGroups([]); return; }
+    const [m, t, g] = await Promise.all([
       supabase.from("team_members").select("team_id,user_id,created_at").eq("team_id", teamId),
       supabase.from("team_tasks").select("*").eq("team_id", teamId).order("position").order("created_at"),
       supabase.from("team_task_groups").select("*").eq("team_id", teamId).order("position").order("created_at"),
-      supabase.from("shared_notes").select("*").eq("team_id", teamId).order("position").order("created_at"),
     ]);
-    const failure = m.error || t.error || g.error || n.error;
+    const failure = m.error || t.error || g.error;
     if (failure) { setError("Não consegui abrir os dados desta equipe."); return; }
-    setMembers(m.data || []); setTasks(t.data || []); setGroups(g.data || []); setNotes(n.data || []);
+    setMembers(m.data || []); setTasks(t.data || []); setGroups(g.data || []);
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
@@ -123,11 +118,53 @@ export default function Equipes({ user }) {
       .on("postgres_changes", { event: "*", schema: "public", table: "teams", filter: `id=eq.${current}` }, refresh)
       .on("postgres_changes", { event: "*", schema: "public", table: "team_tasks", filter: `team_id=eq.${current}` }, () => loadTeam(current))
       .on("postgres_changes", { event: "*", schema: "public", table: "team_task_groups", filter: `team_id=eq.${current}` }, () => loadTeam(current))
-      .on("postgres_changes", { event: "*", schema: "public", table: "shared_notes", filter: `team_id=eq.${current}` }, () => loadTeam(current))
       .on("postgres_changes", { event: "*", schema: "public", table: "team_members", filter: `team_id=eq.${current}` }, () => { loadTeam(current); refresh(); })
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [current, loadTeam, refresh]);
+
+  useEffect(() => {
+    function targetAt(x, y, sourceId) {
+      const element = document.elementFromPoint(x, y);
+      const row = element?.closest("[data-team-task-id]");
+      if (row) {
+        if (row.dataset.teamTaskId === sourceId) return null;
+        const rect = row.getBoundingClientRect();
+        return { groupId: row.dataset.teamGroupId || null, taskId: row.dataset.teamTaskId, after: y >= rect.top + rect.height / 2 };
+      }
+      const group = element?.closest("[data-team-group-id]");
+      return group ? { groupId: group.dataset.teamGroupId || null, taskId: null, after: false } : null;
+    }
+    function move(event) {
+      const drag = taskDragRef.current;
+      if (!drag) return;
+      if (!drag.active) {
+        const distance = Math.abs(event.clientX - drag.x) + Math.abs(event.clientY - drag.y);
+        if (drag.pointerType === "touch" && distance > 12) { clearTimeout(drag.timer); taskDragRef.current = null; return; }
+        if (drag.pointerType !== "touch" && distance > 5) { drag.active = true; setDraggingTaskId(drag.id); }
+        else return;
+      }
+      event.preventDefault();
+      drag.target = targetAt(event.clientX, event.clientY, drag.id);
+      setTaskDropTarget(drag.target);
+    }
+    function finish(event) {
+      const drag = taskDragRef.current;
+      if (!drag) return;
+      clearTimeout(drag.timer);
+      taskDragRef.current = null;
+      if (drag.active) {
+        const target = targetAt(event.clientX, event.clientY, drag.id);
+        if (target) reorderTaskRef.current?.(drag.id, target.groupId, target.taskId, target.after);
+      }
+      setDraggingTaskId(""); setTaskDropTarget(null);
+    }
+    function cancel() { const drag = taskDragRef.current; if (drag) clearTimeout(drag.timer); taskDragRef.current = null; setDraggingTaskId(""); setTaskDropTarget(null); }
+    document.addEventListener("pointermove", move, { passive: false });
+    document.addEventListener("pointerup", finish);
+    document.addEventListener("pointercancel", cancel);
+    return () => { document.removeEventListener("pointermove", move); document.removeEventListener("pointerup", finish); document.removeEventListener("pointercancel", cancel); };
+  }, []);
 
   async function createTeam(e) {
     e.preventDefault(); if (!teamName.trim()) return; setBusy(true); setError("");
@@ -161,19 +198,13 @@ export default function Equipes({ user }) {
     else { setTaskEditor(null); await loadTeam(team.id); }
     setBusy(false);
   }
-  async function saveNote(fields) {
-    if (!team) return; setBusy(true);
-    const result = noteEditor?.id
-      ? await supabase.from("shared_notes").update({ ...fields, updated_at: new Date().toISOString() }).eq("id", noteEditor.id)
-      : await supabase.from("shared_notes").insert({ ...fields, team_id: team.id, created_by: user.id, position: notes.length });
-    if (result.error) setError("Não consegui salvar a anotação compartilhada.");
-    else { setNoteEditor(null); await loadTeam(team.id); }
-    setBusy(false);
-  }
-  async function createGroup(e) {
-    e.preventDefault(); if (!groupName.trim() || !team) return;
-    const { error: groupError } = await supabase.from("team_task_groups").insert({ team_id: team.id, created_by: user.id, name: groupName.trim(), position: groups.length });
-    if (groupError) setError("Não consegui criar a sessão."); else { setGroupName(""); setGroupFormOpen(false); await loadTeam(team.id); }
+  async function saveGroup(fields, group = groupEditor?.group || null) {
+    if (!team) return;
+    const result = group
+      ? await supabase.from("team_task_groups").update({ ...fields, updated_at: new Date().toISOString() }).eq("id", group.id)
+      : await supabase.from("team_task_groups").insert({ ...fields, team_id: team.id, created_by: user.id, position: groups.length });
+    if (result.error) setError(group ? "Não consegui editar a sessão." : "Não consegui criar a sessão.");
+    else { setGroupEditor(null); await loadTeam(team.id); }
   }
   async function removeMember(member) {
     if (!team || (member.user_id !== user.id && team.owner_id !== user.id)) return;
@@ -189,12 +220,56 @@ export default function Equipes({ user }) {
   async function deleteTask(task) {
     setConfirm({ title: "Excluir tarefa compartilhada?", message: `“${task.title}” será removida para todos da equipe.`, action: "Excluir para todos", confirm: async () => { const { error: deleteError } = await supabase.from("team_tasks").delete().eq("id", task.id); setConfirm(null); if (deleteError) setError("Não consegui excluir a tarefa."); else await loadTeam(team.id); } });
   }
-  async function deleteNote(note) {
-    setConfirm({ title: "Excluir anotação?", message: `“${note.title}” será removida para todos da equipe.`, action: "Excluir anotação", confirm: async () => { const { error: deleteError } = await supabase.from("shared_notes").delete().eq("id", note.id); setConfirm(null); if (deleteError) setError("Não consegui excluir a anotação."); else await loadTeam(team.id); } });
-  }
   async function changePriority(task) {
     const { error: updateError } = await supabase.from("team_tasks").update({ priority: ((task.priority || 0) + 1) % 4, updated_at: new Date().toISOString() }).eq("id", task.id);
     if (updateError) setError("Não consegui atualizar a prioridade."); else await loadTeam(team.id);
+  }
+  async function reorderTeamTask(taskId, targetGroupId, targetTaskId = null, after = false) {
+    if (!team) return;
+    const dragged = tasks.find((task) => task.id === taskId);
+    if (!dragged) return;
+    const originGroupId = dragged.group_id || null;
+    const destinationGroupId = targetGroupId || null;
+    const siblings = (groupId) => tasks.filter((task) => (task.group_id || null) === groupId).sort((a, b) => a.position - b.position || String(a.created_at).localeCompare(String(b.created_at)));
+    const origin = siblings(originGroupId);
+    if (originGroupId === destinationGroupId) {
+      const next = origin.filter((task) => task.id !== taskId);
+      const targetIndex = targetTaskId ? next.findIndex((task) => task.id === targetTaskId) : -1;
+      const insertion = targetIndex < 0 ? next.length : targetIndex + (after ? 1 : 0);
+      next.splice(insertion, 0, dragged);
+      const updates = next.map((task, position) => ({ id: task.id, group_id: originGroupId, position }));
+      setTasks((currentTasks) => currentTasks.map((task) => { const update = updates.find((item) => item.id === task.id); return update ? { ...task, ...update } : task; }));
+      const { error: orderError } = await supabase.rpc("social_apply_team_task_order", { p_team_id: team.id, p_updates: updates });
+      if (orderError) { setError("Não consegui salvar a ordem das tarefas da equipe."); await loadTeam(team.id); }
+      return;
+    }
+    const originNext = origin.filter((task) => task.id !== taskId);
+    const destination = siblings(destinationGroupId).filter((task) => task.id !== taskId);
+    const targetIndex = targetTaskId ? destination.findIndex((task) => task.id === targetTaskId) : -1;
+    const insertion = targetIndex < 0 ? destination.length : targetIndex + (after ? 1 : 0);
+    destination.splice(insertion, 0, { ...dragged, group_id: destinationGroupId });
+    const updates = [
+      ...originNext.map((task, position) => ({ id: task.id, group_id: originGroupId, position })),
+      ...destination.map((task, position) => ({ id: task.id, group_id: destinationGroupId, position })),
+    ];
+    setTasks((currentTasks) => currentTasks.map((task) => { const update = updates.find((item) => item.id === task.id); return update ? { ...task, ...update } : task; }));
+    const { error: orderError } = await supabase.rpc("social_apply_team_task_order", { p_team_id: team.id, p_updates: updates });
+    if (orderError) { setError("Não consegui mover a tarefa para outra sessão."); await loadTeam(team.id); }
+  }
+  reorderTaskRef.current = reorderTeamTask;
+  function startTaskDrag(event, task) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    if (taskDragRef.current) clearTimeout(taskDragRef.current.timer);
+    const drag = { id: task.id, x: event.clientX, y: event.clientY, pointerType: event.pointerType, active: false, target: null, timer: null };
+    if (event.pointerType === "touch") drag.timer = window.setTimeout(() => { drag.active = true; setDraggingTaskId(task.id); }, 320);
+    taskDragRef.current = drag;
+  }
+  async function moveTaskByKeyboard(task, delta) {
+    const siblings = tasks.filter((item) => (item.group_id || null) === (task.group_id || null)).sort((a, b) => a.position - b.position);
+    const index = siblings.findIndex((item) => item.id === task.id);
+    const target = siblings[index + delta];
+    if (target) await reorderTeamTask(task.id, task.group_id || null, target.id, delta > 0);
   }
   async function deleteGroup(group) {
     setConfirm({ title: "Excluir sessão?", message: `“${group.name}” será removida. As tarefas serão movidas para “Sem sessão”.`, action: "Excluir sessão", confirm: async () => { const { error: deleteError } = await supabase.from("team_task_groups").delete().eq("id", group.id); setConfirm(null); if (deleteError) setError("Não consegui excluir a sessão."); else await loadTeam(team.id); } });
@@ -207,32 +282,31 @@ export default function Equipes({ user }) {
   const friendById = new Map(friends.map((f) => [f.friend_id, f]));
   const labelMember = (id) => id === user.id ? "Você" : nome(friendById.get(id)?.display_name || "Integrante");
   return <section className="ck-social-page ck-teams-page">
-    <header className="ck-social-heading"><div><span className="ck-social-icon"><svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="2.4"/><circle cx="14" cy="6" r="2.4"/><path d="M1.8 16c.3-2.7 1.8-4 4.2-4h.2m11.9 4c-.3-2.7-1.8-4-4.2-4h-.2M6 16c.3-3.4 1.6-5 4-5s3.7 1.6 4 5"/></svg></span><div><h2>Equipes</h2><p>Organize tarefas e anotações com várias pessoas.</p></div></div></header>
+    <header className={`ck-social-heading${team ? " ck-team-detail-heading" : ""}`}>{team && <button type="button" className="ck-social-back" onClick={() => { setCurrent(""); setTaskEditor(null); setTeamSettingsOpen(false); }}>‹ <span>Equipes</span></button>}<div><span className="ck-social-icon"><svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="2.4"/><circle cx="14" cy="6" r="2.4"/><path d="M1.8 16c.3-2.7 1.8-4 4.2-4h.2m11.9 4c-.3-2.7-1.8-4-4.2-4h-.2M6 16c.3-3.4 1.6-5 4-5s3.7 1.6 4 5"/></svg></span><div><h2>{team?.name || "Equipes"}</h2><p>{team ? "Tarefas e anotações compartilhadas" : "Organize tarefas e anotações com várias pessoas."}</p></div></div></header>
     {error && <p className="ck-social-message erro" role="alert">{error}</p>}
-    <div className="ck-team-create-area"><button type="button" className="ck-barra-mais" aria-expanded={teamCreateOpen} onClick={() => setTeamCreateOpen((open) => !open)}><span className="ck-mais" aria-hidden="true">+</span><span>{teamCreateOpen ? "Cancelar criação" : "Criar equipe"}</span></button>{teamCreateOpen&&<form className="ck-social-search ck-team-create" onSubmit={createTeam}><label htmlFor="ck-team-name">Nome da equipe</label><div><input id="ck-team-name" maxLength={60} value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="Ex.: Projeto da viagem" /><button type="submit" disabled={busy || !teamName.trim()}>Criar equipe</button></div><fieldset className="ck-team-create-friends"><legend>Quem vai participar?</legend>{friends.length ? friends.map((friend) => <label key={friend.friend_id}><input type="checkbox" checked={selectedFriendIds.includes(friend.friend_id)} onChange={(e) => setSelectedFriendIds((ids) => e.target.checked ? [...new Set([...ids, friend.friend_id])] : ids.filter((id) => id !== friend.friend_id))} /><span>{nome(friend.display_name)}</span></label>) : <small>Adicione amigos no Social para convidá-los a uma equipe.</small>}</fieldset></form>}</div>
-    {teams.length > 0 && <nav className="ck-team-tabs" aria-label="Suas equipes">{teams.map((t) => <button type="button" className={current === t.id ? "ativo" : ""} key={t.id} onClick={() => { setCurrent(t.id); setTaskEditor(null); setNoteEditor(null); setTeamSettingsOpen(false); }}>{t.name}</button>)}</nav>}
-    {!teams.length ? <p className="ck-social-empty">Crie uma equipe para começar a compartilhar tarefas e anotações.</p> : team && <>
-      <section className="ck-team-panel"><header><h3>{team.name}</h3><div className="ck-team-settings-controls"><span>{members.length} integrante{members.length === 1 ? "" : "s"}</span><button type="button" className="ck-icone" title="Configurações da equipe" aria-label="Configurações da equipe" aria-expanded={teamSettingsOpen} onClick={() => setTeamSettingsOpen((open) => !open)}>⚙</button></div></header>
+    {!team && <><div className="ck-team-create-area"><button type="button" className="ck-barra-mais" aria-expanded={teamCreateOpen} onClick={() => setTeamCreateOpen((open) => !open)}><span className="ck-mais" aria-hidden="true">+</span><span>{teamCreateOpen ? "Cancelar criação" : "Criar equipe"}</span></button>{teamCreateOpen&&<form className="ck-social-search ck-team-create" onSubmit={createTeam}><label htmlFor="ck-team-name">Nome da equipe</label><div><input id="ck-team-name" maxLength={60} value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="Ex.: Projeto da viagem" /><button type="submit" disabled={busy || !teamName.trim()}>Criar equipe</button></div><fieldset className="ck-team-create-friends"><legend>Quem vai participar?</legend>{friends.length ? friends.map((friend) => <label key={friend.friend_id}><input type="checkbox" checked={selectedFriendIds.includes(friend.friend_id)} onChange={(e) => setSelectedFriendIds((ids) => e.target.checked ? [...new Set([...ids, friend.friend_id])] : ids.filter((id) => id !== friend.friend_id))} /><span>{nome(friend.display_name)}</span></label>) : <small>Adicione amigos no Social para convidá-los a uma equipe.</small>}</fieldset></form>}</div>{teams.length ? <nav className="ck-team-list" aria-label="Suas equipes">{teams.map((t) => <button type="button" className="ck-team-list-row" key={t.id} onClick={() => { setCurrent(t.id); setTaskEditor(null); setTeamSettingsOpen(false); }}><span className="ck-team-list-icon" aria-hidden="true"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="2.4"/><circle cx="14" cy="6" r="2.4"/><path d="M1.8 16c.3-2.7 1.8-4 4.2-4h.2m11.9 4c-.3-2.7-1.8-4-4.2-4h-.2M6 16c.3-3.4 1.6-5 4-5s3.7 1.6 4 5"/></svg></span><strong>{t.name}</strong><span aria-hidden="true">›</span></button>)}</nav> : <p className="ck-social-empty">Crie uma equipe para começar a compartilhar tarefas e anotações.</p>}</>}
+    {team && <>
+      <section className="ck-team-panel ck-team-settings-panel"><header><span>{members.length} integrante{members.length === 1 ? "" : "s"}</span><div className="ck-team-settings-controls"><button type="button" className="ck-icone" title="Configurações da equipe" aria-label="Configurações da equipe" aria-expanded={teamSettingsOpen} onClick={() => setTeamSettingsOpen((open) => !open)}>⚙</button></div></header>
         {teamSettingsOpen && <div className="ck-team-settings"><h4>Integrantes da equipe</h4><div className="ck-team-members">{members.map((m) => <div key={m.user_id}><span>{labelMember(m.user_id)}</span>{(team.owner_id === user.id || m.user_id === user.id) && <button type="button" className="ck-icone ck-social-remove" title={m.user_id === user.id ? "Sair da equipe" : "Remover integrante"} onClick={() => removeMember(m)}>×</button>}</div>)}</div>{team.owner_id === user.id && <form className="ck-team-add-member" onSubmit={addMember}><select aria-label="Amigo para adicionar" value={friendToAdd} onChange={(e) => setFriendToAdd(e.target.value)}><option value="">Escolha um amigo</option>{friends.filter((f) => !members.some((m) => m.user_id === f.friend_id)).map((f) => <option key={f.friend_id} value={f.friend_id}>{nome(f.display_name)}</option>)}</select><button type="submit" disabled={!friendToAdd || busy}>Adicionar integrante</button><button type="button" className="ck-team-delete" onClick={deleteTeam}>Excluir equipe</button></form>}</div>}
       </section>
-      <section className="ck-team-panel ck-team-work-panel"><header><h3>Tarefas compartilhadas</h3></header>
-        <div className="ck-barras-topo ck-team-toolbar"><button type="button" className="ck-barra-mais" onClick={() => setTaskEditor((v) => v && !v.id && v.groupId == null ? null : { groupId: null })}><span className="ck-mais" aria-hidden="true">+</span><span>Adicionar tarefa</span></button><button type="button" className="ck-barra-mais" onClick={() => setGroupFormOpen((v)=>!v)}><span className="ck-mais" aria-hidden="true">+</span><span>Adicionar sessão</span></button></div>
-        {taskEditor && !taskEditor.id && taskEditor.groupId == null && <EditorTarefa grupos={groups} onSave={saveTask} onCancel={() => setTaskEditor(null)} />}
-        {groupFormOpen&&<form className="ck-nova-divisao ck-team-session-editor" onSubmit={createGroup}><input autoFocus maxLength={60} value={groupName} onChange={(e)=>setGroupName(e.target.value)} placeholder="Nome da sessão" aria-label="Nome da sessão"/><button type="submit" disabled={!groupName.trim()}>Criar</button><button type="button" className="ck-icone" onClick={()=>setGroupFormOpen(false)} aria-label="Cancelar">×</button></form>}
-        {groups.map((g) => { const groupTasks=tasks.filter((t)=>t.group_id===g.id); const collapsed=Boolean(collapsedGroups[g.id]); const editingTask=taskEditor?.id?groupTasks.find((t)=>t.id===taskEditor.id):null; return <section className="ck-team-task-group ck-team-session" key={g.id}><header><button type="button" className="ck-grupo-titulo" aria-expanded={!collapsed} onClick={()=>setCollapsedGroups((v)=>({...v,[g.id]:!v[g.id]}))}><span className={`ck-seta ${!collapsed?"aberta":""}`}>›</span><span className="ck-grupo-nome">{g.name}</span><span className="ck-grupo-qtd">{groupTasks.filter((t)=>t.completed).length}/{groupTasks.length}</span></button>{!collapsed&&<><button type="button" className="ck-mais ck-mais-circular" title="Adicionar tarefa nesta sessão" aria-label={`Adicionar tarefa em ${g.name}`} onClick={()=>setTaskEditor((v)=>v&&!v.id&&v.groupId===g.id?null:{groupId:g.id})}><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M8 3v10M3 8h10"/></svg></button><button type="button" className="ck-icone ck-social-remove" aria-label={`Excluir sessão ${g.name}`} title="Excluir sessão" onClick={()=>deleteGroup(g)}>×</button></>}</header>{!collapsed&&<div className="ck-team-session-body">{taskEditor&&!taskEditor.id&&taskEditor.groupId===g.id&&<EditorTarefa grupos={groups} onSave={saveTask} onCancel={()=>setTaskEditor(null)}/ >}{editingTask&&<EditorTarefa tarefa={editingTask} grupos={groups} onSave={saveTask} onCancel={()=>setTaskEditor(null)}/ >}{groupTasks.filter((t)=>t.id!==taskEditor?.id).map((t)=><TaskRow key={t.id} task={t} status={setTaskStatus} priority={changePriority} edit={()=>setTaskEditor({id:t.id})} remove={()=>deleteTask(t)}/>)}</div>}</section>; })}
-        <section className="ck-team-task-group ck-team-session"><h4>Sem sessão</h4>{taskEditor?.id&&!tasks.find((t)=>t.id===taskEditor.id)?.group_id&&<EditorTarefa tarefa={tasks.find((t)=>t.id===taskEditor.id)} grupos={groups} onSave={saveTask} onCancel={()=>setTaskEditor(null)}/ >}{tasks.filter((t)=>!t.group_id&&t.id!==taskEditor?.id).map((t)=><TaskRow key={t.id} task={t} status={setTaskStatus} priority={changePriority} edit={()=>setTaskEditor({id:t.id})} remove={()=>deleteTask(t)}/>)}{!tasks.length&&<p className="ck-social-empty">Nenhuma tarefa nesta equipe.</p>}</section>
-      </section>
-      <section className="ck-team-panel ck-team-work-panel"><header><h3>Anotações compartilhadas</h3></header>
-        <div className="ck-barras-topo ck-team-toolbar"><button type="button" className="ck-barra-mais" onClick={() => setNoteEditor((v)=>v?null:{})}><span className="ck-mais" aria-hidden="true">+</span><span>Adicionar anotação</span></button></div>
-        {noteEditor && <EditorNota nota={noteEditor.id ? notes.find((n) => n.id === noteEditor.id) : null} onSave={saveNote} onCancel={() => setNoteEditor(null)} />}
-        {notes.map((n) => <article className="ck-team-note" key={n.id}><div className="ck-team-note-bubble"><div><strong>{n.title}</strong><time>{new Date(n.updated_at || n.created_at).toLocaleDateString("pt-BR")}</time></div>{n.body && <p>{n.body}</p>}</div><div className="ck-team-note-actions"><button type="button" className="ck-icone" aria-label={`Editar ${n.title}`} onClick={() => setNoteEditor({ id: n.id })}>✎</button><button type="button" className="ck-icone ck-social-remove" aria-label={`Excluir ${n.title}`} onClick={() => deleteNote(n)}>×</button></div></article>)}
-        {!notes.length && !noteEditor && <p className="ck-social-empty">Nenhuma anotação compartilhada nesta equipe.</p>}
+      <section className="ck-team-work-panel">
+        <div className="ck-abas ck-abas-principais ck-social-work-tabs" role="tablist" aria-label={`${team.name}: tarefas e anotações`}><button type="button" role="tab" className="ck-aba" aria-selected={activeTab === "tarefas"} onClick={() => setActiveTab("tarefas")}>Checklist</button><button type="button" role="tab" className="ck-aba" aria-selected={activeTab === "anotacoes"} onClick={() => setActiveTab("anotacoes")}>Anotações</button></div>
+        {activeTab === "tarefas" ? <>
+          <div className="ck-barras-topo"><button type="button" className="ck-barra-mais" onClick={() => setTaskEditor((v) => v && !v.id && v.groupId == null ? null : { groupId: null })}><span className="ck-mais" aria-hidden="true">+</span><span>Adicionar tarefa</span></button><button type="button" className="ck-barra-mais" onClick={() => setGroupEditor((v)=>v&&!v.group?null:{group:null})}><span className="ck-mais" aria-hidden="true">+</span><span>Adicionar sessão</span></button></div>
+          {taskEditor && !taskEditor.id && taskEditor.groupId == null && <EditorTarefa grupos={groups} onSave={saveTask} onCancel={() => setTaskEditor(null)} />}
+          {groupEditor && !groupEditor.group && <GroupEditor onCancel={() => setGroupEditor(null)} onSave={(fields) => saveGroup(fields, null)} />}
+          {groups.map((g) => { const groupTasks=tasks.filter((t)=>t.group_id===g.id); const collapsed=Boolean(collapsedGroups[g.id]); const editingTask=taskEditor?.id?groupTasks.find((t)=>t.id===taskEditor.id):null; return <section data-team-group-id={g.id} className={`ck-grupo ck-team-session${collapsed?" recolhida":""}${taskDropTarget?.groupId===g.id&&!taskDropTarget?.taskId?" alvo":""}`} key={g.id}><header className="ck-grupo-topo"><button type="button" className="ck-grupo-titulo" aria-expanded={!collapsed} onClick={()=>setCollapsedGroups((v)=>({...v,[g.id]:!v[g.id]}))}><span className={`ck-seta ${!collapsed?"aberta":""}`}>›</span><IconeGrupo tipo={g.icon} /><span className="ck-grupo-nome">{g.name}</span><span className="ck-grupo-qtd">{groupTasks.filter((t)=>t.completed).length}/{groupTasks.length}</span></button>{groupEditor?.group?.id!==g.id&&<><button type="button" className="ck-mais ck-mais-circular" title="Adicionar tarefa nesta sessão" aria-label={`Adicionar tarefa em ${g.name}`} onClick={()=>{setCollapsedGroups((v)=>({...v,[g.id]:false}));setTaskEditor((v)=>v&&!v.id&&v.groupId===g.id?null:{groupId:g.id})}}><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M8 3v10M3 8h10"/></svg></button><button type="button" className="ck-icone" aria-label={`Editar sessão ${g.name}`} title="Editar sessão" onClick={()=>{setCollapsedGroups((v)=>({...v,[g.id]:false}));setGroupEditor({group:g})}}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z"/></svg></button><button type="button" className="ck-icone ck-social-remove" aria-label={`Excluir sessão ${g.name}`} title="Excluir sessão" onClick={()=>deleteGroup(g)}>×</button></>}</header>{!collapsed&&<div className="ck-team-session-body">{groupEditor?.group?.id===g.id&&<GroupEditor group={g} onCancel={()=>setGroupEditor(null)} onSave={(fields)=>saveGroup(fields,g)}/ >}{taskEditor&&!taskEditor.id&&taskEditor.groupId===g.id&&<EditorTarefa grupos={groups} onSave={saveTask} onCancel={()=>setTaskEditor(null)}/ >}{editingTask&&<EditorTarefa tarefa={editingTask} grupos={groups} onSave={saveTask} onCancel={()=>setTaskEditor(null)}/ >}<ul className="ck-social-task-list" data-team-group-id={g.id}>{groupTasks.filter((t)=>t.id!==taskEditor?.id).map((t)=><TaskRow key={t.id} task={t} status={setTaskStatus} priority={changePriority} edit={()=>setTaskEditor({id:t.id})} remove={()=>deleteTask(t)} startDrag={(event)=>startTaskDrag(event,t)} moveByKeyboard={(delta)=>moveTaskByKeyboard(t,delta)} dragging={draggingTaskId===t.id} target={taskDropTarget?.taskId===t.id}/>)}</ul></div>}</section>; })}
+          {tasks.some((t) => !t.group_id) && <>{taskEditor?.id&&!tasks.find((t)=>t.id===taskEditor.id)?.group_id&&<EditorTarefa tarefa={tasks.find((t)=>t.id===taskEditor.id)} grupos={groups} onSave={saveTask} onCancel={()=>setTaskEditor(null)}/ >}{groups.length > 0 && <h2 className="ck-secao ck-team-unfiled-title">Sem sessão</h2>}<ul className={"ck-social-task-list" + (taskDropTarget?.groupId == null && !taskDropTarget?.taskId ? " alvo" : "")} data-team-group-id="">{tasks.filter((t)=>!t.group_id&&t.id!==taskEditor?.id).map((t)=><TaskRow key={t.id} task={t} status={setTaskStatus} priority={changePriority} edit={()=>setTaskEditor({id:t.id})} remove={()=>deleteTask(t)} startDrag={(event)=>startTaskDrag(event,t)} moveByKeyboard={(delta)=>moveTaskByKeyboard(t,delta)} dragging={draggingTaskId===t.id} target={taskDropTarget?.taskId===t.id}/>)}</ul></>}
+          {!tasks.length && !groups.length && <p className="ck-vazio">Adicione uma tarefa ou crie uma sessão para começar.</p>}
+        </> : <>
+          <AnotacoesCompartilhadas tipo="equipe" escopoId={team.id} />
+        </>}
       </section>
     </>}
     <ConfirmacaoEquipe item={confirm} onClose={() => setConfirm(null)} onConfirm={() => confirm?.confirm?.()} />
   </section>;
 }
 
-function TaskRow({ task, status, priority, edit, remove }) {
-  return <article className={`ck-social-task-card ck-team-task-row${task.completed ? " feita" : ""}`}><button type="button" className={`ck-social-task-status${task.partial ? " parcial" : task.completed ? " feita" : ""}`} aria-label={task.completed ? "Reabrir tarefa" : task.partial ? "Marcar como concluída" : "Marcar como meio pronta"} onClick={() => status(task, !task.partial && !task.completed)}>{task.partial ? "◐" : task.completed ? "✓" : ""}</button><div className="ck-social-task-content"><strong>{task.title}</strong>{(task.due_date || task.due_time) && <small>Prazo: {task.due_date ? new Date(`${task.due_date}T00:00`).toLocaleDateString("pt-BR") : "hoje"}{task.due_time ? ` · ${task.due_time.slice(0, 5)}` : ""}</small>}{task.comment && <small>💬 {task.comment}</small>}</div><button type="button" className={`ck-prio p${task.priority || 0}`} title="Alterar prioridade" aria-label={`Prioridade ${task.priority || 0}; alterar`} onClick={() => priority(task)} /><button type="button" className="ck-icone" aria-label={`Editar ${task.title}`} onClick={edit}>✎</button><button type="button" className="ck-icone ck-social-remove" aria-label={`Excluir ${task.title}`} onClick={remove}>×</button></article>;
+function TaskRow({ task, status, priority, edit, remove, startDrag, moveByKeyboard, dragging, target }) {
+  return <li data-team-task-id={task.id} data-team-group-id={task.group_id || ""} className={`ck-social-task-card ck-team-task-row${task.completed ? " feita" : ""}${dragging ? " arrastando" : ""}${target ? " alvo" : ""}`}><span className="ck-alca ck-team-task-handle" role="button" tabIndex={0} aria-label="Mover tarefa; use as setas para cima e para baixo" title="Arraste para mudar a ordem" onPointerDown={startDrag} onKeyDown={(event) => { if (event.key === "ArrowUp" || event.key === "ArrowDown") { event.preventDefault(); moveByKeyboard(event.key === "ArrowUp" ? -1 : 1); } }}><svg viewBox="0 0 12 18" width="12" height="18" aria-hidden="true" fill="currentColor"><circle cx="3" cy="3" r="1.2"/><circle cx="9" cy="3" r="1.2"/><circle cx="3" cy="9" r="1.2"/><circle cx="9" cy="9" r="1.2"/><circle cx="3" cy="15" r="1.2"/><circle cx="9" cy="15" r="1.2"/></svg></span><button type="button" className={`ck-social-task-status${task.partial ? " parcial" : task.completed ? " feita" : ""}`} aria-label={task.completed ? "Reabrir tarefa" : task.partial ? "Marcar como concluída" : "Marcar como meio pronta"} onClick={() => status(task, !task.partial && !task.completed)}>{task.completed ? "✓" : ""}</button><div className="ck-social-task-content"><strong>{task.title}</strong>{(task.due_date || task.due_time) && <small>Prazo: {task.due_date ? new Date(`${task.due_date}T00:00`).toLocaleDateString("pt-BR") : "hoje"}{task.due_time ? ` · ${task.due_time.slice(0, 5)}` : ""}</small>}{task.comment && <small>💬 {task.comment}</small>}</div><button type="button" className={`ck-prio p${task.priority || 0}`} title="Alterar prioridade" aria-label={`Prioridade ${task.priority || 0}; alterar`} onClick={() => priority(task)} /><button type="button" className="ck-icone" aria-label={`Editar ${task.title}`} onClick={edit}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z"/></svg></button><button type="button" className="ck-icone ck-social-remove" aria-label={`Excluir ${task.title}`} onClick={remove}>×</button></li>;
 }

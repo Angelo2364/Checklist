@@ -1720,8 +1720,7 @@ function ListaTarefas({ tarefas, alternar, apagar, mudarPrioridade, ordem, edica
 function FormularioAnotacao({ form, onSalvar, onChange, onCancelar }) {
   return (
     <form className="ck-form-grupo ck-form-anotacao" onSubmit={onSalvar} onBlur={(e) => fecharAoClicarFora(e, onCancelar)}>
-      <input id="campo-titulo-anotacao" autoFocus type="text" maxLength={100} placeholder="Título" aria-label="Título da anotação" value={form.titulo} onChange={(e) => onChange((atual) => ({ ...atual, titulo: e.target.value }))} required />
-      <input type="date" aria-label="Data da anotação" value={form.data} onChange={(e) => onChange((atual) => ({ ...atual, data: e.target.value }))} required />
+      <div className="ck-anotacao-titulo-data"><input id="campo-titulo-anotacao" autoFocus type="text" maxLength={100} placeholder="Título" aria-label="Título da anotação" value={form.titulo} onChange={(e) => onChange((atual) => ({ ...atual, titulo: e.target.value }))} required /><DiaMes value={form.data || ""} onChange={(data) => onChange((atual) => ({ ...atual, data }))} rotulo="Data da anotação (opcional)" /></div>
       <textarea className="ck-campo-largo" rows={4} placeholder="Anotação (opcional)" aria-label="Anotação (opcional)" value={form.texto} onChange={(e) => onChange((atual) => ({ ...atual, texto: e.target.value }))} onKeyDown={(e) => { if (e.key === "Escape") onCancelar(); else enviarAoEnter(e); }} />
       <button type="submit" disabled={!form.titulo.trim()}>Salvar</button>
       <button type="button" className="secundario" onClick={onCancelar}>Cancelar</button>
@@ -1987,6 +1986,7 @@ function Checklist({ usuario }) {
   const [anotacoes, setAnotacoes] = useState(() => lerStorage(STORAGE_NOTES, []));
   const [sessoesAnotacoes, setSessoesAnotacoes] = useState(() => lerStorage(STORAGE_NOTE_GROUPS, []));
   const [pagina, setPagina] = useState("tarefas");
+  const [amizadeSelecionada, setAmizadeSelecionada] = useState("");
   const [abaConfiguracoes, setAbaConfiguracoes] = useState("preferencias");
   const paginaRef = useRef(pagina);
   paginaRef.current = pagina;
@@ -2858,7 +2858,7 @@ function Checklist({ usuario }) {
     const titulo = formAnotacao?.titulo?.trim();
     const texto = formAnotacao?.texto?.trim();
     if (!titulo) return;
-    const item = { id: formAnotacao.id || novoId(), titulo, texto: texto || "", data: formAnotacao.data || iso(new Date()), sessaoId: formAnotacao.sessaoId || null };
+    const item = { id: formAnotacao.id || novoId(), titulo, texto: texto || "", data: formAnotacao.data || null, sessaoId: formAnotacao.sessaoId || null };
     setAnotacoes((atual) => formAnotacao.id ? atual.map((a) => a.id === item.id ? item : a) : [...atual, item]);
     setFormAnotacao(null);
   }
@@ -3174,10 +3174,10 @@ function Checklist({ usuario }) {
         </p>
       </section>}
 
-      <div className="ck-abas ck-abas-principais" role="tablist" aria-label="Área principal" data-tutorial="abas">
+      {pagina !== "amizade" && <div className="ck-abas ck-abas-principais" role="tablist" aria-label="Área principal" data-tutorial="abas">
         <button type="button" role="tab" className="ck-aba" aria-selected={pagina === "tarefas"} onClick={() => setPagina("tarefas")}>Checklist</button>
         <button type="button" role="tab" className="ck-aba" aria-selected={pagina === "anotacoes"} onClick={() => setPagina("anotacoes")}>Anotações</button>
-      </div>
+      </div>}
       {pagina === "configuracoes" && <section className="ck-configuracoes">
         <div className="ck-config-titulo"><h2>Configurações</h2></div>
         <div className="ck-abas ck-abas-principais" role="tablist" aria-label="Categorias de configurações">
@@ -3200,7 +3200,7 @@ function Checklist({ usuario }) {
           </div>
         </section>}
       </section>}
-      {pagina === "tarefas" ? <>
+      {pagina === "amizade" ? <section className="ck-social-page-wrap ck-social-detail-page"><Social user={usuario} view="friend-detail" friendshipId={amizadeSelecionada} onBack={() => { setPagina("tarefas"); setAmizadeSelecionada(""); }} /></section> : pagina === "tarefas" ? <>
       <div className="ck-barras-topo" data-tutorial="criar">
       {criandoSolta ? (
         <NovaTarefa
@@ -3351,7 +3351,7 @@ function Checklist({ usuario }) {
         />
       )}
 
-      <Social user={usuario} view="tasks" onManage={() => setPagina("social")} onMovePersonalTask={moverTarefaParaSocial} />
+      <Social user={usuario} view="tasks" onManage={() => setPagina("social")} onOpenFriend={(id) => { setAmizadeSelecionada(id); setPagina("amizade"); }} onMovePersonalTask={moverTarefaParaSocial} />
 
       {feitas > 0 && (
         <button type="button" className="ck-link" onClick={limparFeitas}>
@@ -3422,7 +3422,7 @@ function Checklist({ usuario }) {
           </>
         )}
       </section>
-      </> : pagina === "social" ? <section className="ck-social-page-wrap"><Social user={usuario} view="manage" /></section> : pagina === "equipes" ? <section className="ck-social-page-wrap"><Equipes user={usuario} /></section> : pagina === "anotacoes" ? <section className="ck-anotacoes">
+      </> : pagina === "social" ? <section className="ck-social-page-wrap"><Social user={usuario} view="manage" /></section> : pagina === "equipes" ? <section className="ck-social-page-wrap ck-social-detail-page"><Equipes user={usuario} /></section> : pagina === "anotacoes" ? <section className="ck-anotacoes">
         <div className="ck-barras-topo">
           {formAnotacao && !formAnotacao.id && (!formAnotacao.sessaoId || !sessoesAnotacoes.some((s) => s.id === formAnotacao.sessaoId)) ? <FormularioAnotacao form={formAnotacao} onSalvar={salvarAnotacao} onChange={setFormAnotacao} onCancelar={() => setFormAnotacao(null)} /> : <BarraMais rotulo="Adicionar anotação" atalho={ATALHO_TAREFA} onClick={() => abrirNovaAnotacao()} />}
           {criandoSessaoAnotacao ? <form className="ck-nova-divisao" onSubmit={criarSessaoAnotacao} onBlur={(e) => fecharAoClicarFora(e, () => { setCriandoSessaoAnotacao(false); setNomeSessaoAnotacao(""); })}>
@@ -3447,10 +3447,10 @@ function Checklist({ usuario }) {
           {formAnotacao?.sessaoId === s.id && <FormularioAnotacao form={formAnotacao} onSalvar={salvarAnotacao} onChange={setFormAnotacao} onCancelar={() => setFormAnotacao(null)} />}
           {s.aberta !== false && anotacoes.filter((a) => a.sessaoId === s.id).map((a) => <article className={`ck-anotacao${ordem.sobre === a.id && ordem.arrastando?.tipo === "anotacao" ? " alvo" : ""}`} key={a.id} {...alvoProps(ordem, "anotacao", a.id, s.id)}>
             <Alca id={a.id} tipo="anotacao" grupo={s.id} ordem={ordem} imagem=".ck-anotacao" />
-            <div className="ck-anotacao-corpo"><div><strong>{a.titulo}</strong><time>{new Date(`${a.data}T00:00`).toLocaleDateString("pt-BR")}</time></div>{a.texto && !descricoesAnotacaoFechadas[a.id] && <p>{a.texto}</p>}</div>{a.texto && <ToggleDescricao fechada={descricoesAnotacaoFechadas[a.id]} onClick={() => setDescricoesAnotacaoFechadas((atual) => ({ ...atual, [a.id]: !atual[a.id] }))} />}<button type="button" className="ck-icone" title="Editar anotação" aria-label={`Editar ${a.titulo}`} onClick={() => setFormAnotacao({ ...a })}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" /></svg></button><BotaoApagar nome={`anotação ${a.titulo}`} onClick={() => setAnotacoes((xs) => xs.filter((x) => x.id !== a.id))} />
+            <div className="ck-anotacao-corpo"><div><strong>{a.titulo}</strong>{a.data && <time>{new Date(`${a.data}T00:00`).toLocaleDateString("pt-BR")}</time>}</div>{a.texto && !descricoesAnotacaoFechadas[a.id] && <p>{a.texto}</p>}</div>{a.texto && <ToggleDescricao fechada={descricoesAnotacaoFechadas[a.id]} onClick={() => setDescricoesAnotacaoFechadas((atual) => ({ ...atual, [a.id]: !atual[a.id] }))} />}<button type="button" className="ck-icone" title="Editar anotação" aria-label={`Editar ${a.titulo}`} onClick={() => setFormAnotacao({ ...a })}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" /></svg></button><BotaoApagar nome={`anotação ${a.titulo}`} onClick={() => setAnotacoes((xs) => xs.filter((x) => x.id !== a.id))} />
           </article>)}
         </section>)}
-        {(anotacoes.some((a) => !a.sessaoId || !sessoesAnotacoes.some((s) => s.id === a.sessaoId)) || arrastando?.tipo === "anotacao") && <section className="ck-grupo"><h2 className={`ck-secao${ordem.sobre === "__sem_sessao__" && ordem.arrastando?.tipo === "anotacao" ? " alvo" : ""}`} {...alvoProps(ordem, "destinoAnotacoes", "__sem_sessao__", null)}>Sem sessão</h2>{anotacoes.filter((a) => !a.sessaoId || !sessoesAnotacoes.some((s) => s.id === a.sessaoId)).map((a) => <article className={`ck-anotacao${ordem.sobre === a.id && ordem.arrastando?.tipo === "anotacao" ? " alvo" : ""}`} key={a.id} {...alvoProps(ordem, "anotacao", a.id, null)}><Alca id={a.id} tipo="anotacao" grupo={null} ordem={ordem} imagem=".ck-anotacao" /><div className="ck-anotacao-corpo"><div><strong>{a.titulo}</strong><time>{new Date(`${a.data}T00:00`).toLocaleDateString("pt-BR")}</time></div>{a.texto && !descricoesAnotacaoFechadas[a.id] && <p>{a.texto}</p>}</div>{a.texto && <ToggleDescricao fechada={descricoesAnotacaoFechadas[a.id]} onClick={() => setDescricoesAnotacaoFechadas((atual) => ({ ...atual, [a.id]: !atual[a.id] }))} />}<button type="button" className="ck-icone" title="Editar anotação" aria-label={`Editar ${a.titulo}`} onClick={() => setFormAnotacao({ ...a })}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" /></svg></button><BotaoApagar nome={`anotação ${a.titulo}`} onClick={() => setAnotacoes((xs) => xs.filter((x) => x.id !== a.id))} /></article>)}</section>}
+        {(anotacoes.some((a) => !a.sessaoId || !sessoesAnotacoes.some((s) => s.id === a.sessaoId)) || arrastando?.tipo === "anotacao") && <section className="ck-grupo"><h2 className={`ck-secao${ordem.sobre === "__sem_sessao__" && ordem.arrastando?.tipo === "anotacao" ? " alvo" : ""}`} {...alvoProps(ordem, "destinoAnotacoes", "__sem_sessao__", null)}>Sem sessão</h2>{anotacoes.filter((a) => !a.sessaoId || !sessoesAnotacoes.some((s) => s.id === a.sessaoId)).map((a) => <article className={`ck-anotacao${ordem.sobre === a.id && ordem.arrastando?.tipo === "anotacao" ? " alvo" : ""}`} key={a.id} {...alvoProps(ordem, "anotacao", a.id, null)}><Alca id={a.id} tipo="anotacao" grupo={null} ordem={ordem} imagem=".ck-anotacao" /><div className="ck-anotacao-corpo"><div><strong>{a.titulo}</strong>{a.data && <time>{new Date(`${a.data}T00:00`).toLocaleDateString("pt-BR")}</time>}</div>{a.texto && !descricoesAnotacaoFechadas[a.id] && <p>{a.texto}</p>}</div>{a.texto && <ToggleDescricao fechada={descricoesAnotacaoFechadas[a.id]} onClick={() => setDescricoesAnotacaoFechadas((atual) => ({ ...atual, [a.id]: !atual[a.id] }))} />}<button type="button" className="ck-icone" title="Editar anotação" aria-label={`Editar ${a.titulo}`} onClick={() => setFormAnotacao({ ...a })}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" /></svg></button><BotaoApagar nome={`anotação ${a.titulo}`} onClick={() => setAnotacoes((xs) => xs.filter((x) => x.id !== a.id))} /></article>)}</section>}
         {!formAnotacao && anotacoes.length === 0 && sessoesAnotacoes.length === 0 && <p className="ck-vazio">Adicione uma anotação ou crie uma sessão.</p>}
       </section> : null}
 
@@ -3462,7 +3462,7 @@ function Checklist({ usuario }) {
         <span aria-hidden="true"> · </span>
         <Contato />
                 <span aria-hidden="true"> · </span>
-                <span aria-hidden="true"> V0.78 </span>
+                <span aria-hidden="true"> V0.85 </span>
       </footer>
     </main>
 

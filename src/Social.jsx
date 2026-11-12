@@ -17,11 +17,11 @@ function dataSeguinte(dd, mm, anterior = "") {
   return "";
 }
 
-function DataDiaMes({ value, onChange }) {
+function DataDiaMes({ value, onChange, rotulo = "Prazo: dia e mês" }) {
   const [dia, setDia] = useState(value?.slice(8, 10) || "");
   const [mes, setMes] = useState(value?.slice(5, 7) || "");
   useEffect(() => { setDia(value?.slice(8, 10) || ""); setMes(value?.slice(5, 7) || ""); }, [value]);
-  return <span className="ck-hora24 ck-social-diammes" role="group" aria-label="Prazo: dia e mês">
+  return <span className="ck-hora24 ck-social-diammes" role="group" aria-label={rotulo}>
     <input type="text" inputMode="numeric" maxLength={2} placeholder="dd" value={dia} aria-label="Dia do prazo" onChange={(e) => { let d = e.target.value.replace(/\D/g, "").slice(0, 2); if (d.length === 1 && Number(d) > 3) d = `0${d}`; if (Number(d) > 31) d = "31"; setDia(d); onChange(dataSeguinte(d, mes, value)); }} onBlur={() => { const d = dia ? dia.padStart(2, "0") : ""; setDia(d); onChange(dataSeguinte(d, mes, value)); }} />
     <span aria-hidden="true">/</span>
     <input type="text" inputMode="numeric" maxLength={2} placeholder="mm" value={mes} aria-label="Mês do prazo" onChange={(e) => { let m = e.target.value.replace(/\D/g, "").slice(0, 2); if (m.length === 1 && Number(m) > 1) m = `0${m}`; if (Number(m) > 12) m = "12"; setMes(m); onChange(dataSeguinte(dia, m, value)); }} onBlur={() => { const m = mes ? mes.padStart(2, "0") : ""; setMes(m); onChange(dataSeguinte(dia, m, value)); }} />
@@ -119,34 +119,206 @@ function IconePessoa() {
   return <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="10" cy="6.5" r="3" /><path d="M3.8 17c.4-3.1 2.8-5 6.2-5s5.8 1.9 6.2 5" /></svg>;
 }
 
-function NotasCompartilhadasAmizade({ friendshipId }) {
+export function AnotacoesCompartilhadas({ tipo, escopoId }) {
+  const colunaEscopo = tipo === "equipe" ? "team_id" : "friendship_id";
   const [notes, setNotes] = useState([]);
-  const [editing, setEditing] = useState(null);
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
+  const [groups, setGroups] = useState([]);
+  const [noteForm, setNoteForm] = useState(null);
+  const [groupForm, setGroupForm] = useState(null);
+  const [fechadas, setFechadas] = useState({});
   const [error, setError] = useState("");
+  const [draggingNote, setDraggingNote] = useState("");
+  const [noteDropTarget, setNoteDropTarget] = useState(null);
+  const noteDragRef = useRef(null);
+  const reorderNoteRef = useRef(null);
+
   const load = useCallback(async () => {
-    const { data, error: loadError } = await supabase.from("shared_notes").select("*").eq("friendship_id", friendshipId).order("position").order("created_at");
-    if (loadError) setError("Não consegui carregar as anotações. Confira se a migração do Supabase foi aplicada.");
-    else { setNotes(data || []); setError(""); }
-  }, [friendshipId]);
-  useEffect(() => { load(); const channel = supabase.channel(`shared-notes-${friendshipId}`).on("postgres_changes", { event: "*", schema: "public", table: "shared_notes", filter: `friendship_id=eq.${friendshipId}` }, load).subscribe(); return () => { supabase.removeChannel(channel); }; }, [load, friendshipId]);
-  function begin(note = null) { setEditing(note?.id || "new"); setTitle(note?.title || ""); setBody(note?.body || ""); }
-  async function save(e) {
-    e.preventDefault(); if (!title.trim()) return;
-    const change = { title: title.trim(), body: body.trim(), updated_at: new Date().toISOString() };
-    const result = editing === "new"
-      ? await supabase.from("shared_notes").insert({ ...change, friendship_id: friendshipId, position: notes.length })
-      : await supabase.from("shared_notes").update(change).eq("id", editing);
-    if (result.error) setError("Não consegui salvar a anotação compartilhada."); else { setEditing(null); setTitle(""); setBody(""); await load(); }
+    const [notesResult, groupsResult] = await Promise.all([
+      supabase.from("shared_notes").select("*").eq(colunaEscopo, escopoId).order("position").order("created_at"),
+      supabase.from("shared_note_groups").select("*").eq(colunaEscopo, escopoId).order("position").order("created_at"),
+    ]);
+    if (notesResult.error || groupsResult.error) setError("Não consegui carregar as anotações. A migração de sessões compartilhadas precisa estar aplicada no Supabase.");
+    else { setNotes(notesResult.data || []); setGroups(groupsResult.data || []); setError(""); }
+  }, [colunaEscopo, escopoId]);
+
+  useEffect(() => {
+    load();
+    const channel = supabase.channel(`shared-notes-${tipo}-${escopoId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "shared_notes", filter: `${colunaEscopo}=eq.${escopoId}` }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "shared_note_groups", filter: `${colunaEscopo}=eq.${escopoId}` }, load)
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [load, tipo, escopoId, colunaEscopo]);
+
+  useEffect(() => {
+    function shortcuts(event) {
+      if (!event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
+      const key = event.key.toLowerCase();
+      if (key === "f") { event.preventDefault(); setNoteForm((current) => current || { id: null, title: "", body: "", groupId: null }); }
+      if (key === "d") { event.preventDefault(); setGroupForm((current) => current && !current.group ? null : { group: null }); }
+    }
+    window.addEventListener("keydown", shortcuts);
+    return () => window.removeEventListener("keydown", shortcuts);
+  }, []);
+
+  useEffect(() => {
+    function targetAt(x, y, sourceId) {
+      const element = document.elementFromPoint(x, y);
+      const row = element?.closest("[data-shared-note-id]");
+      if (row) {
+        if (row.dataset.sharedNoteId === sourceId) return null;
+        const rect = row.getBoundingClientRect();
+        return { noteId: row.dataset.sharedNoteId, groupId: row.dataset.sharedNoteGroupId || null, after: y >= rect.top + rect.height / 2 };
+      }
+      const group = element?.closest("[data-shared-note-group]");
+      return group ? { noteId: null, groupId: group.dataset.sharedNoteGroup || null, after: false } : null;
+    }
+    function move(event) {
+      const drag = noteDragRef.current;
+      if (!drag) return;
+      if (!drag.active) {
+        const distance = Math.abs(event.clientX - drag.x) + Math.abs(event.clientY - drag.y);
+        if (drag.pointerType === "touch" && distance > 12) { clearTimeout(drag.timer); noteDragRef.current = null; return; }
+        if (drag.pointerType !== "touch" && distance > 5) { drag.active = true; setDraggingNote(drag.id); }
+        else return;
+      }
+      event.preventDefault();
+      drag.target = targetAt(event.clientX, event.clientY, drag.id);
+      setNoteDropTarget(drag.target);
+    }
+    function finish(event) {
+      const drag = noteDragRef.current;
+      if (!drag) return;
+      clearTimeout(drag.timer);
+      noteDragRef.current = null;
+      if (drag.active) {
+        const target = targetAt(event.clientX, event.clientY, drag.id);
+        if (target) reorderNoteRef.current?.(drag.id, target.groupId, target.noteId, target.after);
+      }
+      setDraggingNote(""); setNoteDropTarget(null);
+    }
+    function cancel() { const drag = noteDragRef.current; if (drag) clearTimeout(drag.timer); noteDragRef.current = null; setDraggingNote(""); setNoteDropTarget(null); }
+    document.addEventListener("pointermove", move, { passive: false });
+    document.addEventListener("pointerup", finish);
+    document.addEventListener("pointercancel", cancel);
+    return () => { document.removeEventListener("pointermove", move); document.removeEventListener("pointerup", finish); document.removeEventListener("pointercancel", cancel); };
+  }, []);
+
+  function startNoteDrag(event, note) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    if (noteDragRef.current) clearTimeout(noteDragRef.current.timer);
+    const drag = { id: note.id, x: event.clientX, y: event.clientY, pointerType: event.pointerType, active: false, target: null, timer: null };
+    if (event.pointerType === "touch") drag.timer = window.setTimeout(() => { drag.active = true; setDraggingNote(note.id); }, 320);
+    noteDragRef.current = drag;
   }
-  async function remove(note) { if (!window.confirm(`Excluir a anotação “${note.title}” para vocês dois?`)) return; const { error: removeError } = await supabase.from("shared_notes").delete().eq("id", note.id); if (removeError) setError("Não consegui excluir a anotação."); else await load(); }
-  return <div className="ck-shared-notes">{error && <p className="ck-social-message erro" role="alert">{error}</p>}
-    {editing && <form className="ck-social-task-form" onSubmit={save}><input autoFocus maxLength={100} required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título da anotação" /><textarea rows={3} maxLength={5000} value={body} onChange={(e) => setBody(e.target.value)} placeholder="Anotação (opcional)" /><div className="ck-edit-acoes"><button type="submit">{editing === "new" ? "Adicionar" : "Salvar"}</button><button type="button" className="ck-icone" onClick={() => setEditing(null)} aria-label="Cancelar">×</button></div></form>}
-    {!editing && <button type="button" className="ck-shared-note-add" onClick={() => begin()}>+ Anotação</button>}
-    {notes.map((note) => <article className="ck-team-note" key={note.id}><div className="ck-team-note-bubble"><div><strong>{note.title}</strong><time>{new Date(note.updated_at || note.created_at).toLocaleDateString("pt-BR")}</time></div>{note.body && <p>{note.body}</p>}</div><div className="ck-team-note-actions"><button type="button" className="ck-icone" title="Editar anotação" aria-label={`Editar ${note.title}`} onClick={() => begin(note)}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" /></svg></button><button type="button" className="ck-icone ck-social-remove" title="Excluir anotação" aria-label={`Excluir ${note.title}`} onClick={() => remove(note)}>×</button></div></article>)}
-    {!notes.length && !editing && <p className="ck-social-empty">Nenhuma anotação com esta pessoa ainda.</p>}
+
+  function beginNote(note = null, groupId = null) {
+    const noteDate = note ? (note.note_date === undefined ? note.created_at?.slice(0, 10) || "" : note.note_date || "") : hojeISO();
+    setNoteForm({ id: note?.id || null, title: note?.title || "", body: note?.body || "", date: noteDate, groupId: note?.group_id ?? groupId });
+    setGroupForm(null);
+  }
+
+  async function saveNote(event) {
+    event.preventDefault();
+    if (!noteForm?.title.trim()) return;
+    const changes = { title: noteForm.title.trim(), body: noteForm.body.trim(), note_date: noteForm.date || null, group_id: noteForm.groupId || null, updated_at: new Date().toISOString() };
+    const result = noteForm.id
+      ? await supabase.from("shared_notes").update(changes).eq("id", noteForm.id)
+      : await supabase.from("shared_notes").insert({ ...changes, [colunaEscopo]: escopoId, position: notes.filter((n) => (n.group_id || null) === (noteForm.groupId || null)).length });
+    if (result.error) setError("Não consegui salvar a anotação compartilhada.");
+    else { setNoteForm(null); await load(); }
+  }
+
+  async function saveGroup(fields, group = groupForm?.group || null) {
+    const result = group
+      ? await supabase.from("shared_note_groups").update({ ...fields, updated_at: new Date().toISOString() }).eq("id", group.id)
+      : await supabase.from("shared_note_groups").insert({ ...fields, [colunaEscopo]: escopoId, position: groups.length });
+    if (result.error) setError(group ? "Não consegui editar a sessão de anotações." : "Não consegui criar a sessão de anotações.");
+    else { setGroupForm(null); await load(); }
+  }
+
+  async function deleteNote(note) {
+    if (!window.confirm(`Excluir a anotação “${note.title}” para todos?`)) return;
+    const { error: deleteError } = await supabase.from("shared_notes").delete().eq("id", note.id);
+    if (deleteError) setError("Não consegui excluir a anotação."); else await load();
+  }
+
+  async function deleteGroup(group) {
+    if (!window.confirm(`Excluir a sessão “${group.name}”? As anotações vão para Sem sessão.`)) return;
+    const { error: deleteError } = await supabase.from("shared_note_groups").delete().eq("id", group.id);
+    if (deleteError) setError("Não consegui excluir a sessão."); else await load();
+  }
+
+  async function reorderNote(noteId, targetGroupId, targetId = null, after = false) {
+    const dragged = notes.find((note) => note.id === noteId);
+    if (!dragged) return;
+    const targetGroup = targetGroupId || null;
+    const affectedGroups = new Set([dragged.group_id || null, targetGroup]);
+    let next = [...notes];
+    for (const groupId of affectedGroups) {
+      let list = next.filter((note) => (note.group_id || null) === groupId).sort((a, b) => a.position - b.position);
+      if ((dragged.group_id || null) === groupId) list = list.filter((note) => note.id !== noteId);
+      if (groupId === targetGroup) {
+        const index = targetId ? list.findIndex((note) => note.id === targetId) : list.length;
+        const insertAt = index < 0 ? list.length : index + (after ? 1 : 0);
+        list.splice(insertAt, 0, { ...dragged, group_id: groupId });
+      }
+      list = list.map((note, position) => ({ ...note, group_id: groupId, position }));
+      next = next.filter((note) => (note.group_id || null) !== groupId).concat(list);
+    }
+    setNotes(next.sort((a, b) => {
+      const ga = groups.findIndex((group) => group.id === a.group_id); const gb = groups.findIndex((group) => group.id === b.group_id);
+      return ga - gb || a.position - b.position;
+    }));
+    const updates = next.filter((note) => affectedGroups.has(note.group_id || null));
+    const results = await Promise.all(updates.map((note) => supabase.from("shared_notes").update({ group_id: note.group_id, position: note.position }).eq("id", note.id)));
+    if (results.some((result) => result.error)) { setError("Não consegui mudar a ordem das anotações."); await load(); }
+  }
+  reorderNoteRef.current = reorderNote;
+
+  function moveNoteByKeyboard(note, delta) {
+    const siblings = notesFor(note.group_id || null);
+    const index = siblings.findIndex((item) => item.id === note.id);
+    const target = siblings[index + delta];
+    if (target) reorderNote(note.id, note.group_id || null, target.id, delta > 0);
+  }
+
+  function noteRow(note) {
+    const descriptionOpen = !fechadas[note.id];
+    return <article key={note.id} data-shared-note-id={note.id} data-shared-note-group-id={note.group_id || ""} className={`ck-anotacao ck-team-note-row${draggingNote === note.id ? " arrastando" : ""}${noteDropTarget?.noteId === note.id ? " alvo" : ""}`}>
+      <span className="ck-alca ck-shared-note-handle" role="button" tabIndex={0} aria-label="Mover anotação; use as setas para cima e para baixo" title="Arraste para mudar a posição" onPointerDown={(event) => startNoteDrag(event, note)} onKeyDown={(event) => { if (event.key === "ArrowUp" || event.key === "ArrowDown") { event.preventDefault(); moveNoteByKeyboard(note, event.key === "ArrowUp" ? -1 : 1); } }}><svg viewBox="0 0 12 18" width="12" height="18" aria-hidden="true" fill="currentColor"><circle cx="3" cy="3" r="1.2"/><circle cx="9" cy="3" r="1.2"/><circle cx="3" cy="9" r="1.2"/><circle cx="9" cy="9" r="1.2"/><circle cx="3" cy="15" r="1.2"/><circle cx="9" cy="15" r="1.2"/></svg></span>
+      <div className="ck-anotacao-corpo"><div><strong>{note.title}</strong>{(note.note_date === undefined ? note.created_at?.slice(0, 10) : note.note_date) && <time>{new Date(((note.note_date === undefined ? note.created_at?.slice(0, 10) : note.note_date) || "") + "T00:00").toLocaleDateString("pt-BR")}</time>}</div>{note.body && descriptionOpen && <p>{note.body}</p>}</div>
+      {note.body && <button type="button" className="ck-descricao-toggle" aria-label={descriptionOpen ? "Ocultar anotação" : "Mostrar anotação"} aria-expanded={descriptionOpen} onClick={() => setFechadas((value) => ({ ...value, [note.id]: !value[note.id] }))}><svg className={`ck-descricao-seta${descriptionOpen ? " aberta" : ""}`} viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m3.5 6 4.5 4.5L12.5 6" /></svg></button>}
+      <button type="button" className="ck-icone" title="Editar anotação" aria-label={`Editar ${note.title}`} onClick={() => beginNote(note)}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" /></svg></button><button type="button" className="ck-icone ck-social-remove" title="Excluir anotação" aria-label={`Excluir ${note.title}`} onClick={() => deleteNote(note)}>×</button>
+    </article>;
+  }
+
+  const notesFor = (groupId) => notes.filter((note) => (note.group_id || null) === (groupId || null)).sort((a, b) => a.position - b.position || String(a.created_at).localeCompare(String(b.created_at)));
+  return <div className="ck-shared-notes">
+    {error && <p className="ck-social-message erro" role="alert">{error}</p>}
+    <div className="ck-barras-topo"><button type="button" className="ck-barra-mais" onClick={() => beginNote()}><span className="ck-mais" aria-hidden="true">+</span><span>Adicionar anotação</span><kbd className="ck-atalho">Ctrl F</kbd></button><button type="button" className="ck-barra-mais" onClick={() => { setGroupForm((value) => value && !value.group ? null : { group: null }); setNoteForm(null); }}><span className="ck-mais" aria-hidden="true">+</span><span>Adicionar sessão</span><kbd className="ck-atalho">Ctrl D</kbd></button></div>
+    {noteForm && !noteForm.groupId && <form className="ck-form-grupo ck-form-anotacao ck-shared-note-editor" onSubmit={saveNote}><div className="ck-anotacao-titulo-data"><input autoFocus maxLength={100} required value={noteForm.title} onChange={(event) => setNoteForm((value) => ({ ...value, title: event.target.value }))} placeholder="Título" aria-label="Título da anotação"/><DataDiaMes value={noteForm.date || ""} onChange={(date) => setNoteForm((value) => ({ ...value, date }))} rotulo="Data da anotação (opcional): dia e mês" /></div><textarea className="ck-campo-largo" rows={3} maxLength={5000} value={noteForm.body} onChange={(event) => setNoteForm((value) => ({ ...value, body: event.target.value }))} placeholder="Anotação (opcional)" aria-label="Anotação (opcional)"/><div className="ck-edit-acoes"><button type="submit" disabled={!noteForm.title.trim()}>{noteForm.id ? "Salvar" : "Adicionar"}</button><button type="button" className="ck-icone" onClick={() => setNoteForm(null)} aria-label="Cancelar">×</button></div></form>}
+    {groupForm && !groupForm.group && <GroupEditor onCancel={() => setGroupForm(null)} onSave={(fields) => saveGroup(fields, null)} />}
+    {groups.map((group) => {
+      const groupNotes = notesFor(group.id);
+      const collapsed = Boolean(fechadas[`group:${group.id}`]);
+      return <section data-shared-note-group={group.id} key={group.id} className={`ck-grupo ck-social-note-group${collapsed ? " recolhida" : ""}${noteDropTarget && !noteDropTarget.noteId && noteDropTarget.groupId === group.id ? " alvo" : ""}`} onDragOver={(event) => { if (draggingNote) event.preventDefault(); }} onDrop={(event) => { if (draggingNote) { event.preventDefault(); reorderNote(draggingNote, group.id); setDraggingNote(""); } }}>
+        <header className="ck-grupo-topo"><button type="button" className="ck-grupo-titulo" aria-expanded={!collapsed} onClick={() => setFechadas((value) => ({ ...value, [`group:${group.id}`]: !value[`group:${group.id}`] }))}><span className={`ck-seta ${!collapsed ? "aberta" : ""}`}>›</span><IconeGrupo tipo={group.icon}/><span className="ck-grupo-nome">{group.name}</span><span className="ck-grupo-qtd">{groupNotes.length}</span></button>{groupForm?.group?.id !== group.id && <><button type="button" className="ck-mais ck-mais-circular" title="Adicionar anotação nesta sessão" aria-label={`Adicionar anotação em ${group.name}`} onClick={() => { setFechadas((value) => ({ ...value, ["group:" + group.id]: false })); beginNote(null, group.id); }}><IconeGrupoMais/></button><button type="button" className="ck-icone" title="Editar sessão" aria-label={`Editar sessão ${group.name}`} onClick={() => { setFechadas((value) => ({ ...value, ["group:" + group.id]: false })); setGroupForm({ group }); setNoteForm(null); }}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z"/></svg></button><button type="button" className="ck-icone ck-social-remove" title="Apagar sessão" aria-label={`Apagar sessão ${group.name}`} onClick={() => deleteGroup(group)}>×</button></>}</header>
+        {!collapsed && <>{groupForm?.group?.id === group.id && <GroupEditor group={group} onCancel={() => setGroupForm(null)} onSave={(fields) => saveGroup(fields, group)}/ >}{noteForm?.groupId === group.id && <NoteFormInline form={noteForm} setForm={setNoteForm} onSubmit={saveNote} onCancel={() => setNoteForm(null)}/ >}{groupNotes.map(noteRow)}{!groupNotes.length && !groupForm?.group && !noteForm?.groupId && <p className="ck-vazio-grupo">Nenhuma anotação nesta sessão.</p>}</>}
+      </section>;
+    })}
+    {notesFor(null).length > 0 && <section data-shared-note-group="" className="ck-grupo ck-social-note-unfiled"><h2 className="ck-secao">Sem sessão</h2>{notesFor(null).map(noteRow)}</section>}
+    {!groups.length && !notes.length && !noteForm && <p className="ck-vazio">Adicione uma anotação ou crie uma sessão.</p>}
   </div>;
+}
+
+function NoteFormInline({ form, setForm, onSubmit, onCancel }) {
+  return <form className="ck-form-grupo ck-form-anotacao ck-shared-note-editor" onSubmit={onSubmit}><div className="ck-anotacao-titulo-data"><input autoFocus maxLength={100} required value={form.title} onChange={(event) => setForm((value) => ({ ...value, title: event.target.value }))} placeholder="Título" aria-label="Título da anotação"/><DataDiaMes value={form.date || ""} onChange={(date) => setForm((value) => ({ ...value, date }))} rotulo="Data da anotação (opcional): dia e mês" /></div><textarea className="ck-campo-largo" rows={3} maxLength={5000} value={form.body} onChange={(event) => setForm((value) => ({ ...value, body: event.target.value }))} placeholder="Anotação (opcional)" aria-label="Anotação (opcional)"/><div className="ck-edit-acoes"><button type="submit" disabled={!form.title.trim()}>Adicionar</button><button type="button" className="ck-icone" onClick={onCancel} aria-label="Cancelar">×</button></div></form>;
+}
+
+function IconeGrupoMais() {
+  return <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M8 3v10M3 8h10"/></svg>;
 }
 
 function TaskEditor({ initial, groupId = null, onSave, onCancel, busy }) {
@@ -247,8 +419,8 @@ function ConfirmacaoSocial({ confirm, busy, onCancel, onConfirm }) {
   </div>;
 }
 
-const ICONES_GRUPO = [["butterfly", "Borboleta"], ["home", "Casa"], ["person", "Pessoa"], ["work", "Trabalho"], ["book", "Estudos"], ["heart", "Favoritos"], ["star", "Importante"], ["calendar", "Agenda"], ["target", "Objetivo"], ["folder", "Geral"]];
-function IconeGrupo({ tipo = "folder" }) {
+export const ICONES_GRUPO = [["butterfly", "Borboleta"], ["home", "Casa"], ["person", "Pessoa"], ["work", "Trabalho"], ["book", "Estudos"], ["heart", "Favoritos"], ["star", "Importante"], ["calendar", "Agenda"], ["target", "Objetivo"], ["folder", "Geral"]];
+export function IconeGrupo({ tipo = "folder" }) {
   if (tipo === "butterfly") return <span className="ck-sessao-icone logo monocromatico" style={{ maskImage: `url("${import.meta.env.BASE_URL}Logo.svg")`, WebkitMaskImage: `url("${import.meta.env.BASE_URL}Logo.svg")` }} aria-hidden="true" />;
   const paths = {
     home: <><path d="m2.5 8 6.5-5.5L15.5 8v6a1.5 1.5 0 0 1-1.5 1.5H4A1.5 1.5 0 0 1 2.5 14z" /><path d="M7 15.5v-5h4v5" /></>,
@@ -264,10 +436,18 @@ function IconeGrupo({ tipo = "folder" }) {
   return <svg className="ck-sessao-icone" viewBox="0 0 18 18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">{paths[tipo] || paths.folder}</svg>;
 }
 
-function GroupEditor({ group, onSave, onCancel }) {
+export function GroupEditor({ group, onSave, onCancel }) {
+  const formRef = useRef(null);
   const [name, setName] = useState(group?.name || "");
   const [icon, setIcon] = useState(group?.icon || "butterfly");
-  return <form className="ck-social-group-editor" onSubmit={(e) => { e.preventDefault(); if (name.trim()) onSave({ name: name.trim(), icon }); }}>
+  useEffect(() => {
+    const closeOutside = (event) => {
+      if (formRef.current && !formRef.current.contains(event.target)) window.setTimeout(() => onCancel?.(), 0);
+    };
+    document.addEventListener("pointerdown", closeOutside, true);
+    return () => document.removeEventListener("pointerdown", closeOutside, true);
+  }, [onCancel]);
+  return <form ref={formRef} className="ck-social-group-editor" onSubmit={(e) => { e.preventDefault(); if (name.trim()) onSave({ name: name.trim(), icon }); }} onBlur={(event) => { const form = event.currentTarget; if (event.relatedTarget && form.contains(event.relatedTarget)) return; window.setTimeout(() => { if (!form.contains(document.activeElement)) onCancel?.(); }, 50); }} onKeyDown={(event) => { if (event.key === "Escape") onCancel?.(); }}>
     <div className="ck-seletor-icones">{ICONES_GRUPO.map(([item, label]) => <button type="button" className="ck-opcao-icone" key={item} aria-pressed={icon === item} aria-label={`Ícone ${label}`} title={label} onClick={() => setIcon(item)}><IconeGrupo tipo={item} /></button>)}</div>
     <input autoFocus maxLength={60} value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome da sessão" aria-label="Nome da sessão compartilhada" required />
     <button type="submit" className="ck-icone" aria-label="Salvar sessão" title="Salvar sessão"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m3 8 3.2 3.2L13 4.5" /></svg></button>
@@ -275,7 +455,7 @@ function GroupEditor({ group, onSave, onCancel }) {
   </form>;
 }
 
-export default function Social({ user, view = "tasks", onManage, onMovePersonalTask }) {
+export default function Social({ user, view = "tasks", friendshipId = "", onBack, onOpenFriend, onManage, onMovePersonalTask }) {
   const [friends, setFriends] = useState([]);
   const [friendOrder, setFriendOrder] = useState([]);
   const [requests, setRequests] = useState([]);
@@ -287,7 +467,6 @@ export default function Social({ user, view = "tasks", onManage, onMovePersonalT
     const topBefore = encontrarCard()?.getBoundingClientRect().top;
     const nextNotes = friendViews[friendshipId] !== "notes";
     setFriendViews((v) => ({ ...v, [friendshipId]: nextNotes ? "notes" : "tasks" }));
-    setCollapsedFriends((v) => ({ ...v, [friendshipId]: false }));
     setAddingFor("");
     setGroupForm(null);
     if (topBefore != null) requestAnimationFrame(() => requestAnimationFrame(() => {
@@ -305,7 +484,6 @@ export default function Social({ user, view = "tasks", onManage, onMovePersonalT
   const [taskError, setTaskError] = useState("");
   const [addingFor, setAddingFor] = useState("");
   const [savingTask, setSavingTask] = useState(false);
-  const [collapsedFriends, setCollapsedFriends] = useState({});
   const [collapsedGroups, setCollapsedGroups] = useState({});
   const [groupForm, setGroupForm] = useState(null);
   const [confirm, setConfirm] = useState(null);
@@ -838,16 +1016,14 @@ export default function Social({ user, view = "tasks", onManage, onMovePersonalT
   if (loading && friends.length === 0) return <section className="ck-social-tasks"><p>Carregando tarefas compartilhadas…</p></section>;
 
   return <section className="ck-social-tasks" onDragOver={(event) => { if (Array.from(event.dataTransfer?.types || []).includes("application/x-crysalis-task") && event.target.closest("[data-social-drop-kind]")) { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; } }} onDrop={receberTarefaPessoal}>
-    <div className="ck-social-tasks-heading"><div><span className="ck-social-icon"><IconePessoa /></span><h2>Tarefas em conjunto</h2></div><button type="button" className="ck-link ck-social-manage-link" onClick={onManage}>Gerenciar pessoas</button></div>
+    <div className="ck-social-tasks-heading">{view === "friend-detail" ? <><button type="button" className="ck-social-back" onClick={onBack}>‹ <span>Amigos</span></button><div><span className="ck-social-icon"><IconePessoa /></span><h2>{nomeVisivel(friends.find((item) => item.friendship_id === friendshipId)?.display_name || "Amizade")}</h2></div></> : <><div><span className="ck-social-icon"><IconePessoa /></span><h2>Tarefas em conjunto</h2></div><button type="button" className="ck-link ck-social-manage-link" onClick={onManage}>Gerenciar pessoas</button></>}</div>
     {error && <p className="ck-social-message erro" role="alert">{error}</p>}
     {taskError && <p className="ck-social-message erro" role="alert">{taskError}</p>}
-    {friends.length === 0 ? <p className="ck-social-empty">Adicione alguém em Social para começar a compartilhar tarefas.</p> : friendsOrdered().map((friend) => {
+    {friends.length === 0 ? <p className="ck-social-empty">Adicione alguém em Social para começar a compartilhar tarefas.</p> : friendsOrdered().filter((friend) => view !== "friend-detail" || friend.friendship_id === friendshipId).map((friend) => {
       const friendGroups = taskGroups.filter((group) => group.friendship_id === friend.friendship_id);
       const friendTasks = tasks.filter((task) => task.friendship_id === friend.friendship_id && (!task.scheduled_for || task.scheduled_for <= hojeISO()));
-      const hasAnyTasks = tasks.some((task) => task.friendship_id === friend.friendship_id);
       const notesOpen = friendViews[friend.friendship_id] === "notes";
-      const canExpand = friendGroups.length > 0 || hasAnyTasks || notesOpen;
-      const collapsed = canExpand && Boolean(collapsedFriends[friend.friendship_id]);
+      const opened = view === "friend-detail";
       const unfiledTasks = friendTasks.filter((task) => !task.group_id || !friendGroups.some((g) => g.id === task.group_id));
       const addKey = (groupId) => `${friend.friendship_id}:${groupId || "root"}`;
       const openForm = (groupId) => addingFor === addKey(groupId);
@@ -855,15 +1031,13 @@ export default function Social({ user, view = "tasks", onManage, onMovePersonalT
       const friendSource = { type: "friend", id: friend.friendship_id };
       const friendDragging = dragging?.type === "friend" && dragging.id === friend.friendship_id;
       const friendTarget = dropTarget?.type === "friend" && dropTarget.id === friend.friendship_id;
-      const showBody = (canExpand && !collapsed) || openForm(null) || groupForm?.friendshipId === friend.friendship_id;
-      return <section data-social-drop-kind="friend" data-social-id={friend.friendship_id} data-social-friendship-id={friend.friendship_id} className={`ck-social-friend-group${collapsed ? " recolhida" : ""}${friendDragging ? " arrastando" : ""}${friendTarget ? " alvo" : ""}`} key={friend.friendship_id}>
-        <header className="ck-social-friend-heading">
-          <SocialAlca item={friendSource} onKeyboardMove={moverPorTeclado} onPointerStart={iniciarArrastePointer} label={nomeVisivel(friend.display_name)} />
-          {canExpand ? <button type="button" className="ck-social-collapse" aria-expanded={!collapsed} onClick={() => setCollapsedFriends((v) => ({ ...v, [friend.friendship_id]: !v[friend.friendship_id] }))}><span className={`ck-seta ${!collapsed ? "aberta" : ""}`}>›</span><IconePessoa /><strong>Tarefas com {nomeVisivel(friend.display_name)}</strong><span className="ck-grupo-qtd">{friendTasks.filter((t) => t.completed).length}/{friendTasks.length}</span></button> : <div className="ck-social-collapse ck-social-empty-friend"><IconePessoa /><strong>Tarefas com {nomeVisivel(friend.display_name)}</strong><span className="ck-grupo-qtd">0/0</span></div>}
-          <div className="ck-social-header-actions"><button type="button" className="ck-social-notes-toggle" aria-label={notesOpen ? "Voltar às tarefas compartilhadas" : "Abrir anotações compartilhadas"} title={notesOpen ? "Voltar às tarefas" : "Anotações compartilhadas"} onClick={() => alternarVisaoAmigo(friend.friendship_id)}>{notesOpen ? <img src={`${import.meta.env.BASE_URL}Logo.svg`} alt="" aria-hidden="true" /> : <svg viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M16 9.5a6.5 6.5 0 0 1-6.7 6 7 7 0 0 1-2.8-.6L3 16l.9-3.1A5.8 5.8 0 0 1 3 9.7 6.4 6.4 0 0 1 9.6 3h.5A6.2 6.2 0 0 1 16 9z" /></svg>}</button>{(!canExpand || !collapsed) && <><button type="button" className="ck-mais ck-mais-circular" onClick={() => { setAddingFor(openForm(null) ? "" : addKey(null)); setGroupForm(null); }} aria-label={`Adicionar tarefa com ${nomeVisivel(friend.display_name)}`} title="Adicionar tarefa"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M8 3v10M3 8h10" /></svg></button><button type="button" className="ck-social-session-add" onClick={() => { setGroupForm({ friendshipId: friend.friendship_id, group: null }); setAddingFor(""); }}>+ Sessão</button></>}</div>
-        </header>
+      const showBody = opened;
+      return <section data-social-drop-kind="friend" data-social-id={friend.friendship_id} data-social-friendship-id={friend.friendship_id} className={`ck-social-friend-group${opened ? " ck-social-friend-detail" : ""}${friendDragging ? " arrastando" : ""}${friendTarget ? " alvo" : ""}`} key={friend.friendship_id}>
+        {!opened && <header className="ck-social-friend-heading"><SocialAlca item={friendSource} onKeyboardMove={moverPorTeclado} onPointerStart={iniciarArrastePointer} label={nomeVisivel(friend.display_name)} /><button type="button" className="ck-social-collapse" onClick={() => onOpenFriend?.(friend.friendship_id)} aria-label={`Abrir tarefas com ${nomeVisivel(friend.display_name)}`}><IconePessoa /><strong>{nomeVisivel(friend.display_name)}</strong><span className="ck-grupo-qtd">{friendTasks.filter((t) => t.completed).length}/{friendTasks.length}</span></button></header>}
         {showBody && <div className="ck-social-friend-body">
-          {notesOpen ? <NotasCompartilhadasAmizade friendshipId={friend.friendship_id} /> : <>
+          <div className="ck-abas ck-abas-principais ck-social-work-tabs" role="tablist" aria-label={`${nomeVisivel(friend.display_name)}: tarefas e anotações`}><button type="button" role="tab" className="ck-aba" aria-selected={!notesOpen} onClick={() => { if (notesOpen) alternarVisaoAmigo(friend.friendship_id); }}>Checklist</button><button type="button" role="tab" className="ck-aba" aria-selected={notesOpen} onClick={() => { if (!notesOpen) alternarVisaoAmigo(friend.friendship_id); }}>Anotações</button></div>
+          {notesOpen ? <AnotacoesCompartilhadas tipo="amizade" escopoId={friend.friendship_id} /> : <>
+          <div className="ck-barras-topo"><button type="button" className="ck-barra-mais" onClick={() => { setAddingFor(openForm(null) ? "" : addKey(null)); setGroupForm(null); }}><span className="ck-mais" aria-hidden="true">+</span><span>Adicionar tarefa</span></button><button type="button" className="ck-barra-mais" onClick={() => { setGroupForm({ friendshipId: friend.friendship_id, group: null }); setAddingFor(""); }}><span className="ck-mais" aria-hidden="true">+</span><span>Adicionar sessão</span></button></div>
           {openForm(null) && <TaskEditor busy={savingTask} onCancel={() => setAddingFor("")} onSave={(fields) => saveTask(friend, fields)} />}
           {groupForm?.friendshipId === friend.friendship_id && !groupForm.group && <GroupEditor onCancel={() => setGroupForm(null)} onSave={(fields) => salvarGrupo(friend.friendship_id, fields)} />}
           {friendGroups.map((group) => {
@@ -872,16 +1046,16 @@ export default function Social({ user, view = "tasks", onManage, onMovePersonalT
             const groupSource = { type: "group", id: group.id, friendshipId: friend.friendship_id };
             const groupDragging = dragging?.type === "group" && dragging.id === group.id;
             const groupTarget = dropTarget?.type === "group" && dropTarget.id === group.id;
-            return <section data-social-drop-kind="group" data-social-id={group.id} data-social-friendship-id={friend.friendship_id} className={`ck-social-shared-session${groupCollapsed ? " recolhida" : ""}${groupDragging ? " arrastando" : ""}${groupTarget ? " alvo" : ""}`} key={group.id}>
+            return <section data-social-drop-kind="group" data-social-id={group.id} data-social-friendship-id={friend.friendship_id} className={`ck-grupo ck-social-shared-session${groupCollapsed ? " recolhida" : ""}${groupDragging ? " arrastando" : ""}${groupTarget ? " alvo" : ""}`} key={group.id}>
               <header className="ck-grupo-topo">
                 <SocialAlca item={groupSource} onKeyboardMove={moverPorTeclado} onPointerStart={iniciarArrastePointer} label={group.name} />
                 <button type="button" className="ck-grupo-titulo" aria-expanded={!groupCollapsed} onClick={() => setCollapsedGroups((v) => ({ ...v, [group.id]: !v[group.id] }))}><span className={`ck-seta ${!groupCollapsed ? "aberta" : ""}`}>›</span><IconeGrupo tipo={group.icon} /><span className="ck-grupo-nome">{group.name}</span><span className="ck-grupo-qtd">{groupTasks.filter((t) => t.completed).length}/{groupTasks.length}</span></button>
-                {!groupCollapsed && <><button type="button" className="ck-mais ck-mais-circular" onClick={() => { setAddingFor(openForm(group.id) ? "" : addKey(group.id)); setGroupForm(null); }} aria-label={`Adicionar tarefa em ${group.name}`} title="Adicionar tarefa"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M8 3v10M3 8h10" /></svg></button><button type="button" className="ck-icone" title="Editar sessão" aria-label="Editar sessão" onClick={() => setGroupForm({ friendshipId: friend.friendship_id, group })}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" /></svg></button><button type="button" className="ck-icone ck-social-remove" title="Apagar sessão" aria-label="Apagar sessão" onClick={() => setConfirm({ type: "group", item: group, title: "Apagar sessão?", message: `A sessão “${group.name}” será removida. As tarefas ficam em “Sem sessão” para vocês dois.`, action: "Apagar sessão" })}>×</button></>}
+                {groupForm?.group?.id !== group.id && <><button type="button" className="ck-mais ck-mais-circular" onClick={() => { setCollapsedGroups((v) => ({ ...v, [group.id]: false })); setAddingFor(openForm(group.id) ? "" : addKey(group.id)); setGroupForm(null); }} aria-label={`Adicionar tarefa em ${group.name}`} title="Adicionar tarefa"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M8 3v10M3 8h10" /></svg></button><button type="button" className="ck-icone" title="Editar sessão" aria-label="Editar sessão" onClick={() => { setCollapsedGroups((v) => ({ ...v, [group.id]: false })); setGroupForm({ friendshipId: friend.friendship_id, group }); }}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" /></svg></button><button type="button" className="ck-icone ck-social-remove" title="Apagar sessão" aria-label="Apagar sessão" onClick={() => setConfirm({ type: "group", item: group, title: "Apagar sessão?", message: `A sessão “${group.name}” será removida. As tarefas ficam em “Sem sessão” para vocês dois.`, action: "Apagar sessão" })}>×</button></>}
               </header>
               {!groupCollapsed && <div className="ck-social-session-body">{groupForm?.group?.id === group.id && <GroupEditor group={group} onCancel={() => setGroupForm(null)} onSave={(fields) => salvarGrupo(friend.friendship_id, fields, group)} />}{openForm(group.id) && <TaskEditor groupId={group.id} busy={savingTask} onCancel={() => setAddingFor("")} onSave={(fields) => saveTask(friend, fields)} />}{taskList(groupTasks)}</div>}
             </section>;
           })}
-          {(unfiledTasks.length > 0 || friendGroups.length > 0 || hasAnyTasks) && <div data-social-drop-kind="unfiled" data-social-friendship-id={friend.friendship_id} className={`ck-social-unfiled${dropTarget?.type === "unfiled" && dropTarget.friendshipId === friend.friendship_id ? " alvo" : ""}`}><h3>Sem sessão</h3>{taskList(unfiledTasks)}</div>}
+          {unfiledTasks.length > 0 && <div data-social-drop-kind="unfiled" data-social-friendship-id={friend.friendship_id} className={`ck-social-unfiled${dropTarget?.type === "unfiled" && dropTarget.friendshipId === friend.friendship_id ? " alvo" : ""}`}><h2 className="ck-secao">Sem sessão</h2>{taskList(unfiledTasks)}</div>}
           </>}
         </div>}
       </section>;
