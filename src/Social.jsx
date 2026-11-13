@@ -3,6 +3,13 @@ import { supabase } from "./services/supabase";
 import { scheduleCollaborationNotificationDispatch } from "./services/collaborationNotifications";
 
 const z2 = (n) => String(n).padStart(2, "0");
+function lerPreferenciaLocal(chave, padrao) {
+  try { const valor = localStorage.getItem(chave); return valor == null ? padrao : JSON.parse(valor); }
+  catch { return padrao; }
+}
+function salvarPreferenciaLocal(chave, valor) {
+  try { localStorage.setItem(chave, JSON.stringify(valor)); } catch { /* armazenamento opcional */ }
+}
 const hojeISO = () => { const d = new Date(); return `${d.getFullYear()}-${z2(d.getMonth() + 1)}-${z2(d.getDate())}`; };
 const OPCOES_REPETE = [["0", "Não repete"], ["1", "Todo dia"], ["3", "A cada 3 dias"], ["30", "Uma vez por mês"], ["personalizado", "Intervalo personalizado"]];
 const DIAS_SEMANA = [[1, "Seg"], [2, "Ter"], [3, "Qua"], [4, "Qui"], [5, "Sex"], [6, "Sáb"], [0, "Dom"]];
@@ -66,7 +73,7 @@ function repeticaoDaTask(task) {
 }
 function configRepeticaoDaTask(task) { return task?.recurrence ? { ...task.recurrence, diasSemana: task.recurrence.diasSemana || [] } : { tipo: "dias", intervalo: 2, diasSemana: [] }; }
 function recurrencePayload(opcao, config) {
-  if (opcao === "personalizado") return config;
+  if (opcao === "personalizado") return config.tipo !== "semana" && Number(config.intervalo) <= 0 ? null : config;
   if (opcao === "30") return { tipo: "meses", intervalo: 1 };
   return Number(opcao) > 0 ? { tipo: "dias", intervalo: Number(opcao) } : null;
 }
@@ -122,11 +129,12 @@ function IconePessoa() {
 
 export function AnotacoesCompartilhadas({ tipo, escopoId }) {
   const colunaEscopo = tipo === "equipe" ? "team_id" : "friendship_id";
+  const chaveEstadoVisual = `crysalis:anotacoes-compartilhadas:${tipo}:${escopoId}`;
   const [notes, setNotes] = useState([]);
   const [groups, setGroups] = useState([]);
   const [noteForm, setNoteForm] = useState(null);
   const [groupForm, setGroupForm] = useState(null);
-  const [fechadas, setFechadas] = useState({});
+  const [fechadas, setFechadas] = useState(() => lerPreferenciaLocal(chaveEstadoVisual, {}));
   const [error, setError] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
@@ -134,6 +142,8 @@ export function AnotacoesCompartilhadas({ tipo, escopoId }) {
   const [noteDropTarget, setNoteDropTarget] = useState(null);
   const noteDragRef = useRef(null);
   const reorderNoteRef = useRef(null);
+
+  useEffect(() => { salvarPreferenciaLocal(chaveEstadoVisual, fechadas); }, [chaveEstadoVisual, fechadas]);
 
   const load = useCallback(async () => {
     const [notesResult, groupsResult] = await Promise.all([
@@ -388,7 +398,7 @@ function TaskEditor({ initial, groupId = null, onSave, onCancel, busy }) {
         </select>
       </label>
       {repeatConfig.tipo === "semana" ? <div className="ck-dias-semana" aria-label="Dias da semana">{DIAS_SEMANA.map(([n, label]) => <label key={n} className={(repeatConfig.diasSemana || []).includes(n) ? "selecionado" : ""}><input type="checkbox" checked={(repeatConfig.diasSemana || []).includes(n)} onChange={(e) => setRepeatConfig((v) => ({ ...v, diasSemana: e.target.checked ? [...new Set([...(v.diasSemana || []), n])].sort((a, b) => DIAS_SEMANA.findIndex(([d]) => d === a) - DIAS_SEMANA.findIndex(([d]) => d === b)) : (v.diasSemana || []).filter((d) => d !== n) }))} />{label}</label>)}</div>
-        : <label className="ck-repeticao-intervalo">A cada <input type="number" min="1" max={repeatConfig.tipo === "meses" ? 24 : 365} value={repeatConfig.intervalo || 1} onChange={(e) => setRepeatConfig((v) => ({ ...v, intervalo: Math.max(1, Number(e.target.value) || 1) }))} />{repeatConfig.tipo === "meses" ? "meses" : "dias"}</label>}
+        : <label className="ck-repeticao-intervalo">A cada <input type="number" min="0" max={repeatConfig.tipo === "meses" ? 24 : 365} value={repeatConfig.intervalo ?? ""} aria-label="Intervalo (vazio ou zero significa não repetir)" title="Deixe vazio ou use 0 para não repetir" onChange={(e) => setRepeatConfig((v) => ({ ...v, intervalo: e.target.value === "" ? "" : Math.max(0, Number(e.target.value) || 0) }))} />{repeatConfig.tipo === "meses" ? "meses" : "dias"}</label>}
     </div>}
     <div className="ck-prazo-campos"><span className="ck-prazo-rotulo">Prazo</span><DataDiaMes value={dueDate} onChange={setDueDate} /><Hora24Social value={dueTime} onChange={setDueTime} rotulo="Horário do prazo (opcional)" opcional /></div>
     <textarea className="ck-campo-largo" rows={2} maxLength={1000} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descrição (opcional)" aria-label="Descrição da tarefa compartilhada" />
@@ -402,10 +412,12 @@ function TaskEditor({ initial, groupId = null, onSave, onCancel, busy }) {
 
 function TarefaCompartilhada({ task, onToggle, onEdit, onDelete, busy, now, source, dragging, dropTarget, onKeyboardMove, onPointerStart }) {
   const [editing, setEditing] = useState(false);
-  const [descriptionOpen, setDescriptionOpen] = useState(false);
+  const chaveDescricao = `crysalis:descricao-tarefa-compartilhada:${task.id}`;
+  const [descriptionOpen, setDescriptionOpen] = useState(() => lerPreferenciaLocal(chaveDescricao, false));
   const [priority, setPriority] = useState(task.priority || 0);
   const checkboxRef = useRef(null);
   useEffect(() => setPriority(task.priority || 0), [task.priority]);
+  useEffect(() => { salvarPreferenciaLocal(chaveDescricao, descriptionOpen); }, [chaveDescricao, descriptionOpen]);
   useEffect(() => { if (checkboxRef.current) checkboxRef.current.indeterminate = Boolean(task.partial && !task.completed); }, [task.partial, task.completed]);
   const visiblePriority = prioridadePeloPrazo({ ...task, priority }, now);
   const dueText = task.due_date ? new Date(`${task.due_date}T00:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }) + (task.due_time ? ` ${task.due_time.slice(0, 5)}` : "") : "";
@@ -475,6 +487,7 @@ export function GroupEditor({ group, onSave, onCancel }) {
 }
 
 export default function Social({ user, view = "tasks", friendshipId = "", onBack, onOpenFriend, onManage, onMovePersonalTask, excluirSemConfirmacao = true }) {
+  const [socialSection, setSocialSection] = useState("tasks");
   const [friends, setFriends] = useState([]);
   const [friendOrder, setFriendOrder] = useState([]);
   const [requests, setRequests] = useState([]);
@@ -503,7 +516,8 @@ export default function Social({ user, view = "tasks", friendshipId = "", onBack
   const [taskError, setTaskError] = useState("");
   const [addingFor, setAddingFor] = useState("");
   const [savingTask, setSavingTask] = useState(false);
-  const [collapsedGroups, setCollapsedGroups] = useState({});
+  const chaveSessoesAmigos = `crysalis:sessoes-amigos:${user.id}`;
+  const [collapsedGroups, setCollapsedGroups] = useState(() => lerPreferenciaLocal(chaveSessoesAmigos, {}));
   const [groupForm, setGroupForm] = useState(null);
   const [confirm, setConfirm] = useState(null);
   const [now, setNow] = useState(Date.now());
@@ -516,6 +530,7 @@ export default function Social({ user, view = "tasks", friendshipId = "", onBack
   const taskRevision = useRef(0);
   const taskReadSequence = useRef(0);
   const taskOrderPending = useRef(0);
+  useEffect(() => { salvarPreferenciaLocal(chaveSessoesAmigos, collapsedGroups); }, [chaveSessoesAmigos, collapsedGroups]);
   const taskOrderQueue = useRef(Promise.resolve());
   const taskReloadTimer = useRef(null);
 
@@ -1016,9 +1031,10 @@ export default function Social({ user, view = "tasks", friendshipId = "", onBack
     }
   }
 
-  if (view === "manage") {
-    return <section className="ck-social-page">
-      <div className="ck-social-heading"><div><span className="ck-social-icon"><IconePessoa /></span><div><h2>Social</h2><p>Adicione pessoas e aceite pedidos para organizar tarefas em conjunto.</p></div></div><button type="button" className="secundario" onClick={() => refresh()}>Atualizar</button></div>
+  if (view === "manage" || (view === "hub" && socialSection === "settings")) {
+    return <section className={`ck-social-page${view === "hub" ? " ck-social-hub" : ""}`}>
+      {view === "hub" && <nav className="ck-abas ck-abas-principais ck-social-hub-tabs" role="tablist" aria-label="Social"><button type="button" role="tab" className="ck-aba" aria-selected={false} onClick={() => setSocialSection("tasks")}>Tarefas em conjunto</button><button type="button" role="tab" className="ck-aba" aria-selected={true} onClick={() => setSocialSection("settings")}>Configurações</button></nav>}
+      <div className="ck-social-heading ck-social-area-heading"><div><span className="ck-social-icon"><IconePessoa /></span><div><h2>Social</h2><p>Adicione pessoas e aceite pedidos para organizar tarefas em conjunto.</p></div></div><button type="button" className="secundario" onClick={() => refresh()}>Atualizar</button></div>
       <form className="ck-social-search" onSubmit={search}>
         <label htmlFor="ck-social-query">Encontrar alguém</label>
         <div><input id="ck-social-query" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Nome de usuário ou email" autoCapitalize="none" autoCorrect="off" /><button type="submit" disabled={searching || !query.trim()}>{searching ? "Buscando…" : "Buscar"}</button></div>
@@ -1045,8 +1061,9 @@ export default function Social({ user, view = "tasks", friendshipId = "", onBack
 
   if (loading && friends.length === 0) return <section className="ck-social-tasks"><p>Carregando tarefas compartilhadas…</p></section>;
 
-  return <section className="ck-social-tasks" onDragOver={(event) => { if (Array.from(event.dataTransfer?.types || []).includes("application/x-crysalis-task") && event.target.closest("[data-social-drop-kind]")) { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; } }} onDrop={receberTarefaPessoal}>
-    <div className="ck-social-tasks-heading">{view === "friend-detail" ? <><button type="button" className="ck-social-back" onClick={onBack}>‹ <span>Amigos</span></button><div><span className="ck-social-icon"><IconePessoa /></span><h2>{nomeVisivel(friends.find((item) => item.friendship_id === friendshipId)?.display_name || "Amizade")}</h2></div></> : <><div><span className="ck-social-icon"><IconePessoa /></span><h2>Tarefas em conjunto</h2></div><button type="button" className="ck-link ck-social-manage-link" onClick={onManage}>Gerenciar pessoas</button></>}</div>
+  return <section className={`ck-social-tasks${view === "hub" ? " ck-social-hub" : ""}`} onDragOver={(event) => { if (Array.from(event.dataTransfer?.types || []).includes("application/x-crysalis-task") && event.target.closest("[data-social-drop-kind]")) { event.preventDefault(); event.dataTransfer.dropEffect = "copy"; } }} onDrop={receberTarefaPessoal}>
+    {view === "hub" && <nav className="ck-abas ck-abas-principais ck-social-hub-tabs" role="tablist" aria-label="Social"><button type="button" role="tab" className="ck-aba" aria-selected={true} onClick={() => setSocialSection("tasks")}>Tarefas em conjunto</button><button type="button" role="tab" className="ck-aba" aria-selected={false} onClick={() => setSocialSection("settings")}>Configurações</button></nav>}
+    <div className="ck-social-tasks-heading ck-social-area-heading">{view === "friend-detail" ? <><button type="button" className="ck-social-back" onClick={onBack}>‹ <span>Amigos</span></button><div><span className="ck-social-icon"><IconePessoa /></span><h2>{nomeVisivel(friends.find((item) => item.friendship_id === friendshipId)?.display_name || "Amizade")}</h2></div></> : <div><span className="ck-social-icon"><IconePessoa /></span><h2>Amigos</h2></div>}</div>
     {error && <p className="ck-social-message erro" role="alert">{error}</p>}
     {taskError && <p className="ck-social-message erro" role="alert">{taskError}</p>}
     {friends.length === 0 ? <p className="ck-social-empty">Adicione alguém em Social para começar a compartilhar tarefas.</p> : friendsOrdered().filter((friend) => view !== "friend-detail" || friend.friendship_id === friendshipId).map((friend) => {
@@ -1066,7 +1083,7 @@ export default function Social({ user, view = "tasks", friendshipId = "", onBack
         {!opened && <header className="ck-social-friend-heading"><SocialAlca item={friendSource} onKeyboardMove={moverPorTeclado} onPointerStart={iniciarArrastePointer} label={nomeVisivel(friend.display_name)} /><button type="button" className="ck-social-collapse" onClick={() => onOpenFriend?.(friend.friendship_id)} aria-label={`Abrir tarefas com ${nomeVisivel(friend.display_name)}`}><IconePessoa /><strong>{nomeVisivel(friend.display_name)}</strong><span className="ck-grupo-qtd">{friendTasks.filter((t) => t.completed).length}/{friendTasks.length}</span></button></header>}
         {showBody && <div className={`ck-social-friend-body${!notesOpen && !friendGroups.length && !friendTasks.length ? " ck-social-friend-body-empty" : ""}`}>
           <div className="ck-abas ck-abas-principais ck-social-work-tabs" role="tablist" aria-label={`${nomeVisivel(friend.display_name)}: tarefas e anotações`}><button type="button" role="tab" className="ck-aba" aria-selected={!notesOpen} onClick={() => { if (notesOpen) alternarVisaoAmigo(friend.friendship_id); }}>Checklist</button><button type="button" role="tab" className="ck-aba" aria-selected={notesOpen} onClick={() => { if (!notesOpen) alternarVisaoAmigo(friend.friendship_id); }}>Anotações</button></div>
-          {notesOpen ? <AnotacoesCompartilhadas tipo="amizade" escopoId={friend.friendship_id} /> : <>
+          {notesOpen ? <AnotacoesCompartilhadas key={`amizade:${friend.friendship_id}`} tipo="amizade" escopoId={friend.friendship_id} /> : <>
           <div className="ck-barras-topo"><button type="button" className="ck-barra-mais" onClick={() => { setAddingFor(openForm(null) ? "" : addKey(null)); setGroupForm(null); }}><span className="ck-mais" aria-hidden="true">+</span><span>Adicionar tarefa</span></button><button type="button" className="ck-barra-mais" onClick={() => { setGroupForm({ friendshipId: friend.friendship_id, group: null }); setAddingFor(""); }}><span className="ck-mais" aria-hidden="true">+</span><span>Adicionar sessão</span></button></div>
           {openForm(null) && <TaskEditor busy={savingTask} onCancel={() => setAddingFor("")} onSave={(fields) => saveTask(friend, fields)} />}
           {groupForm?.friendshipId === friend.friendship_id && !groupForm.group && <GroupEditor onCancel={() => setGroupForm(null)} onSave={(fields) => salvarGrupo(friend.friendship_id, fields)} />}

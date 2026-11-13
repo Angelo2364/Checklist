@@ -4,6 +4,13 @@ import { scheduleCollaborationNotificationDispatch } from "./services/collaborat
 import { AnotacoesCompartilhadas, GroupEditor, IconeGrupo, ICONES_GRUPO } from "./Social";
 
 const z2 = (n) => String(n).padStart(2, "0");
+function lerPreferenciaEquipe(chave, padrao) {
+  try { const valor = localStorage.getItem(chave); return valor == null ? padrao : JSON.parse(valor); }
+  catch { return padrao; }
+}
+function salvarPreferenciaEquipe(chave, valor) {
+  try { localStorage.setItem(chave, JSON.stringify(valor)); } catch { /* armazenamento opcional */ }
+}
 const nome = (s = "") => s ? s[0].toLocaleUpperCase("pt-BR") + s.slice(1) : s;
 const DIAS = [[1,"Seg"],[2,"Ter"],[3,"Qua"],[4,"Qui"],[5,"Sex"],[6,"Sáb"],[0,"Dom"]];
 const OPCOES_REPETE = [["0","Não repete"],["1","Todo dia"],["3","A cada 3 dias"],["30","Uma vez por mês"],["personalizado","Intervalo personalizado"]];
@@ -32,7 +39,7 @@ function Hora24Equipe({ value, onChange, opcional = false }) {
   return <span className="ck-hora24" role="group" aria-label="Horário"><input type="text" inputMode="numeric" maxLength={2} placeholder={opcional?"--":"00"} value={h} aria-label="Hora" onChange={(e)=>update(e.target.value,"h")} onBlur={()=>blur("h")}/><span>:</span><input type="text" inputMode="numeric" maxLength={2} placeholder={opcional?"--":"00"} value={m} aria-label="Minuto" onChange={(e)=>update(e.target.value,"m")} onBlur={()=>blur("m")}/></span>;
 }
 function repeticaoDaTarefa(task) { const r=task?.recurrence; if(!r)return "0"; if(r.tipo==="semana")return "personalizado"; if(r.tipo==="meses")return Number(r.intervalo)===1?"30":"personalizado"; return [1,3].includes(Number(r.intervalo))?String(r.intervalo):"personalizado"; }
-function recurrencePayload(option, config) { if(option==="personalizado")return config; if(option==="30")return {tipo:"meses",intervalo:1}; return Number(option)>0?{tipo:"dias",intervalo:Number(option)}:null; }
+function recurrencePayload(option, config) { if(option==="personalizado")return config.tipo!=="semana"&&Number(config.intervalo)<=0?null:config; if(option==="30")return {tipo:"meses",intervalo:1}; return Number(option)>0?{tipo:"dias",intervalo:Number(option)}:null; }
 
 function EditorTarefa({ tarefa, grupos, onSave, onCancel }) {
   const formRef = useRef(null);
@@ -50,7 +57,7 @@ function EditorTarefa({ tarefa, grupos, onSave, onCancel }) {
   return <form ref={formRef} className="ck-form-grupo ck-editor-tarefa ck-team-editor" onSubmit={(e) => { e.preventDefault(); if (titulo.trim() && (recurrence?.tipo!=="semana" || recurrence.diasSemana?.length)) onSave({ title: titulo.trim(), description: descricao.trim(), comment: comentario.trim(), due_date: prazo || (hora ? hoje() : null), due_time: (prazo || hora) ? (hora || null) : null, recurrence, recurrence_time: recurrence ? horaRepeticao : null }); }} onKeyDown={(e)=>{if(e.key==="Escape")onCancel();else if(e.key==="Enter"&&e.target.tagName==="TEXTAREA"&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();e.currentTarget.requestSubmit();}}}>
     <input autoFocus maxLength={200} required value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="O que a equipe precisa fazer?" aria-label="Título da tarefa" onKeyDown={(e)=>e.key==="Escape"&&onCancel()} />
     <div className="ck-social-repeat-row"><select value={repetir} onChange={(e)=>setRepetir(e.target.value)} aria-label="Frequência da tarefa">{OPCOES_REPETE.map(([v,label])=><option key={v} value={v}>{label}</option>)}</select>{repetir!=="0"&&<Hora24Equipe value={horaRepeticao} onChange={setHoraRepeticao}/>}</div>
-    {repetir==="personalizado"&&<div className="ck-repeticao-personalizada ck-social-repeat-custom"><label className="ck-repeticao-tipo">Repetir por<select value={config.tipo} onChange={(e)=>setConfig((v)=>({...v,tipo:e.target.value}))}><option value="dias">A cada N dias</option><option value="semana">Dias da semana</option><option value="meses">A cada N meses</option></select></label>{config.tipo==="semana"?<div className="ck-dias-semana" aria-label="Dias da semana">{DIAS.map(([d,label])=><label key={d} className={(config.diasSemana||[]).includes(d)?"selecionado":""}><input type="checkbox" checked={(config.diasSemana||[]).includes(d)} onChange={(e)=>setConfig((v)=>({...v,diasSemana:e.target.checked?[...new Set([...(v.diasSemana||[]),d])].sort((a,b)=>DIAS.findIndex(([x])=>x===a)-DIAS.findIndex(([x])=>x===b)):(v.diasSemana||[]).filter((x)=>x!==d)}))}/>{label}</label>)}</div>:<label className="ck-repeticao-intervalo">A cada<input type="number" min="1" max={config.tipo==="meses"?24:365} value={config.intervalo||1} onChange={(e)=>setConfig((v)=>({...v,intervalo:Math.max(1,Number(e.target.value)||1)}))}/>{config.tipo==="meses"?"meses":"dias"}</label>}</div>}
+    {repetir==="personalizado"&&<div className="ck-repeticao-personalizada ck-social-repeat-custom"><label className="ck-repeticao-tipo">Repetir por<select value={config.tipo} onChange={(e)=>setConfig((v)=>({...v,tipo:e.target.value}))}><option value="dias">A cada N dias</option><option value="semana">Dias da semana</option><option value="meses">A cada N meses</option></select></label>{config.tipo==="semana"?<div className="ck-dias-semana" aria-label="Dias da semana">{DIAS.map(([d,label])=><label key={d} className={(config.diasSemana||[]).includes(d)?"selecionado":""}><input type="checkbox" checked={(config.diasSemana||[]).includes(d)} onChange={(e)=>setConfig((v)=>({...v,diasSemana:e.target.checked?[...new Set([...(v.diasSemana||[]),d])].sort((a,b)=>DIAS.findIndex(([x])=>x===a)-DIAS.findIndex(([x])=>x===b)):(v.diasSemana||[]).filter((x)=>x!==d)}))}/>{label}</label>)}</div>:<label className="ck-repeticao-intervalo">A cada<input type="number" min="0" max={config.tipo==="meses"?24:365} value={config.intervalo??""} aria-label="Intervalo (vazio ou zero significa não repetir)" title="Deixe vazio ou use 0 para não repetir" onChange={(e)=>setConfig((v)=>({...v,intervalo:e.target.value===""?"":Math.max(0,Number(e.target.value)||0)}))}/>{config.tipo==="meses"?"meses":"dias"}</label>}</div>}
     <div className="ck-prazo-campos"><span className="ck-prazo-rotulo">Prazo</span><DataDiaMesEquipe value={prazo} onChange={setPrazo}/><Hora24Equipe value={hora} onChange={setHora} opcional/></div>
     <textarea className="ck-campo-largo" rows={2} maxLength={1000} value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Descrição (opcional)" aria-label="Descrição" />
     <div className="ck-tarefa-form-rodape"><div className="ck-tarefa-form-botoes"><span className="ck-edit-acoes"><button type="submit" disabled={!titulo.trim()||(recurrence?.tipo==="semana"&&!recurrence.diasSemana?.length)}>{tarefa?"Salvar":"Adicionar"}</button><button type="button" className="ck-icone" onClick={onCancel} aria-label="Cancelar">×</button></span></div>{comentarioAberto&&<textarea className="ck-comentario-input" rows={2} maxLength={1000} value={comentario} onChange={(e)=>setComentario(e.target.value)} placeholder="Comentário (opcional)" aria-label="Comentário"/>}<button type="button" className="ck-comentario-botao" aria-label={comentarioAberto?"Ocultar comentário":"Adicionar comentário"} aria-expanded={comentarioAberto} title="Comentário" onClick={()=>setComentarioAberto((v)=>!v)}><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M13.5 7.7a5.6 5.6 0 0 1-5.8 5.1 6.2 6.2 0 0 1-2.5-.5L2 13l.8-2.7a5 5 0 0 1-.8-2.6A5.5 5.5 0 0 1 7.8 2.5h.4a5.5 5.5 0 0 1 5.3 5.2z"/></svg></button></div>
@@ -65,6 +72,7 @@ function ConfirmacaoEquipe({ item, onClose, onConfirm }) {
 export default function Equipes({ user, excluirSemConfirmacao = true }) {
   const [friends, setFriends] = useState([]);
   const [teams, setTeams] = useState([]);
+  const [teamOrder, setTeamOrder] = useState([]);
   const [members, setMembers] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [groups, setGroups] = useState([]);
@@ -77,7 +85,8 @@ export default function Equipes({ user, excluirSemConfirmacao = true }) {
   const [friendToAdd, setFriendToAdd] = useState("");
   const [friendToAddSearch, setFriendToAddSearch] = useState("");
   const [groupEditor, setGroupEditor] = useState(null);
-  const [collapsedGroups, setCollapsedGroups] = useState({});
+  const chaveSessoesEquipe = `crysalis:sessoes-equipe:${user.id}`;
+  const [collapsedGroups, setCollapsedGroups] = useState(() => lerPreferenciaEquipe(chaveSessoesEquipe, {}));
   const [taskEditor, setTaskEditor] = useState(null);
   const [draggingTaskId, setDraggingTaskId] = useState("");
   const [taskDropTarget, setTaskDropTarget] = useState(null);
@@ -88,6 +97,11 @@ export default function Equipes({ user, excluirSemConfirmacao = true }) {
   const [confirm, setConfirm] = useState(null);
   const [teamSettingsOpen, setTeamSettingsOpen] = useState(false);
   const teamSettingsRef = useRef(null);
+  const teamDragRef = useRef(null);
+  const teamOrderQueue = useRef(Promise.resolve());
+  const [draggingTeamId, setDraggingTeamId] = useState("");
+  const [teamDropTargetId, setTeamDropTargetId] = useState("");
+  useEffect(() => { salvarPreferenciaEquipe(chaveSessoesEquipe, collapsedGroups); }, [chaveSessoesEquipe, collapsedGroups]);
   useEffect(() => {
     if (!teamCreateOpen) return undefined;
     const closeOutside = (event) => {
@@ -109,14 +123,78 @@ export default function Equipes({ user, excluirSemConfirmacao = true }) {
   const team = teams.find((t) => t.id === current);
 
   const refresh = useCallback(async () => {
-    const [f, t] = await Promise.all([
+    const [f, t, o] = await Promise.all([
       supabase.rpc("social_list_friends"),
       supabase.from("teams").select("*").order("position").order("created_at"),
+      supabase.from("team_user_order").select("team_id,position").eq("user_id", user.id).order("position"),
     ]);
     if (f.error || t.error) { setError("Não consegui carregar as equipes. Confira se a migração do Supabase foi aplicada."); return; }
-    setFriends(f.data || []); setTeams(t.data || []);
+    setFriends(f.data || []); setTeams(t.data || []); setTeamOrder(o.error ? [] : o.data || []);
     if (current && !t.data?.some((x) => x.id === current)) setCurrent("");
-  }, [current]);
+  }, [current, user.id]);
+
+  function teamsOrdered() {
+    const order = new Map(teamOrder.map((item) => [item.team_id, item.position]));
+    return [...teams].sort((a, b) => (order.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (order.get(b.id) ?? Number.MAX_SAFE_INTEGER) || String(a.created_at).localeCompare(String(b.created_at)));
+  }
+
+  async function reorderTeamList(teamId, targetId) {
+    if (!teamId || !targetId || teamId === targetId) return;
+    const ordered = teamsOrdered();
+    const from = ordered.findIndex((item) => item.id === teamId);
+    const to = ordered.findIndex((item) => item.id === targetId);
+    if (from < 0 || to < 0) return;
+    const next = [...ordered]; const [item] = next.splice(from, 1); next.splice(to, 0, item);
+    const rows = next.map((team, position) => ({ user_id: user.id, team_id: team.id, position }));
+    setTeamOrder(rows);
+    const saveOrder = () => supabase.from("team_user_order").upsert(rows, { onConflict: "user_id,team_id" });
+    const operation = teamOrderQueue.current.then(saveOrder, saveOrder);
+    teamOrderQueue.current = operation.catch(() => {});
+    const { error: orderError } = await operation;
+    if (orderError) { setError("Não consegui salvar a ordem das equipes. Aplique a migração mais recente e tente novamente."); await refresh(); }
+  }
+
+  function moveTeamByKeyboard(teamId, delta) {
+    const ordered = teamsOrdered(); const index = ordered.findIndex((item) => item.id === teamId); const target = ordered[index + delta];
+    if (target) reorderTeamList(teamId, target.id);
+  }
+
+  function startTeamDrag(event, teamId) {
+    if (event.button !== 0) return;
+    if (event.pointerType === "touch") event.preventDefault();
+    if (teamDragRef.current) clearTimeout(teamDragRef.current.timer);
+    const drag = { id: teamId, x: event.clientX, y: event.clientY, pointerType: event.pointerType, active: false, target: "", timer: null };
+    if (event.pointerType === "touch") drag.timer = window.setTimeout(() => { drag.active = true; setDraggingTeamId(teamId); }, 320);
+    teamDragRef.current = drag;
+  }
+
+  useEffect(() => {
+    function teamAt(x, y, sourceId) {
+      const element = document.elementFromPoint(x, y)?.closest("[data-team-list-id]");
+      return element && element.dataset.teamListId !== sourceId ? element.dataset.teamListId : "";
+    }
+    function move(event) {
+      const drag = teamDragRef.current; if (!drag) return;
+      if (!drag.active) {
+        const distance = Math.abs(event.clientX - drag.x) + Math.abs(event.clientY - drag.y);
+        if (drag.pointerType === "touch" && distance > 12) { clearTimeout(drag.timer); teamDragRef.current = null; return; }
+        if (drag.pointerType !== "touch" && distance > 5) { drag.active = true; setDraggingTeamId(drag.id); }
+        else return;
+      }
+      event.preventDefault(); drag.target = teamAt(event.clientX, event.clientY, drag.id); setTeamDropTargetId(drag.target);
+    }
+    function finish(event) {
+      const drag = teamDragRef.current; if (!drag) return;
+      clearTimeout(drag.timer); teamDragRef.current = null;
+      if (drag.active) { const target = teamAt(event.clientX, event.clientY, drag.id); if (target) reorderTeamList(drag.id, target); }
+      setDraggingTeamId(""); setTeamDropTargetId("");
+    }
+    function cancel() { if (teamDragRef.current) clearTimeout(teamDragRef.current.timer); teamDragRef.current = null; setDraggingTeamId(""); setTeamDropTargetId(""); }
+    document.addEventListener("pointermove", move, { passive: false });
+    document.addEventListener("pointerup", finish);
+    document.addEventListener("pointercancel", cancel);
+    return () => { document.removeEventListener("pointermove", move); document.removeEventListener("pointerup", finish); document.removeEventListener("pointercancel", cancel); };
+  }, [teams, teamOrder, user.id]);
 
   const loadTeam = useCallback(async (teamId) => {
     if (!teamId) { setMembers([]); setTasks([]); setGroups([]); return; }
@@ -349,7 +427,7 @@ export default function Equipes({ user, excluirSemConfirmacao = true }) {
       </div>
     </header>
     {error && <p className="ck-social-message erro" role="alert">{error}</p>}
-    {!team && <><div className="ck-team-create-area"><button type="button" className="ck-barra-mais" aria-expanded={teamCreateOpen} onClick={() => setTeamCreateOpen((open) => !open)}><span className="ck-mais" aria-hidden="true">+</span><span>{teamCreateOpen ? "Cancelar criação" : "Criar equipe"}</span></button>{teamCreateOpen&&<form ref={teamCreateRef} className="ck-social-search ck-team-create" onSubmit={createTeam}><label htmlFor="ck-team-name">Nome da equipe</label><div><input id="ck-team-name" maxLength={60} value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="Ex.: Projeto da viagem" /><button type="submit" disabled={busy || !teamName.trim()}>Criar equipe</button></div><fieldset className="ck-team-create-friends"><legend><span>Quem vai participar?</span><span className="ck-team-selected-count">{selectedFriendIds.length} selecionado{selectedFriendIds.length === 1 ? "" : "s"}</span></legend>{friends.length ? <><input className="ck-team-friend-search" type="search" value={friendSearch} onChange={(e) => setFriendSearch(e.target.value)} placeholder="Buscar entre seus amigos" aria-label="Buscar amigos para adicionar à equipe"/><div className="ck-team-friend-list">{friends.filter((friend) => `${friend.display_name || ""} ${friend.email || ""}`.toLocaleLowerCase("pt-BR").includes(friendSearch.trim().toLocaleLowerCase("pt-BR"))).map((friend) => <label key={friend.friend_id} className={selectedFriendIds.includes(friend.friend_id) ? "selecionado" : ""}><input type="checkbox" checked={selectedFriendIds.includes(friend.friend_id)} onChange={(e) => setSelectedFriendIds((ids) => e.target.checked ? [...new Set([...ids, friend.friend_id])] : ids.filter((id) => id !== friend.friend_id))} /><span>{nome(friend.display_name || friend.email || "Amigo")}</span></label>)}</div>{!friends.some((friend) => `${friend.display_name || ""} ${friend.email || ""}`.toLocaleLowerCase("pt-BR").includes(friendSearch.trim().toLocaleLowerCase("pt-BR"))) && <small>Nenhum amigo encontrado.</small>}</> : <small>Adicione amigos no Social para convidá-los a uma equipe.</small>}</fieldset></form>}</div>{teams.length ? <nav className="ck-team-list" aria-label="Suas equipes">{teams.map((t) => <button type="button" className="ck-team-list-row" key={t.id} onClick={() => { setCurrent(t.id); setTaskEditor(null); setTeamSettingsOpen(false); }}><span className="ck-team-list-icon" aria-hidden="true"><svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="6" cy="6" r="2.4"/><circle cx="14" cy="6" r="2.4"/><path d="M1.8 16c.3-2.7 1.8-4 4.2-4h.2m11.9 4c-.3-2.7-1.8-4-4.2-4h-.2M6 16c.3-3.4 1.6-5 4-5s3.7 1.6 4 5"/></svg></span><IconeGrupo tipo={t.icon || "butterfly"}/><strong>{t.name}</strong><span aria-hidden="true">›</span></button>)}</nav> : <p className="ck-social-empty">Crie uma equipe para começar a compartilhar tarefas e anotações.</p>}</>}
+    {!team && <><div className="ck-team-create-area"><button type="button" className="ck-barra-mais" aria-expanded={teamCreateOpen} onClick={() => setTeamCreateOpen((open) => !open)}><span className="ck-mais" aria-hidden="true">+</span><span>{teamCreateOpen ? "Cancelar criação" : "Criar equipe"}</span></button>{teamCreateOpen&&<form ref={teamCreateRef} className="ck-social-search ck-team-create" onSubmit={createTeam}><label htmlFor="ck-team-name">Nome da equipe</label><div><input id="ck-team-name" maxLength={60} value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="Ex.: Projeto da viagem" /><button type="submit" disabled={busy || !teamName.trim()}>Criar equipe</button></div><fieldset className="ck-team-create-friends"><legend><span>Quem vai participar?</span><span className="ck-team-selected-count">{selectedFriendIds.length} selecionado{selectedFriendIds.length === 1 ? "" : "s"}</span></legend>{friends.length ? <><input className="ck-team-friend-search" type="search" value={friendSearch} onChange={(e) => setFriendSearch(e.target.value)} placeholder="Buscar entre seus amigos" aria-label="Buscar amigos para adicionar à equipe"/><div className="ck-team-friend-list">{friends.filter((friend) => `${friend.display_name || ""} ${friend.email || ""}`.toLocaleLowerCase("pt-BR").includes(friendSearch.trim().toLocaleLowerCase("pt-BR"))).map((friend) => <label key={friend.friend_id} className={selectedFriendIds.includes(friend.friend_id) ? "selecionado" : ""}><input type="checkbox" checked={selectedFriendIds.includes(friend.friend_id)} onChange={(e) => setSelectedFriendIds((ids) => e.target.checked ? [...new Set([...ids, friend.friend_id])] : ids.filter((id) => id !== friend.friend_id))} /><span>{nome(friend.display_name || friend.email || "Amigo")}</span></label>)}</div>{!friends.some((friend) => `${friend.display_name || ""} ${friend.email || ""}`.toLocaleLowerCase("pt-BR").includes(friendSearch.trim().toLocaleLowerCase("pt-BR"))) && <small>Nenhum amigo encontrado.</small>}</> : <small>Adicione amigos no Social para convidá-los a uma equipe.</small>}</fieldset></form>}</div>{teams.length ? <nav className="ck-team-list" aria-label="Suas equipes">{teamsOrdered().map((t) => <div data-team-list-id={t.id} className={`ck-team-list-row${draggingTeamId === t.id ? " arrastando" : ""}${teamDropTargetId === t.id ? " alvo" : ""}`} key={t.id}><span className="ck-alca ck-team-list-handle" role="button" tabIndex={0} aria-label={`Reordenar equipe ${t.name}`} title="Arraste para mudar a ordem; no celular, toque e segure; use ↑ e ↓ pelo teclado" onPointerDown={(event) => startTeamDrag(event, t.id)} onKeyDown={(event) => { if (event.key === "ArrowUp" || event.key === "ArrowDown") { event.preventDefault(); moveTeamByKeyboard(t.id, event.key === "ArrowUp" ? -1 : 1); } }}><svg viewBox="0 0 10 16" width="10" height="16" aria-hidden="true" fill="currentColor">{[3, 8, 13].map((y) => [2.5, 7.5].map((x) => <circle key={`${x}-${y}`} cx={x} cy={y} r="1.4" />))}</svg></span><button type="button" className="ck-team-list-open" onClick={() => { setCurrent(t.id); setTaskEditor(null); setTeamSettingsOpen(false); }}><IconeGrupo tipo={t.icon || "butterfly"}/><strong>{t.name}</strong><span aria-hidden="true">›</span></button></div>)}</nav> : <p className="ck-social-empty">Crie uma equipe para começar a compartilhar tarefas e anotações.</p>}</>}
     {team && <>
       <section className={`ck-team-work-panel${activeTab === "tarefas" && !tasks.length && !groups.length ? " ck-team-work-panel-empty" : ""}`}>
         <div className="ck-abas ck-abas-principais ck-social-work-tabs" role="tablist" aria-label={`${team.name}: tarefas e anotações`}><button type="button" role="tab" className="ck-aba" aria-selected={activeTab === "tarefas"} onClick={() => setActiveTab("tarefas")}>Checklist</button><button type="button" role="tab" className="ck-aba" aria-selected={activeTab === "anotacoes"} onClick={() => setActiveTab("anotacoes")}>Anotações</button></div>
@@ -361,7 +439,7 @@ export default function Equipes({ user, excluirSemConfirmacao = true }) {
           {!tasks.length && !groups.length && <p className="ck-intro-organizacao">Lembre-se: cresça no seu tempo</p>}
           {<section data-team-group-id="" className="ck-team-unfiled-card"><h2 data-team-group-id="" className="ck-secao ck-team-unfiled-title">Sem sessão</h2><ul className={"ck-social-task-list" + (taskDropTarget && taskDropTarget.groupId == null && !taskDropTarget.taskId ? " alvo" : "")} data-team-group-id="">{taskEditor?.id&&!tasks.find((t)=>t.id===taskEditor.id)?.group_id&&<li className="ck-social-task-card ck-team-task-row ck-team-task-edit-row editando"><EditorTarefa tarefa={tasks.find((t)=>t.id===taskEditor.id)} grupos={groups} onSave={saveTask} onCancel={()=>setTaskEditor(null)}/ ></li>}{tasks.filter((t)=>!t.group_id&&t.id!==taskEditor?.id).map((t)=><TaskRow key={t.id} task={t} status={setTaskStatus} priority={changePriority} edit={()=>setTaskEditor({id:t.id})} remove={()=>deleteTask(t)} startDrag={(event)=>startTaskDrag(event,t)} moveByKeyboard={(delta)=>moveTaskByKeyboard(t,delta)} dragging={draggingTaskId===t.id} target={taskDropTarget?.taskId===t.id}/>)}</ul>{tasks.every((t) => Boolean(t.group_id)) && <p className="ck-vazio-grupo">Nenhuma tarefa aqui ainda.</p>}</section>}
         </> : <>
-          <AnotacoesCompartilhadas tipo="equipe" escopoId={team.id} />
+          <AnotacoesCompartilhadas key={`equipe:${team.id}`} tipo="equipe" escopoId={team.id} />
         </>}
       </section>
     </>}

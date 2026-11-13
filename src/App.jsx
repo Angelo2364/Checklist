@@ -29,14 +29,39 @@ const NOME_RODAPE = "Moony"; // aparece no rodapé; ao passar o mouse mostra o n
 const NOME_SECRETO = "Luna";
 const EMAIL_CONTATO = "sayaokaua@gmail.com";
 const STORAGE_INTERVALO = "checklist:intervaloAviso"; // minutos entre os lembretes
+const STORAGE_INTERVALO_PERSONALIZADO = "checklist:intervaloAvisoPersonalizado";
+const STORAGE_INTERVALO_MODO = "checklist:intervaloAvisoModo";
 const STORAGE_JANELA_AVISOS = "checklist:janelaAvisos";
 const STORAGE_EXCLUIR_SEM_CONFIRMAR = "checklist:excluirSemConfirmar";
 const STORAGE_PREF_NOTIFICACOES = "checklist:preferenciasNotificacoes";
 const STORAGE_AVISOS_AGENDA_FECHADOS = "checklist:avisosAgendaFechados";
 const JANELA_AVISOS_PADRAO = { ativa: false, inicio: "08:00", fim: "22:00" };
 const PREFERENCIAS_NOTIFICACAO_PADRAO = { checklistSummary: true, deadlines: true, collaboration: true };
-const INTERVALOS_AVISO = [15, 30, 60, 120, 180];
-const rotuloIntervalo = (m) => (m < 60 ? `${m} minutos` : m === 60 ? "1 hora" : `${m / 60} horas`);
+const APP_VERSION = "0.93";
+function normalizarIntervaloAviso(valor) {
+  const minutos = Number(valor);
+  return Number.isInteger(minutos) && minutos >= 5 && minutos <= 1440 ? minutos : 30;
+}
+function normalizarIntervaloPersonalizado(valor, intervaloAtual = 30) {
+  if (valor && ["minutos", "horas"].includes(valor.unidade)) {
+    const quantidade = Number(valor.quantidade);
+    const maximo = valor.unidade === "horas" ? 24 : 1440;
+    if (Number.isInteger(quantidade) && quantidade >= (valor.unidade === "horas" ? 1 : 5) && quantidade <= maximo) return { quantidade, unidade: valor.unidade };
+  }
+  const atual = normalizarIntervaloAviso(intervaloAtual);
+  return atual >= 60 && atual % 60 === 0
+    ? { quantidade: atual / 60, unidade: "horas" }
+    : { quantidade: atual, unidade: "minutos" };
+}
+function versaoMaisNova(disponivel, atual) {
+  const a = String(disponivel || "").split(".").map(Number);
+  const b = String(atual || "").split(".").map(Number);
+  if (!a.length || a.some(Number.isNaN) || b.some(Number.isNaN)) return false;
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    if ((a[i] || 0) !== (b[i] || 0)) return (a[i] || 0) > (b[i] || 0);
+  }
+  return false;
+}
 const STORAGE_TEMA = "checklist:tema"; // "escuro" (padrão) | "claro"
 const FORMATO_BACKUP = "checklist-backup"; // marca dos arquivos exportados
 const STORAGE_DONO = "checklist:donoLocal"; // id do usuário a quem pertence o cache local
@@ -174,7 +199,10 @@ function configRecorrenciaPadrao(recorrencia, dias) {
 }
 
 function recorrenciaSelecionada(opcao, config) {
-  if (opcao === "personalizado") return config;
+  if (opcao === "personalizado") {
+    if (config.tipo !== "semana" && Number(config.intervalo) <= 0) return null;
+    return config;
+  }
   if (Number(opcao) === 30) return { tipo: "meses", intervalo: 1 };
   return recorrenciaSimples(Number(opcao));
 }
@@ -624,7 +652,7 @@ function SeletorRepeticao({ value, onChange, config, onConfigChange }) {
         </select>
       </label>
       {config.tipo === "dias" || config.tipo === "meses" ? <label className="ck-repeticao-intervalo">A cada
-        <input type="number" min="1" max={config.tipo === "meses" ? "24" : "365"} value={config.intervalo || 1} onChange={(e) => onConfigChange((atual) => ({ ...atual, intervalo: Math.max(1, Number(e.target.value) || 1) }))} />
+        <input type="number" min="0" max={config.tipo === "meses" ? "24" : "365"} value={config.intervalo ?? ""} aria-label="Intervalo (vazio ou zero significa não repetir)" title="Deixe vazio ou use 0 para não repetir" onChange={(e) => onConfigChange((atual) => ({ ...atual, intervalo: e.target.value === "" ? "" : Math.max(0, Number(e.target.value) || 0) }))} />
         {config.tipo === "meses" ? "meses" : "dias"}
       </label> : <div className="ck-dias-semana" aria-label="Dias da semana">
         {dias.map(([numero, rotulo]) => <label key={numero} className={(config.diasSemana || []).includes(numero) ? "selecionado" : ""}><input type="checkbox" checked={(config.diasSemana || []).includes(numero)} onChange={(e) => onConfigChange((atual) => ({ ...atual, diasSemana: e.target.checked ? [...new Set([...(atual.diasSemana || []), numero])].sort((a, b) => dias.findIndex(([dia]) => dia === a) - dias.findIndex(([dia]) => dia === b)) : (atual.diasSemana || []).filter((dia) => dia !== numero) }))} />{rotulo}</label>)}
@@ -718,7 +746,7 @@ function Calendario({ eventos, tarefasAgendadas, adicionar, editar, apagar, agen
         <button type="button" className="ck-cal-nav" aria-label="Mês anterior" onClick={() => setMes(new Date(ano, m - 1, 1))}>
           <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m9.5 3.5-4.5 4.5 4.5 4.5" /></svg>
         </button>
-        <strong>{MESES[m]} de {ano}</strong>
+        <strong>{MESES[m][0].toLocaleUpperCase("pt-BR") + MESES[m].slice(1)}{ano !== new Date().getFullYear() ? ` de ${ano}` : ""}</strong>
         <button type="button" className="ck-cal-nav" aria-label="Próximo mês" onClick={() => setMes(new Date(ano, m + 1, 1))}>
           <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m6.5 3.5 4.5 4.5-4.5 4.5" /></svg>
         </button>
@@ -1397,7 +1425,7 @@ function NovaTarefa({ onAdd, placeholder, onFechar, idCampo, modoAgenda = false,
   function enviar(e) {
     e.preventDefault();
     const limpo = texto.trim();
-    if (!limpo) return;
+    if (!limpo || (modoAgenda && !agendadaPara)) return;
     const recorrencia = recorrenciaSelecionada(repete, configRepeticao);
     if (recorrencia?.tipo === "semana" && !recorrencia.diasSemana?.length) return;
     const prazoResolvido = limite || (limiteHora ? iso(new Date()) : "");
@@ -1433,7 +1461,7 @@ function NovaTarefa({ onAdd, placeholder, onFechar, idCampo, modoAgenda = false,
         aria-label={placeholder}
         maxLength={200}
       />
-      {modoAgenda && <label className="ck-form-data ck-form-data-agendada"><span>Começar em</span><input type="date" value={agendadaPara} onChange={(e) => setAgendadaPara(e.target.value)} required /></label>}
+      {modoAgenda && <label className="ck-form-data ck-form-data-agendada"><span>Começar em</span><DiaMes value={agendadaPara} onChange={setAgendadaPara} rotulo="Data de início" /></label>}
       <SeletorRepeticao value={repete} onChange={setRepete} config={configRepeticao} onConfigChange={setConfigRepeticao} />
       {repete !== "0" && (
         <Hora24 value={hora} onChange={setHora} rotulo="Horário em que a tarefa volta" />
@@ -1450,7 +1478,7 @@ function NovaTarefa({ onAdd, placeholder, onFechar, idCampo, modoAgenda = false,
         maxLength={1000}
       />
       <CampoComentarioTarefa valor={comentario} onChange={setComentario}>
-        <button type="submit" disabled={!texto.trim() || (repete === "personalizado" && configRepeticao.tipo === "semana" && !configRepeticao.diasSemana.length)}>
+        <button type="submit" disabled={!texto.trim() || (modoAgenda && !agendadaPara) || (repete === "personalizado" && configRepeticao.tipo === "semana" && !configRepeticao.diasSemana.length)}>
           {modoAgenda ? "Agendar tarefa" : "Adicionar"}
         </button>
       </CampoComentarioTarefa>
@@ -1559,7 +1587,7 @@ function EditarTarefa({ tarefa, onSalvar, onCancelar, incluirDataAgenda = false 
       className="ck-form-grupo ck-editor-tarefa"
       onSubmit={(e) => {
         e.preventDefault();
-        if (texto.trim()) {
+        if (texto.trim() && (!incluirDataAgenda || agendadaPara)) {
           const recorrencia = recorrenciaSelecionada(repete, configRepeticao);
           if (recorrencia?.tipo === "semana" && !recorrencia.diasSemana?.length) return;
           onSalvar(texto.trim(), intervaloLegado(recorrencia), hora || "00:00", {
@@ -1580,7 +1608,7 @@ function EditarTarefa({ tarefa, onSalvar, onCancelar, incluirDataAgenda = false 
         aria-label="Nome da tarefa"
         maxLength={200}
       />
-      {incluirDataAgenda && <label className="ck-form-data ck-form-data-agendada"><span>Começar em</span><input type="date" value={agendadaPara} onChange={(e) => setAgendadaPara(e.target.value)} required /></label>}
+      {incluirDataAgenda && <label className="ck-form-data ck-form-data-agendada"><span>Começar em</span><DiaMes value={agendadaPara} onChange={setAgendadaPara} rotulo="Data de início" /></label>}
       <SeletorRepeticao value={repete} onChange={setRepete} config={configRepeticao} onConfigChange={setConfigRepeticao} />
       {repete !== "0" && (
         <Hora24 value={hora} onChange={setHora} rotulo="Horário em que a tarefa volta" />
@@ -1598,7 +1626,7 @@ function EditarTarefa({ tarefa, onSalvar, onCancelar, incluirDataAgenda = false 
       />
       <CampoComentarioTarefa valor={comentario} onChange={setComentario}>
         <span className="ck-edit-acoes">
-          <button type="submit" disabled={!texto.trim() || (repete === "personalizado" && configRepeticao.tipo === "semana" && !configRepeticao.diasSemana.length)}>Salvar</button>
+          <button type="submit" disabled={!texto.trim() || (incluirDataAgenda && !agendadaPara) || (repete === "personalizado" && configRepeticao.tipo === "semana" && !configRepeticao.diasSemana.length)}>Salvar</button>
           <button type="button" className="ck-icone" onClick={onCancelar} title="Cancelar (Esc)" aria-label="Cancelar edição">
             <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M3.5 3.5l9 9M12.5 3.5l-9 9" /></svg>
           </button>
@@ -1660,8 +1688,7 @@ function EditarNomeSessao({ sessao, onSalvar, onCancelar }) {
   </form>;
 }
 
-function ListaTarefas({ tarefas, alternar, apagar, mudarPrioridade, ordem, edicao }) {
-  const [descricoesAbertas, setDescricoesAbertas] = useState({});
+function ListaTarefas({ tarefas, alternar, apagar, mudarPrioridade, ordem, edicao, descricoesAbertas, alternarDescricao }) {
   return (
     <ul className="ck-lista">
       {tarefas.map((t) => edicao.id === t.id ? (
@@ -1709,7 +1736,7 @@ function ListaTarefas({ tarefas, alternar, apagar, mudarPrioridade, ordem, edica
               {t.descricao && descricoesAbertas[t.id] && <span className="ck-descricao">{t.descricao}</span>}
             </span>
           </label>
-          {t.descricao && <ToggleDescricao fechada={!descricoesAbertas[t.id]} onClick={() => setDescricoesAbertas((atual) => ({ ...atual, [t.id]: !atual[t.id] }))} />}
+          {t.descricao && <ToggleDescricao fechada={!descricoesAbertas[t.id]} onClick={() => alternarDescricao(t.id)} />}
           {(() => {
             const prioridadeVisivel = prioridadePeloPrazo(t);
             return <button
@@ -2009,6 +2036,8 @@ function Checklist({ usuario }) {
   const [contas, setContas] = useState(() => lerStorage(STORAGE_BILLS, []));
   const [anotacoes, setAnotacoes] = useState(() => lerStorage(STORAGE_NOTES, []));
   const [sessoesAnotacoes, setSessoesAnotacoes] = useState(() => lerStorage(STORAGE_NOTE_GROUPS, []));
+  const chaveDescricoesTarefa = `checklist:descricoesTarefas:${usuario.id}`;
+  const [descricoesTarefasAbertas, setDescricoesTarefasAbertas] = useState(() => lerStorage(chaveDescricoesTarefa, {}));
   const [pagina, setPaginaState] = useState("tarefas");
   const [amizadeSelecionada, setAmizadeSelecionada] = useState("");
   const [abaConfiguracoes, setAbaConfiguracoes] = useState("preferencias");
@@ -2051,17 +2080,21 @@ function Checklist({ usuario }) {
   const [criandoSessaoAnotacao, setCriandoSessaoAnotacao] = useState(false);
   const [formAnotacao, setFormAnotacao] = useState(null);
   const sessaoAnotacaoNovaRef = useRef(null);
-  const [descricoesAnotacaoFechadas, setDescricoesAnotacaoFechadas] = useState({});
+  const chaveDescricoesAnotacao = `checklist:descricoesAnotacoes:${usuario.id}`;
+  const [descricoesAnotacaoFechadas, setDescricoesAnotacaoFechadas] = useState(() => lerStorage(chaveDescricoesAnotacao, {}));
   const [aba, setAba] = useState("rotinas");
   const [fundo, setFundo] = useState(null); // URL (blob:) do papel de parede, carregado do IndexedDB
   const [desfoque, setDesfoque] = useState(() => lerStorage(STORAGE_BLUR, DESFOQUE_PADRAO));
   const [ajusteFundo, setAjusteFundo] = useState(() => lerStorage(STORAGE_BG_AJUSTE, "preencher"));
   const [pushAtivo, setPushAtivo] = useState(false); // este aparelho recebe avisos do servidor (app fechado)
   const [avisoPush, setAvisoPush] = useState("");
-  const [intervaloAviso, setIntervaloAviso] = useState(() => {
-    const v = lerStorage(STORAGE_INTERVALO, 30);
-    return INTERVALOS_AVISO.includes(v) ? v : 30;
+  const [intervaloAviso, setIntervaloAviso] = useState(() => normalizarIntervaloAviso(lerStorage(STORAGE_INTERVALO, 30)));
+  const [intervaloPersonalizado, setIntervaloPersonalizado] = useState(() => normalizarIntervaloPersonalizado(lerStorage(STORAGE_INTERVALO_PERSONALIZADO, null), lerStorage(STORAGE_INTERVALO, 30)));
+  const [intervaloPersonalizadoAtivo, setIntervaloPersonalizadoAtivo] = useState(() => {
+    const modo = lerStorage(STORAGE_INTERVALO_MODO, null);
+    return modo == null ? ![30, 60].includes(normalizarIntervaloAviso(lerStorage(STORAGE_INTERVALO, 30))) : modo === "personalizado";
   });
+  const [atualizacaoDisponivel, setAtualizacaoDisponivel] = useState(false);
   const [janelaAvisos, setJanelaAvisos] = useState(() => normalizarJanelaAvisos(lerStorage(STORAGE_JANELA_AVISOS, JANELA_AVISOS_PADRAO)));
   const [notificationPreferences, setNotificationPreferences] = useState(() => normalizarPreferenciasNotificacao(lerStorage(STORAGE_PREF_NOTIFICACOES, PREFERENCIAS_NOTIFICACAO_PADRAO)));
   const [excluirSemConfirmacao, setExcluirSemConfirmacao] = useState(() => lerStorage(STORAGE_EXCLUIR_SEM_CONFIRMAR, true) !== false);
@@ -2070,6 +2103,24 @@ function Checklist({ usuario }) {
     document.documentElement.dataset.tema = tema;
     salvarStorage(STORAGE_TEMA, tema);
   }, [tema]);
+  useEffect(() => {
+    let ativo = true;
+    async function conferirVersao() {
+      try {
+        const resposta = await fetch(`${import.meta.env.BASE_URL}version.json?check=${Date.now()}`, { cache: "no-store" });
+        if (!resposta.ok) return;
+        const dados = await resposta.json();
+        if (ativo && versaoMaisNova(dados.version, APP_VERSION)) setAtualizacaoDisponivel(true);
+      } catch {
+        // O app segue funcionando mesmo se a consulta de versão estiver indisponível.
+      }
+    }
+    const aoVoltarVisivel = () => { if (document.visibilityState === "visible") conferirVersao(); };
+    conferirVersao();
+    const intervalo = window.setInterval(conferirVersao, 60_000);
+    document.addEventListener("visibilitychange", aoVoltarVisivel);
+    return () => { ativo = false; window.clearInterval(intervalo); document.removeEventListener("visibilitychange", aoVoltarVisivel); };
+  }, []);
   const [msgDados, setMsgDados] = useState({ texto: "", erro: false });
   const [confirmacaoExcluir, setConfirmacaoExcluir] = useState(null);
   const [, setTick] = useState(0);
@@ -2328,9 +2379,12 @@ function Checklist({ usuario }) {
   }, [contas]);
   useEffect(() => { salvarStorage(STORAGE_NOTES, anotacoes); }, [anotacoes]);
   useEffect(() => { salvarStorage(STORAGE_NOTE_GROUPS, sessoesAnotacoes); }, [sessoesAnotacoes]);
+  useEffect(() => { salvarStorage(chaveDescricoesTarefa, descricoesTarefasAbertas); }, [chaveDescricoesTarefa, descricoesTarefasAbertas]);
   useEffect(() => { salvarStorage(STORAGE_JANELA_AVISOS, janelaAvisos); }, [janelaAvisos]);
   useEffect(() => { salvarStorage(STORAGE_PREF_NOTIFICACOES, notificationPreferences); }, [notificationPreferences]);
   useEffect(() => { salvarStorage(STORAGE_EXCLUIR_SEM_CONFIRMAR, excluirSemConfirmacao); }, [excluirSemConfirmacao]);
+  useEffect(() => { salvarStorage(STORAGE_INTERVALO_PERSONALIZADO, intervaloPersonalizado); }, [intervaloPersonalizado]);
+  useEffect(() => { salvarStorage(chaveDescricoesAnotacao, descricoesAnotacaoFechadas); }, [chaveDescricoesAnotacao, descricoesAnotacaoFechadas]);
 
   useEffect(() => {
     let url = null;
@@ -2606,11 +2660,25 @@ function Checklist({ usuario }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notificar, permissao, intervaloAviso, pushAtivo, janelaAvisos, notificationPreferences]);
 
-  function mudarIntervalo(minutos) {
-    setIntervaloAviso(minutos);
-    salvarStorage(STORAGE_INTERVALO, minutos);
-    salvarStorage(STORAGE_LAST, slotAtual(minutos)); // recomeça a contar a partir de agora
-    if (pushAtivo) atualizarPush(minutos).catch(() => setAvisoPush("Não consegui atualizar o intervalo no servidor."));
+  function mudarIntervalo(minutos, personalizado = false) {
+    const intervalo = normalizarIntervaloAviso(minutos);
+    const modoPersonalizado = personalizado || ![30, 60].includes(intervalo);
+    setIntervaloAviso(intervalo);
+    setIntervaloPersonalizadoAtivo(modoPersonalizado);
+    salvarStorage(STORAGE_INTERVALO, intervalo);
+    salvarStorage(STORAGE_INTERVALO_MODO, modoPersonalizado ? "personalizado" : "padrao");
+    salvarStorage(STORAGE_LAST, slotAtual(intervalo)); // recomeça a contar a partir de agora
+    if (pushAtivo) atualizarPush(intervalo).catch(() => setAvisoPush("Não consegui atualizar o intervalo no servidor."));
+  }
+  function mudarIntervaloPersonalizado(quantidade, unidade = intervaloPersonalizado.unidade) {
+    const maximo = unidade === "horas" ? 24 : 1440;
+    const minimo = unidade === "horas" ? 1 : 5;
+    const valor = Number(quantidade);
+    if (!Number.isInteger(valor) || valor < minimo || valor > maximo) return;
+    const personalizado = { quantidade: valor, unidade };
+    setIntervaloPersonalizado(personalizado);
+    setIntervaloPersonalizadoAtivo(true);
+    mudarIntervalo(valor * (unidade === "horas" ? 60 : 1), true);
   }
 
   function abrirPreferenciasNotificacao() {
@@ -2757,6 +2825,13 @@ function Checklist({ usuario }) {
   }
 
   function editarRotina(id, campos) {
+    if (!campos.recorrencia) {
+      // Intervalo vazio/zero significa encerrar a repetição. A tarefa atual
+      // continua na checklist como tarefa comum, sem gerar novas ocorrências.
+      setRotinas((atual) => atual.filter((r) => r.id !== id));
+      setTarefas((atual) => atual.map((t) => t.rotinaId === id ? { ...t, rotinaId: null, repeteDias: 0, repeteHora: undefined, recorrencia: null } : t));
+      return;
+    }
     setRotinas((atual) => atual.map((r) => r.id === id ? { ...r, ...campos } : r));
     setTarefas((atual) => atual.map((t) => t.rotinaId === id && !t.feita ? {
       ...t,
@@ -3088,6 +3163,9 @@ function Checklist({ usuario }) {
       atual.map((g) => (g.id === id ? { ...g, aberta: g.aberta === false } : g))
     );
   }
+  function alternarDescricaoTarefa(id) {
+    setDescricoesTarefasAbertas((atual) => ({ ...atual, [id]: !atual[id] }));
+  }
 
   function apagarGrupo(grupo) {
     const qtd = tarefas.filter((t) => t.grupoId === grupo.id).length;
@@ -3216,6 +3294,10 @@ function Checklist({ usuario }) {
         )}
 
       </header>
+
+      {atualizacaoDisponivel && <section className="ck-aviso-agenda ck-aviso-versao" role="status" aria-label="Atualização disponível">
+        <p><span>Uma nova versão do Crysalis está disponível.</span><button type="button" className="ck-aviso-versao-atualizar" onClick={() => window.location.reload()}>Atualizar agora</button></p>
+      </section>}
 
       {avisosDeHoje.length > 0 && <section className="ck-aviso-agenda" aria-label="Avisos da agenda">
         {avisosDeHoje.map((evento) => <p key={evento.id}>
@@ -3381,8 +3463,10 @@ function Checklist({ usuario }) {
                     alternar={alternar}
                     apagar={apagar}
                     mudarPrioridade={mudarPrioridade}
-          ordem={ordem}
-          edicao={edicao}
+                    ordem={ordem}
+                    edicao={edicao}
+                    descricoesAbertas={descricoesTarefasAbertas}
+                    alternarDescricao={alternarDescricaoTarefa}
                   />
                 )}
               </>
@@ -3403,10 +3487,10 @@ function Checklist({ usuario }) {
           mudarPrioridade={mudarPrioridade}
           ordem={ordem}
           edicao={edicao}
+          descricoesAbertas={descricoesTarefasAbertas}
+          alternarDescricao={alternarDescricaoTarefa}
         />
       ) : <p className="ck-vazio-grupo">Nenhuma tarefa aqui ainda.</p>}
-
-      <Social user={usuario} view="tasks" excluirSemConfirmacao={excluirSemConfirmacao} onManage={() => setPagina("social")} onOpenFriend={(id) => setPagina("amizade", { friendshipId: id })} onMovePersonalTask={moverTarefaParaSocial} />
 
       {feitas > 0 && (
         <button type="button" className="ck-link" onClick={limparFeitas}>
@@ -3432,20 +3516,20 @@ function Checklist({ usuario }) {
               {ativo
                 ? "Lembrete ativo: você recebe as tarefas que faltam"
                 : "Receba as tarefas pendentes"}{" "}
-              a cada{" "}
               <select
                 className="ck-intervalo"
-                value={intervaloAviso}
-                onChange={(e) => mudarIntervalo(Number(e.target.value))}
+                value={intervaloPersonalizadoAtivo ? "personalizado" : String(intervaloAviso)}
+                onChange={(e) => { if (e.target.value === "personalizado") { setIntervaloPersonalizadoAtivo(true); salvarStorage(STORAGE_INTERVALO_MODO, "personalizado"); } else mudarIntervalo(Number(e.target.value)); }}
                 aria-label="Intervalo entre os lembretes"
               >
-                {INTERVALOS_AVISO.map((m) => (
-                  <option key={m} value={m}>{rotuloIntervalo(m)}</option>
-                ))}
+                <option value="30">A cada 30 minutos</option>
+                <option value="60">A cada hora</option>
+                <option value="personalizado">Personalizado</option>
               </select>
               <button type="button" className="ck-icone ck-aviso-config" onClick={abrirPreferenciasNotificacao} title="Configurar quais notificações receber" aria-label="Configurar notificações"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6.5 1.8h3l.4 1.7a5 5 0 0 1 1.2.7l1.7-.5 1.5 2.6-1.3 1.2v1.4l1.3 1.2-1.5 2.6-1.7-.5a5 5 0 0 1-1.2.7l-.4 1.7h-3l-.4-1.7a5 5 0 0 1-1.2-.7l-1.7.5-1.5-2.6L3 8.9V7.5L1.7 6.3l1.5-2.6 1.7.5a5 5 0 0 1 1.2-.7z"/><circle cx="8" cy="8.2" r="2.1"/></svg></button>
               {" "}
             </p>
+            {intervaloPersonalizadoAtivo && <div className="ck-intervalo-personalizado"><span>A cada</span><input className="ck-intervalo" type="number" min={intervaloPersonalizado.unidade === "horas" ? 1 : 5} max={intervaloPersonalizado.unidade === "horas" ? 24 : 1440} value={intervaloPersonalizado.quantidade} onChange={(e) => { const valor = e.target.value; if (!valor) { setIntervaloPersonalizado((atual) => ({ ...atual, quantidade: "" })); return; } mudarIntervaloPersonalizado(Number(valor)); }} onBlur={() => { if (!intervaloPersonalizado.quantidade) mudarIntervaloPersonalizado(intervaloPersonalizado.unidade === "horas" ? 1 : 30); }} aria-label="Quantidade do intervalo personalizado" /><select className="ck-intervalo" value={intervaloPersonalizado.unidade} onChange={(e) => { const unidade = e.target.value; const min = unidade === "horas" ? 1 : 5; const max = unidade === "horas" ? 24 : 1440; const quantidade = Math.min(max, Math.max(min, Number(intervaloPersonalizado.quantidade) || min)); mudarIntervaloPersonalizado(quantidade, unidade); }} aria-label="Unidade do intervalo personalizado"><option value="minutos">minutos</option><option value="horas">horas</option></select></div>}
             <div className="ck-acoes">
               {ativo ? (
                 <>
@@ -3477,7 +3561,7 @@ function Checklist({ usuario }) {
           </>
         )}
       </section>
-      </> : pagina === "social" ? <section className="ck-social-page-wrap"><Social user={usuario} view="manage" /></section> : pagina === "equipes" ? <section className="ck-social-page-wrap ck-social-detail-page"><Equipes user={usuario} excluirSemConfirmacao={excluirSemConfirmacao} /></section> : pagina === "anotacoes" ? <section className="ck-anotacoes">
+      </> : pagina === "social" ? <section className="ck-social-page-wrap"><Social user={usuario} view="hub" excluirSemConfirmacao={excluirSemConfirmacao} onOpenFriend={(id) => setPagina("amizade", { friendshipId: id })} onMovePersonalTask={moverTarefaParaSocial} /></section> : pagina === "equipes" ? <section className="ck-social-page-wrap ck-social-detail-page"><Equipes user={usuario} excluirSemConfirmacao={excluirSemConfirmacao} /></section> : pagina === "anotacoes" ? <section className="ck-anotacoes">
         <div className="ck-barras-topo">
           {formAnotacao && !formAnotacao.id && (!formAnotacao.sessaoId || !sessoesAnotacoes.some((s) => s.id === formAnotacao.sessaoId)) ? <FormularioAnotacao form={formAnotacao} onSalvar={salvarAnotacao} onChange={setFormAnotacao} onCancelar={() => setFormAnotacao(null)} /> : <BarraMais rotulo="Adicionar anotação" atalho={ATALHO_TAREFA} onClick={() => abrirNovaAnotacao()} />}
           {criandoSessaoAnotacao ? <form ref={sessaoAnotacaoNovaRef} className="ck-nova-divisao" onSubmit={criarSessaoAnotacao}>
@@ -3517,7 +3601,7 @@ function Checklist({ usuario }) {
         <span aria-hidden="true"> · </span>
         <Contato />
                 <span aria-hidden="true"> · </span>
-                <span aria-hidden="true"> V0.9 </span>
+                <span aria-hidden="true"> V{APP_VERSION} </span>
       </footer>
     </main>
 

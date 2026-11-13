@@ -914,6 +914,12 @@ a.ck-apagar:hover {
   margin: 0;
   line-height: 1.45;
 }
+.ck-aviso-versao { border-color: color-mix(in srgb, var(--azul-forte) 48%, var(--linha)); }
+.ck-aviso-versao p { justify-content: space-between; flex-wrap: wrap; }
+.ck-aviso-versao-atualizar { flex: none; padding: 6px 11px; color: var(--tinta); background: color-mix(in srgb, var(--azul-forte) 20%, var(--fundo)); border: 1px solid color-mix(in srgb, var(--azul-forte) 48%, var(--linha)); border-radius: 9px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+.ck-intervalo-personalizado { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin: -3px 0 12px; color: var(--suave); font-size: 13px; }
+.ck-intervalo-personalizado input { width: 76px; }
+.ck-intervalo-personalizado select { min-width: 105px; }
 
 .ck-aviso-agenda-icone {
   flex: none;
@@ -3005,6 +3011,7 @@ body {
   gap: 10px;
 }
 .ck-social-heading, .ck-social-tasks-heading { justify-content: space-between; }
+.ck-social-area-heading, .ck-social-area-heading > div:first-child { display: flex; align-items: center; gap: 10px; }
 .ck-social-heading h2, .ck-social-tasks-heading h2 { margin: 0; font-size: 18px; }
 .ck-social-heading p { margin: 3px 0 0; color: var(--suave); font-size: 12px; line-height: 1.4; }
 .ck-social-icon { display: grid; flex: none; place-items: center; width: 36px; height: 36px; color: var(--azul-forte); background: color-mix(in srgb, var(--azul) 18%, transparent); border: 1px solid color-mix(in srgb, var(--azul-forte) 25%, var(--linha)); border-radius: 12px; }
@@ -3445,19 +3452,24 @@ body {
 .ck-team-list-row {
   display: flex;
   align-items: center;
-  gap: 11px;
+  gap: 4px;
   min-height: 54px;
-  padding: 9px 13px;
+  padding: 8px 10px 8px 2px;
   color: var(--tinta);
-  text-align: left;
   background: color-mix(in srgb, var(--grupo-bg) 48%, transparent);
   border: 1px solid var(--linha);
   border-radius: 13px;
-  cursor: pointer;
 }
-.ck-team-list-row:hover { border-color: color-mix(in srgb, var(--azul-forte) 55%, var(--linha)); background: color-mix(in srgb, var(--azul) 12%, var(--fundo)); }
-.ck-team-list-row strong { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 14px; }
-.ck-team-list-row > span:last-child { color: var(--suave); font-size: 23px; line-height: 1; }
+.ck-team-list-row.arrastando { opacity: .5; }
+.ck-team-list-row.alvo { outline: 2px dashed var(--azul-forte); outline-offset: -2px; background: color-mix(in srgb, var(--azul-forte) 10%, transparent); }
+.ck-team-list-row > .ck-team-list-handle { align-self: center; height: 38px; margin: 0; touch-action: none; }
+.ck-team-list-open { display: flex; flex: 1; align-items: center; gap: 11px; min-width: 0; min-height: 36px; padding: 0 4px; color: var(--tinta); text-align: left; background: transparent; border: 0; border-radius: 9px; cursor: pointer; }
+.ck-team-list-open:hover { background: color-mix(in srgb, var(--azul) 12%, transparent); }
+.ck-team-list-open:focus-visible { outline: 2px solid var(--azul-forte); outline-offset: 2px; }
+.ck-team-list-open > svg { flex: none; width: 18px; height: 18px; color: var(--suave); }
+.ck-team-list-open > .ck-sessao-icone.logo.monocromatico { color: var(--suave); }
+.ck-team-list-open strong { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 14px; }
+.ck-team-list-open > span:last-child { color: var(--suave); font-size: 23px; line-height: 1; }
 .ck-team-list-icon { display: grid; flex: none; place-items: center; width: 34px; height: 34px; color: var(--azul-forte); background: color-mix(in srgb, var(--azul) 18%, transparent); border: 1px solid color-mix(in srgb, var(--azul-forte) 25%, var(--linha)); border-radius: 11px; }
 .ck-team-list-icon svg { display: block; }
 .ck-team-detail-heading { flex-wrap: wrap; justify-content: flex-start; gap: 10px; }
@@ -3473,7 +3485,7 @@ body {
 .ck-social-friend-detail { display: block; padding: 0; overflow: visible; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .ck-social-friend-detail > .ck-social-friend-body { display: grid; gap: 10px; padding: 0; }
 .ck-social-friend-detail > .ck-social-friend-body-empty { gap: 0; }
-.ck-social-friend-detail .ck-social-work-tabs { width: 100%; }
+.ck-social-friend-detail .ck-social-work-tabs { width: 100%; margin-bottom: 8px; }
 .ck-social-friend-detail .ck-barras-topo { width: 100%; }
 .ck-social-friend-detail .ck-social-task-form { margin: 0; }
 .ck-social-friend-detail .ck-social-shared-session,
@@ -3801,4 +3813,12 @@ input[type="checkbox"]:disabled { opacity: .5; cursor: not-allowed; }
 
 @media (max-width: 600px) {
   .ck-social-group-editor .ck-seletor-icones { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+
+/* Keep the Social task/settings panels aligned at the same top offset. */
+.ck-social-page.ck-social-hub,
+.ck-social-tasks.ck-social-hub { margin-top: 12px; }
+@media (max-width: 600px) {
+  .ck-social-page.ck-social-hub,
+  .ck-social-tasks.ck-social-hub { margin-top: 10px; }
 }
