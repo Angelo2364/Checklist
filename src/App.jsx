@@ -37,7 +37,7 @@ const STORAGE_PREF_NOTIFICACOES = "checklist:preferenciasNotificacoes";
 const STORAGE_AVISOS_AGENDA_FECHADOS = "checklist:avisosAgendaFechados";
 const JANELA_AVISOS_PADRAO = { ativa: false, inicio: "08:00", fim: "22:00" };
 const PREFERENCIAS_NOTIFICACAO_PADRAO = { checklistSummary: true, deadlines: true, collaboration: true };
-const APP_VERSION = "0.94";
+const APP_VERSION = "1.0";
 function normalizarIntervaloAviso(valor) {
   const minutos = Number(valor);
   return Number.isInteger(minutos) && minutos >= 5 && minutos <= 1440 ? minutos : 30;
@@ -100,6 +100,7 @@ const empacotarNuvem = (d) =>
 // papel de parede padrão: coloque o arquivo bg.png dentro da pasta public/
 const FUNDO_PADRAO = `${import.meta.env.BASE_URL}bg.png`;
 const STORAGE_BG_AJUSTE = "checklist:ajusteFundo";
+const STORAGE_MODO_TABLET = "checklist:modoTablet";
 
 const OPCOES_REPETE = [
   [0, "Não repete"],
@@ -1779,7 +1780,7 @@ function FormularioAnotacao({ form, onSalvar, onChange, onCancelar }) {
   );
 }
 
-function ConfiguracoesVisuais({ tema, setTema, desfoque, setDesfoque, ajusteFundo, setAjusteFundo, escolherFundo, fundo, removerFundo, erroFundo, janelaAvisos, setJanelaAvisos, excluirSemConfirmacao, setExcluirSemConfirmacao, notificationPreferences, setNotificationPreferences, iniciarTutorial }) {
+function ConfiguracoesVisuais({ tema, setTema, modoTablet, setModoTablet, desfoque, setDesfoque, ajusteFundo, setAjusteFundo, escolherFundo, fundo, removerFundo, erroFundo, janelaAvisos, setJanelaAvisos, excluirSemConfirmacao, setExcluirSemConfirmacao, notificationPreferences, setNotificationPreferences, iniciarTutorial }) {
   return <div className="ck-config-preferencias">
     <section className="ck-pref-card">
       <h3>Tema</h3>
@@ -1801,12 +1802,20 @@ function ConfiguracoesVisuais({ tema, setTema, desfoque, setDesfoque, ajusteFund
         <span>Excluir tarefas sem confirmação</span>
       </label>
     </section>
-    <section className="ck-pref-card">
+    <section className="ck-pref-card ck-pref-notificacoes">
       <h3 id="config-notificacoes">Notificações</h3>
       <p>Escolha quais avisos este aparelho e sua conta podem receber.</p>
       <label className="ck-limite-horario"><input type="checkbox" checked={notificationPreferences.checklistSummary} onChange={(e) => setNotificationPreferences((p) => ({ ...p, checklistSummary: e.target.checked }))} /><span>Resumo periódico da checklist</span></label>
       <label className="ck-limite-horario"><input type="checkbox" checked={notificationPreferences.deadlines} onChange={(e) => setNotificationPreferences((p) => ({ ...p, deadlines: e.target.checked }))} /><span>Avisos de prazo</span></label>
       <label className="ck-limite-horario"><input type="checkbox" checked={notificationPreferences.collaboration} onChange={(e) => setNotificationPreferences((p) => ({ ...p, collaboration: e.target.checked }))} /><span>Atualizações de tarefas com amigos e equipes</span></label>
+    </section>
+    <section className="ck-pref-card">
+      <h3>Modo tablet</h3>
+      <p>Em telas menores, mostra checklist e calendário lado a lado quando o aparelho estiver na horizontal. A rotação continua sendo controlada pelo aparelho.</p>
+      <label className="ck-limite-horario">
+        <input type="checkbox" checked={modoTablet} onChange={(e) => setModoTablet(e.target.checked)} />
+        <span>Usar layout horizontal em tablets</span>
+      </label>
     </section>
     <section className="ck-pref-card">
       <h3>Horário dos lembretes</h3>
@@ -2086,6 +2095,7 @@ function Checklist({ usuario }) {
   const [fundo, setFundo] = useState(null); // URL (blob:) do papel de parede, carregado do IndexedDB
   const [desfoque, setDesfoque] = useState(() => lerStorage(STORAGE_BLUR, DESFOQUE_PADRAO));
   const [ajusteFundo, setAjusteFundo] = useState(() => lerStorage(STORAGE_BG_AJUSTE, "preencher"));
+  const [modoTablet, setModoTablet] = useState(() => lerStorage(STORAGE_MODO_TABLET, false) === true);
   const [pushAtivo, setPushAtivo] = useState(false); // este aparelho recebe avisos do servidor (app fechado)
   const [avisoPush, setAvisoPush] = useState("");
   const [intervaloAviso, setIntervaloAviso] = useState(() => normalizarIntervaloAviso(lerStorage(STORAGE_INTERVALO, 30)));
@@ -2103,6 +2113,7 @@ function Checklist({ usuario }) {
     document.documentElement.dataset.tema = tema;
     salvarStorage(STORAGE_TEMA, tema);
   }, [tema]);
+  useEffect(() => { salvarStorage(STORAGE_MODO_TABLET, modoTablet); }, [modoTablet]);
   useEffect(() => {
     let ativo = true;
     async function conferirVersao() {
@@ -3247,7 +3258,7 @@ function Checklist({ usuario }) {
   });
 
   return (
-    <div className="ck-layout com-fundo">
+    <div className={`ck-layout com-fundo${modoTablet ? " ck-modo-tablet" : ""}`}>
     {ajusteFundo === "inteira" && (
       <div className="ck-fundo-preenche" style={{ backgroundImage: `url(${fundoAtual})` }} aria-hidden="true" />
     )}
@@ -3326,7 +3337,7 @@ function Checklist({ usuario }) {
           <button type="button" role="tab" className="ck-aba" aria-selected={abaConfiguracoes === "preferencias"} onClick={() => setAbaConfiguracoes("preferencias")}>Preferências</button>
           <button type="button" role="tab" className="ck-aba" aria-selected={abaConfiguracoes === "conta"} onClick={() => setAbaConfiguracoes("conta")}>Conta</button>
         </div>
-        {abaConfiguracoes === "preferencias" ? <ConfiguracoesVisuais tema={tema} setTema={setTema} desfoque={desfoque} setDesfoque={setDesfoque} ajusteFundo={ajusteFundo} setAjusteFundo={setAjusteFundo} escolherFundo={escolherFundo} fundo={fundo} removerFundo={removerFundo} erroFundo={erroFundo} janelaAvisos={janelaAvisos} setJanelaAvisos={setJanelaAvisos} excluirSemConfirmacao={excluirSemConfirmacao} setExcluirSemConfirmacao={setExcluirSemConfirmacao} notificationPreferences={notificationPreferences} setNotificationPreferences={setNotificationPreferences} iniciarTutorial={iniciarTutorial} /> : <section className="ck-conta-config">
+        {abaConfiguracoes === "preferencias" ? <ConfiguracoesVisuais tema={tema} setTema={setTema} modoTablet={modoTablet} setModoTablet={setModoTablet} desfoque={desfoque} setDesfoque={setDesfoque} ajusteFundo={ajusteFundo} setAjusteFundo={setAjusteFundo} escolherFundo={escolherFundo} fundo={fundo} removerFundo={removerFundo} erroFundo={erroFundo} janelaAvisos={janelaAvisos} setJanelaAvisos={setJanelaAvisos} excluirSemConfirmacao={excluirSemConfirmacao} setExcluirSemConfirmacao={setExcluirSemConfirmacao} notificationPreferences={notificationPreferences} setNotificationPreferences={setNotificationPreferences} iniciarTutorial={iniciarTutorial} /> : <section className="ck-conta-config">
           <div className="ck-conta-identidade"><span className="ck-conta-avatar" aria-hidden="true">{(usuario.email || "?").slice(0, 1).toUpperCase()}</span><div><small>Conta conectada</small><strong>{usuario.email}</strong></div></div>
           <ConfiguracaoNomeUsuario usuario={usuario} onNomeSalvo={setNomeUsuarioDefinido} />
           <button type="button" className="ck-sair-conta" onClick={sair}><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"><path d="M6.5 2.5H4a1.5 1.5 0 0 0-1.5 1.5v8A1.5 1.5 0 0 0 4 13.5h2.5"/><path d="M10 5l3 3-3 3M13 8H6.5"/></svg>Sair da conta</button>
@@ -3661,69 +3672,5 @@ export default function App() {
       />
     );
   }
-  if (window.location.pathname.replace(/\/+$/, "") === "/oauth/consent") return <OAuthConsent user={sessao.user} />;
   return <Checklist key={sessao.user.id} usuario={sessao.user} />;
-}
-
-function OAuthConsent({ user }) {
-  const authorizationId = new URLSearchParams(window.location.search).get("authorization_id");
-  const [details, setDetails] = useState(null);
-  const [loading, setLoading] = useState(Boolean(authorizationId));
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(authorizationId ? "" : "Este pedido de conexão está incompleto. Volte ao ChatGPT e tente conectar novamente.");
-
-  useEffect(() => {
-    let active = true;
-    if (!authorizationId) return () => { active = false; };
-    supabase.auth.oauth.getAuthorizationDetails(authorizationId).then(({ data, error: requestError }) => {
-      if (!active) return;
-      if (requestError) setError("Não consegui carregar os detalhes da autorização. Confira se a conexão está ativa e tente novamente.");
-      else if (data && "redirect_url" in data) window.location.assign(data.redirect_url);
-      else if (data?.user?.id !== user.id) setError("A conta autorizada não corresponde à conta conectada no Crysalis. Entre na conta correta e tente novamente.");
-      else setDetails(data);
-      setLoading(false);
-    }).catch(() => {
-      if (active) {
-        setError("Não consegui carregar os detalhes da autorização. Tente novamente.");
-        setLoading(false);
-      }
-    });
-    return () => { active = false; };
-  }, [authorizationId, user.id]);
-
-  async function decide(approve) {
-    if (!authorizationId || busy) return;
-    setBusy(true);
-    setError("");
-    try {
-      const { data, error: decisionError } = approve
-        ? await supabase.auth.oauth.approveAuthorization(authorizationId, { skipBrowserRedirect: true })
-        : await supabase.auth.oauth.denyAuthorization(authorizationId, { skipBrowserRedirect: true });
-      if (decisionError || !data?.redirect_url) throw decisionError || new Error("Missing OAuth redirect URL");
-      window.location.assign(data.redirect_url);
-    } catch {
-      setError("Não consegui concluir a autorização. Tente novamente.");
-      setBusy(false);
-    }
-  }
-
-  return <main className="ck-oauth-page">
-    <section className="ck-oauth-card" aria-labelledby="ck-oauth-title">
-      <img src={`${import.meta.env.BASE_URL}Logo.svg`} alt="" aria-hidden="true" />
-      <p className="ck-oauth-eyebrow">CONEXÃO SEGURA</p>
-      <h1 id="ck-oauth-title">Conectar ao Crysalis</h1>
-      {loading ? <p>Carregando os detalhes da conexão…</p> : error ? <p className="ck-oauth-error" role="alert">{error}</p> : <>
-        <p><strong>{details?.client?.name || "Um app conectado"}</strong> quer acessar seu Crysalis.</p>
-        <div className="ck-oauth-access"><strong>O que será permitido</strong><ul>
-          <li>Consultar suas tarefas, sessões e eventos pessoais</li>
-          <li>Criar, editar e excluir tarefas e eventos a seu pedido</li>
-        </ul></div>
-        <p className="ck-oauth-account">Conectado como {details?.user?.email || "sua conta Crysalis"}</p>
-        <div className="ck-oauth-actions">
-          <button type="button" className="secundario" onClick={() => decide(false)} disabled={busy}>Recusar</button>
-          <button type="button" className="primario" onClick={() => decide(true)} disabled={busy}>{busy ? "Conectando…" : "Autorizar"}</button>
-        </div>
-      </>}
-    </section>
-  </main>;
 }

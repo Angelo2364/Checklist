@@ -8,10 +8,6 @@ project_id = "checklist"
 # A função valida CRON_SECRET para o agendamento e JWT para o acionamento do app.
 verify_jwt = false
 
-[functions.crysalis-ai]
-# Requests must carry the signed-in user's Supabase JWT (including OAuth sessions).
-verify_jwt = true
-
 [api]
 enabled = true
 # Port to use for the API URL.
@@ -381,7 +377,7 @@ enabled = false
 # OAuth server configuration
 [auth.oauth_server]
 # Enable OAuth server functionality
-enabled = true
+enabled = false
 # Path for OAuth consent flow UI
 authorization_url_path = "/oauth/consent"
 # Allow dynamic client registration

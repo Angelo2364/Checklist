@@ -672,6 +672,14 @@ button.secundario:hover {
   .ck-lateral { border-left: 0; border-right: 0; }
 }
 
+/* Em celulares grandes e tablets compactos, o modo tablet mantém o calendário
+   ao lado da checklist quando o aparelho está em paisagem. */
+@media (min-width: 680px) and (max-width: 1000px) and (orientation: landscape) {
+  .ck-layout.ck-modo-tablet { flex-direction: row; align-items: flex-start; max-width: none; min-height: 100dvh; }
+  .ck-layout.ck-modo-tablet > .ck { flex: 1 1 auto; width: calc(100% - 320px); min-width: 0; max-width: none; margin: 0; }
+  .ck-layout.ck-modo-tablet > .ck-lateral { flex: 0 0 320px; width: 320px; max-width: none; min-height: 100dvh; max-height: 100dvh; margin: 0; position: sticky; top: 0; border: 0; border-left: 1px solid var(--linha); border-top: 0; }
+}
+
 .ck-cal { padding: 12px 16px 16px; }
 
 .ck-cal-topo {
@@ -1607,6 +1615,7 @@ button.ck-topo-marca:focus-visible { outline: 2px solid var(--azul-forte); outli
 .ck-pref-card h3, .ck-backup-card h3 { margin: 0 0 5px; font-size: 15px; }
 .ck-pref-card > p, .ck-backup-card > p { margin: 0 0 14px; color: var(--suave); font-size: 13px; line-height: 1.5; }
 .ck-limite-horario { display: flex; align-items: center; gap: 10px; width: fit-content; color: var(--tinta); font-size: 14px; font-weight: 700; cursor: pointer; }
+.ck-pref-notificacoes .ck-limite-horario + .ck-limite-horario { margin-top: 8px; }
 .ck-limite-horario input { width: 18px; height: 18px; margin: 0; accent-color: var(--azul-forte); cursor: pointer; }
 .ck-periodo-avisos { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: end; gap: 12px; margin: 16px 0 10px; }
 .ck-periodo-avisos label { display: grid; gap: 6px; color: var(--suave); font-size: 12px; font-weight: 700; }
@@ -3822,18 +3831,3 @@ input[type="checkbox"]:disabled { opacity: .5; cursor: not-allowed; }
   .ck-social-page.ck-social-hub,
   .ck-social-tasks.ck-social-hub { margin-top: 10px; }
 }
-.ck-oauth-page { min-height: 100dvh; display: grid; place-items: center; padding: 24px; color: var(--tinta); background: var(--fundo); }
-.ck-oauth-card { width: min(480px, 100%); padding: 28px; border: 1px solid var(--linha); border-radius: 22px; background: color-mix(in srgb, var(--fora) 86%, transparent); box-shadow: 0 18px 60px #09062655; backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); }
-.ck-oauth-card > img { display: block; width: 42px; height: 42px; object-fit: contain; margin-bottom: 8px; }
-.ck-oauth-eyebrow { margin: 0 0 8px !important; color: var(--suave); font-size: 10px; font-weight: 800; letter-spacing: .12em; }
-.ck-oauth-card h1 { margin: 0 0 14px; font-size: 24px; }
-.ck-oauth-card p { color: var(--suave); line-height: 1.55; }
-.ck-oauth-access { margin: 20px 0; padding: 16px; border: 1px solid var(--linha); border-radius: 15px; background: #ffffff08; }
-.ck-oauth-access ul { margin: 10px 0 0; padding-left: 20px; color: var(--suave); line-height: 1.7; }
-.ck-oauth-account { overflow-wrap: anywhere; font-size: 13px; }
-.ck-oauth-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-.ck-oauth-actions button { min-height: 42px; padding: 0 18px; border: 1px solid var(--linha); border-radius: 999px; color: var(--tinta); background: #ffffff0b; font: inherit; font-weight: 700; cursor: pointer; }
-.ck-oauth-actions button:last-child { border-color: transparent; color: #40213d; background: #f59ac6; }
-.ck-oauth-actions button:disabled { opacity: .6; cursor: wait; }
-.ck-oauth-error { color: #ff9aaf !important; }
-@media (max-width: 480px) { .ck-oauth-page { padding: 14px; } .ck-oauth-card { padding: 22px; } }
