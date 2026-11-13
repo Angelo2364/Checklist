@@ -1416,7 +1416,7 @@ function NovaTarefa({ onAdd, placeholder, onFechar, idCampo, modoAgenda = false,
   return (
     <form
       ref={formRef}
-      className={`ck-form-grupo${modoAgenda ? " ck-form-tarefa-agendada" : ""}`}
+      className={`ck-form-grupo ck-editor-tarefa${modoAgenda ? " ck-form-tarefa-agendada" : ""}`}
       onSubmit={enviar}
       onBlur={(e) => {
         if (e.relatedTarget && !e.currentTarget.contains(e.relatedTarget) && onFechar) onFechar();
@@ -1556,7 +1556,7 @@ function EditarTarefa({ tarefa, onSalvar, onCancelar, incluirDataAgenda = false 
   return (
     <form
       ref={formularioRef}
-      className="ck-form-grupo"
+      className="ck-form-grupo ck-editor-tarefa"
       onSubmit={(e) => {
         e.preventDefault();
         if (texto.trim()) {
@@ -3485,7 +3485,7 @@ function Checklist({ usuario }) {
         <span aria-hidden="true"> · </span>
         <Contato />
                 <span aria-hidden="true"> · </span>
-                <span aria-hidden="true"> V0.87 </span>
+                <span aria-hidden="true"> V0.89 </span>
       </footer>
     </main>
 

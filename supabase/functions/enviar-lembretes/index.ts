@@ -139,14 +139,26 @@ async function enviar(sub: any, payload: unknown, opcoes: { TTL: number; urgency
 }
 
 Deno.serve(async (req) => {
-  if (req.headers.get("x-cron-secret") !== Deno.env.get("CRON_SECRET")) {
-    return new Response("não autorizado", { status: 401 });
+  const cronSecret = Deno.env.get("CRON_SECRET");
+  const chamadaCron = Boolean(cronSecret) && req.headers.get("x-cron-secret") === cronSecret;
+  let actorId: string | null = null;
+  if (!chamadaCron) {
+    const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
+    if (!token) return new Response("não autorizado", { status: 401 });
+    const { data: authData, error: authError } = await supabase.auth.getUser(token);
+    if (authError || !authData.user) return new Response("não autorizado", { status: 401 });
+    const body = await req.clone().json().catch(() => ({}));
+    if (body?.colaboracao !== true) return new Response("não autorizado", { status: 403 });
+    actorId = authData.user.id;
   }
-  const forcar = new URL(req.url).searchParams.get("forcar") === "1"; // teste: manda o resumo agora
+  const forcar = chamadaCron && new URL(req.url).searchParams.get("forcar") === "1"; // teste: manda o resumo agora
 
   const { data: subs, error } = await supabase.from("push_subscriptions").select("*").eq("ativo", true);
   if (error) return new Response(error.message, { status: 500 });
-  if (!subs?.length) return new Response("sem aparelhos", { status: 200 });
+  if (!subs?.length) {
+    await supabase.from("collaboration_notifications").update({ sent_at: new Date().toISOString(), claimed_at: null }).is("sent_at", null);
+    return new Response("sem aparelhos; fila de colaboração descartada", { status: 200 });
+  }
 
   const ids = [...new Set(subs.map((s) => s.user_id))];
   const { data: linhas } = await supabase.from("user_data").select("user_id, data").in("user_id", ids);
@@ -156,36 +168,70 @@ Deno.serve(async (req) => {
 
   // Atualizações de tarefas compartilhadas são colocadas na fila pelo banco,
   // assim todos os participantes recebem o aviso mesmo quando o app está fechado.
-  const { data: colaboracao } = await supabase.from("collaboration_notifications")
-    .select("*").is("sent_at", null).order("created_at").limit(500);
-  for (const aviso of colaboracao ?? []) {
-    const dados: any = dadosDe.get(aviso.recipient_id) ?? {};
-    const preferences = dados.notificationPreferences ?? {};
-    if (preferences.collaboration === false) {
-      await supabase.from("collaboration_notifications").update({ sent_at: new Date().toISOString() }).eq("id", aviso.id).is("sent_at", null);
+  const { data: colaboracao, error: filaError } = await supabase.rpc("claim_collaboration_notifications", {
+    p_actor_id: actorId,
+    p_limit: 500,
+  });
+  if (filaError) return new Response(filaError.message, { status: 500 });
+  const porDestinatario = new Map<string, any[]>();
+  for (const aviso of colaboracao ?? []) porDestinatario.set(aviso.recipient_id, [...(porDestinatario.get(aviso.recipient_id) ?? []), aviso]);
+
+  for (const [recipientId, avisos] of porDestinatario) {
+    const dados: any = dadosDe.get(recipientId) ?? {};
+    const aparelhos = subs.filter((sub) => sub.user_id === recipientId);
+    const liberar = async (sentAt: string | null = null) => {
+      for (const aviso of avisos) {
+        let query = supabase.from("collaboration_notifications").update({ sent_at: sentAt, claimed_at: null }).eq("id", aviso.id).eq("created_at", aviso.created_at);
+        if (sentAt) query = query.is("sent_at", null);
+        await query;
+      }
+    };
+    if (dados.notificationPreferences?.collaboration === false || !aparelhos.length) {
+      // Consentimento desligado ou nenhum aparelho inscrito: nunca entregar depois como surpresa.
+      await liberar(new Date().toISOString());
       continue;
     }
-    const aparelhos = (subs ?? []).filter((sub) => sub.user_id === aviso.recipient_id);
-    if (!aparelhos.length) continue;
-    const dentroDaJanela = aparelhos.some((sub) => {
+
+    const aparelhosPermitidos = aparelhos.filter((sub) => {
       const ag = agoraNoFuso(sub.fuso || "America/Sao_Paulo");
       return horarioPermiteAvisos(dados.janelaAvisos, ag.minutosDia);
     });
-    if (!dentroDaJanela) continue;
+    if (!aparelhosPermitidos.length) {
+      // Horário silencioso: deixa o último estado de cada tarefa pendente para o próximo ciclo.
+      await liberar();
+      continue;
+    }
+
+    const verbo = (action: string) => action === "adicionou" ? "adicionada" : action === "excluiu" ? "excluída" : "alterada";
+    const ator = (name: string) => String(name || "Alguém").replace(/^./u, (c: string) => c.toLocaleUpperCase("pt-BR"));
+    const linhas = avisos.slice(0, 8).map((aviso) => `${ator(aviso.actor_name)}: “${aviso.task_title}” foi ${verbo(aviso.action)} · ${aviso.scope_name}`);
+    if (avisos.length > 8) linhas.push(`E mais ${avisos.length - 8} tarefa(s) atualizada(s).`);
+    const primeiro = avisos[0];
     const payload = {
-      titulo: `${String(aviso.actor_name || "Alguém").replace(/^./u, (c: string) => c.toLocaleUpperCase("pt-BR"))} ${aviso.action} uma tarefa · ${aviso.scope_name}`,
-      corpo: `“${aviso.task_title}” foi ${aviso.action === "adicionou" ? "adicionada" : aviso.action === "excluiu" ? "excluída" : "alterada"}.`,
-      tag: `colaboracao-${aviso.scope_type}-${aviso.scope_id}-${aviso.id}`,
+      titulo: avisos.length === 1
+        ? `${ator(primeiro.actor_name)} ${primeiro.action} uma tarefa · ${primeiro.scope_name}`
+        : `${avisos.length} atualizações de tarefas compartilhadas`,
+      corpo: avisos.length === 1
+        ? `“${primeiro.task_title}” foi ${verbo(primeiro.action)}.`
+        : linhas.join("\n").slice(0, 1800),
+      tag: `colaboracao-${recipientId}`,
       renotify: true,
       icon: "/Logo.svg",
       data: { url: "/" },
     };
-    for (const sub of aparelhos) {
-      const ag = agoraNoFuso(sub.fuso || "America/Sao_Paulo");
-      if (horarioPermiteAvisos(dados.janelaAvisos, ag.minutosDia) && await enviar(sub, payload, { TTL: 3600, urgency: "normal" })) enviados++;
+    let sucesso = false;
+    for (const sub of aparelhosPermitidos) {
+      const ok = await enviar(sub, payload, { TTL: 3600, urgency: "normal" });
+      sucesso ||= ok;
+      if (ok) enviados++;
     }
-    await supabase.from("collaboration_notifications").update({ sent_at: new Date().toISOString() }).eq("id", aviso.id).is("sent_at", null);
+    // Não marca falha transitória como enviada; o cron pode tentar novamente.
+    await liberar(sucesso ? new Date().toISOString() : null);
   }
+
+  // Chamadas autenticadas do app servem apenas para acordar o envio colaborativo.
+  // Resumos pessoais e lembretes de prazo continuam exclusivos do cron.
+  if (actorId) return new Response(JSON.stringify({ enviados, colaboracao: true }), { headers: { "Content-Type": "application/json" } });
 
   for (const sub of subs) {
     const dados: any = dadosDe.get(sub.user_id) ?? {};

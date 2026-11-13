@@ -4,6 +4,10 @@
 # working directory name when running `supabase init`.
 project_id = "checklist"
 
+[functions.enviar-lembretes]
+# A função valida CRON_SECRET para o agendamento e JWT para o acionamento do app.
+verify_jwt = false
+
 [api]
 enabled = true
 # Port to use for the API URL.

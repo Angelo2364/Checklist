@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "./services/supabase";
+import { scheduleCollaborationNotificationDispatch } from "./services/collaborationNotifications";
 
 const z2 = (n) => String(n).padStart(2, "0");
 const hojeISO = () => { const d = new Date(); return `${d.getFullYear()}-${z2(d.getMonth() + 1)}-${z2(d.getDate())}`; };
@@ -329,7 +330,7 @@ function NoteFormInline({ form, setForm, onSubmit, onCancel }) {
     document.addEventListener("pointerdown", closeOutside, true);
     return () => document.removeEventListener("pointerdown", closeOutside, true);
   }, [onCancel]);
-  return <form ref={formRef} className="ck-form-grupo ck-form-anotacao ck-shared-note-editor" onSubmit={onSubmit} onKeyDown={(event) => { if (event.key === "Escape") onCancel(); else if (event.key === "Enter" && event.target.tagName === "TEXTAREA" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.requestSubmit(); } }}><div className="ck-anotacao-titulo-data"><input autoFocus maxLength={100} required value={form.title} onChange={(event) => setForm((value) => ({ ...value, title: event.target.value }))} placeholder="Título" aria-label="Título da anotação"/><DataDiaMes value={form.date || ""} onChange={(date) => setForm((value) => ({ ...value, date }))} rotulo="Data da anotação (opcional): dia e mês" /></div><textarea className="ck-campo-largo" rows={3} maxLength={5000} value={form.body} onChange={(event) => setForm((value) => ({ ...value, body: event.target.value }))} placeholder="Anotação (opcional)" aria-label="Anotação (opcional)"/><div className="ck-edit-acoes"><button type="submit" disabled={!form.title.trim()}>{form.id ? "Salvar" : "Adicionar"}</button><button type="button" className="ck-icone" onClick={onCancel} aria-label="Cancelar">×</button></div></form>;
+  return <form ref={formRef} className="ck-form-grupo ck-form-anotacao ck-shared-note-editor" onSubmit={onSubmit} onKeyDown={(event) => { if (event.key === "Escape") onCancel(); else if (event.key === "Enter" && event.target.tagName === "TEXTAREA" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.requestSubmit(); } }}><div className="ck-anotacao-titulo-data"><input autoFocus maxLength={100} required value={form.title} onChange={(event) => setForm((value) => ({ ...value, title: event.target.value }))} placeholder="Título" aria-label="Título da anotação"/><DataDiaMes value={form.date || ""} onChange={(date) => setForm((value) => ({ ...value, date }))} rotulo="Data da anotação (opcional): dia e mês" /></div><textarea className="ck-campo-largo" rows={4} maxLength={5000} value={form.body} onChange={(event) => setForm((value) => ({ ...value, body: event.target.value }))} placeholder="Anotação (opcional)" aria-label="Anotação (opcional)"/><div className="ck-edit-acoes"><button type="submit" disabled={!form.title.trim()}>{form.id ? "Salvar" : "Adicionar"}</button><button type="button" className="ck-icone" onClick={onCancel} aria-label="Cancelar">×</button></div></form>;
 }
 
 function IconeGrupoMais() {
@@ -350,7 +351,10 @@ function TaskEditor({ initial, groupId = null, onSave, onCancel, busy }) {
   const repeatData = recurrencePayload(repeat, repeatConfig);
 
   useEffect(() => {
-    function closeOutside(event) { if (formRef.current && !formRef.current.contains(event.target)) onCancel(); }
+    function closeOutside(event) {
+      const owner = formRef.current?.closest("li.ck-social-task-card.editando") || formRef.current;
+      if (owner && !owner.contains(event.target)) onCancel();
+    }
     document.addEventListener("pointerdown", closeOutside, true);
     return () => document.removeEventListener("pointerdown", closeOutside, true);
   }, [onCancel]);
@@ -369,7 +373,7 @@ function TaskEditor({ initial, groupId = null, onSave, onCancel, busy }) {
     });
   }
 
-  return <form ref={formRef} className="ck-form-grupo ck-social-task-form" onSubmit={submit}>
+  return <form ref={formRef} className="ck-form-grupo ck-editor-tarefa ck-social-task-form" onSubmit={submit} onKeyDown={(event) => { if (event.key === "Escape") onCancel(); else if (event.key === "Enter" && event.target.tagName === "TEXTAREA" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.requestSubmit(); } }}>
     <input autoFocus maxLength={200} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="O que vocês precisam fazer?" aria-label="Nome da tarefa compartilhada" required onKeyDown={(e) => e.key === "Escape" && onCancel()} />
     <div className="ck-social-repeat-row">
       <select value={repeat} onChange={(e) => setRepeat(e.target.value)} aria-label="Frequência da tarefa">
@@ -387,10 +391,10 @@ function TaskEditor({ initial, groupId = null, onSave, onCancel, busy }) {
         : <label className="ck-repeticao-intervalo">A cada <input type="number" min="1" max={repeatConfig.tipo === "meses" ? 24 : 365} value={repeatConfig.intervalo || 1} onChange={(e) => setRepeatConfig((v) => ({ ...v, intervalo: Math.max(1, Number(e.target.value) || 1) }))} />{repeatConfig.tipo === "meses" ? "meses" : "dias"}</label>}
     </div>}
     <div className="ck-prazo-campos"><span className="ck-prazo-rotulo">Prazo</span><DataDiaMes value={dueDate} onChange={setDueDate} /><Hora24Social value={dueTime} onChange={setDueTime} rotulo="Horário do prazo (opcional)" opcional /></div>
-    <textarea className="ck-campo-largo" rows={2} maxLength={1000} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descrição (opcional)" aria-label="Descrição da tarefa compartilhada" onKeyDown={(e) => { if (e.key === "Escape") onCancel(); if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }} />
+    <textarea className="ck-campo-largo" rows={2} maxLength={1000} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descrição (opcional)" aria-label="Descrição da tarefa compartilhada" />
     <div className="ck-tarefa-form-rodape">
       <div className="ck-tarefa-form-botoes"><span className="ck-edit-acoes"><button type="submit" disabled={busy || !title.trim() || (repeatData?.tipo === "semana" && !repeatData.diasSemana?.length)}>{busy ? "Salvando…" : initial ? "Salvar" : "Adicionar"}</button><button type="button" className="ck-icone" onClick={onCancel} title="Cancelar (Esc)" aria-label="Cancelar">×</button></span></div>
-      {commentOpen && <textarea className="ck-comentario-input" rows={2} maxLength={1000} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Comentário (opcional)" aria-label="Comentário da tarefa" onKeyDown={(e) => { if (e.key === "Escape") onCancel(); if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); e.currentTarget.form?.requestSubmit(); } }} />}
+      {commentOpen && <textarea className="ck-comentario-input" rows={2} maxLength={1000} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Comentário (opcional)" aria-label="Comentário da tarefa" />}
       <button type="button" className="ck-comentario-botao" aria-label={commentOpen ? "Ocultar campo de comentário" : "Adicionar comentário"} aria-expanded={commentOpen} title="Comentário" onClick={() => setCommentOpen((v) => !v)}><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M13.5 7.7a5.6 5.6 0 0 1-5.8 5.1 6.2 6.2 0 0 1-2.5-.5L2 13l.8-2.7a5 5 0 0 1-.8-2.6A5.5 5.5 0 0 1 7.8 2.5h.4a5.5 5.5 0 0 1 5.3 5.2z" /></svg></button>
     </div>
   </form>;
@@ -462,7 +466,7 @@ export function GroupEditor({ group, onSave, onCancel }) {
     document.addEventListener("pointerdown", closeOutside, true);
     return () => document.removeEventListener("pointerdown", closeOutside, true);
   }, [onCancel]);
-  return <form ref={formRef} className="ck-social-group-editor" onSubmit={(e) => { e.preventDefault(); if (name.trim()) onSave({ name: name.trim(), icon }); }} onBlur={(event) => { const form = event.currentTarget; if (event.relatedTarget && form.contains(event.relatedTarget)) return; window.setTimeout(() => { if (!form.contains(document.activeElement)) onCancel?.(); }, 50); }} onKeyDown={(event) => { if (event.key === "Escape") onCancel?.(); }}>
+  return <form ref={formRef} className="ck-editar-sessao ck-social-group-editor" onSubmit={(e) => { e.preventDefault(); if (name.trim()) onSave({ name: name.trim(), icon }); }} onKeyDown={(event) => { if (event.key === "Escape") onCancel?.(); }}>
     <div className="ck-seletor-icones">{ICONES_GRUPO.map(([item, label]) => <button type="button" className="ck-opcao-icone" key={item} aria-pressed={icon === item} aria-label={`Ícone ${label}`} title={label} onClick={() => setIcon(item)}><IconeGrupo tipo={item} /></button>)}</div>
     <input autoFocus maxLength={60} value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome da sessão" aria-label="Nome da sessão compartilhada" required />
     <button type="submit" className="ck-icone" aria-label="Salvar sessão" title="Salvar sessão"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m3 8 3.2 3.2L13 4.5" /></svg></button>
@@ -639,6 +643,7 @@ export default function Social({ user, view = "tasks", friendshipId = "", onBack
       setSavingTask(false);
       return false;
     }
+    scheduleCollaborationNotificationDispatch();
     setAddingFor("");
     await loadTasks().catch(() => setTaskError("A tarefa foi salva, mas não consegui atualizar a lista."));
     setSavingTask(false);
@@ -653,7 +658,7 @@ export default function Social({ user, view = "tasks", friendshipId = "", onBack
       setTasks((current) => current.map((item) => item.id === task.id ? { ...item, completed: task.completed, partial: Boolean(task.partial) } : item));
       setTaskError("Não consegui atualizar essa tarefa. Tente novamente.");
     }
-    else await loadTasks().catch(() => {});
+    else { scheduleCollaborationNotificationDispatch(); await loadTasks().catch(() => {}); }
   }
 
   async function editTask(taskId, fields) {
@@ -662,6 +667,7 @@ export default function Social({ user, view = "tasks", friendshipId = "", onBack
       setTaskError("Não consegui editar essa tarefa. Tente novamente.");
       return false;
     }
+    scheduleCollaborationNotificationDispatch();
     await loadTasks().catch(() => {});
     return true;
   }
@@ -669,7 +675,7 @@ export default function Social({ user, view = "tasks", friendshipId = "", onBack
   async function deleteTask(task) {
     const { error: deleteError } = await supabase.from("social_tasks").delete().eq("id", task.id);
     if (deleteError) setTaskError("Não consegui apagar essa tarefa. Tente novamente.");
-    else await loadTasks().catch(() => {});
+    else { scheduleCollaborationNotificationDispatch(); await loadTasks().catch(() => {}); }
   }
 
   async function removerAmizade(friend) {
@@ -951,6 +957,7 @@ export default function Social({ user, view = "tasks", friendshipId = "", onBack
       setSavingTask(false);
       return;
     }
+    scheduleCollaborationNotificationDispatch();
     if (mode === "move") onMovePersonalTask?.(task.id);
     setSharePrompt(null);
     await loadTasks().catch(() => {});

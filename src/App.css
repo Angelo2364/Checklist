@@ -3233,9 +3233,9 @@ body {
 :root[data-tema="claro"] .ck-sessao-icone.logo { filter: brightness(0) saturate(100%); }
 .ck-sessao-icone.logo.monocromatico { background-color: currentColor; filter: none; mask-repeat: no-repeat; mask-position: center; mask-size: contain; }
 .ck-seletor-icones {
-  display: flex;
-  flex: 1 1 100%;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  width: 100%;
   gap: 5px;
   padding-bottom: 2px;
 }
@@ -3256,8 +3256,8 @@ body {
 .ck-editar-sessao .ck-opcao-icone { flex: none; width: 31px; height: 31px; min-width: 31px; color: var(--suave); }
 .ck-editar-sessao .ck-opcao-icone .ck-sessao-icone { color: var(--suave); }
 .ck-editar-sessao input { grid-column: 1; grid-row: 2; width: 100%; min-width: 0; box-sizing: border-box; }
-.ck-editar-sessao button[type="submit"] { grid-column: 2; grid-row: 2; }
-.ck-editar-sessao button[type="button"] { grid-column: 3; grid-row: 2; }
+.ck-editar-sessao > button[type="submit"] { grid-column: 2; grid-row: 2; }
+.ck-editar-sessao > button[type="button"] { grid-column: 3; grid-row: 2; }
 .ck-painel .ck-rotinas ul { display: grid; gap: 9px; margin: 0; padding: 0 12px 14px; }
 .ck-painel .ck-rotinas li {
   min-height: 62px;
@@ -3420,7 +3420,7 @@ body {
 .ck-team-list-icon svg { display: block; }
 .ck-team-detail-heading { flex-wrap: wrap; justify-content: flex-start; gap: 10px; }
 .ck-team-detail-heading > .ck-social-back { margin: 0; }
-.ck-social-group-editor .ck-seletor-icones { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; width: 100%; }
+.ck-social-group-editor .ck-seletor-icones { gap: 6px; }
 .ck-social-group-editor .ck-opcao-icone { width: 100%; min-width: 0; }
 .ck-social-work-tabs { margin: 0; border-top: 0; border-radius: 12px; }
 .ck-social-detail-page { padding: 0 0 18px; }
@@ -3565,7 +3565,7 @@ body {
 .ck-team-settings-controls .ck-icone { width: 38px; height: 38px; border: 1px solid var(--linha); border-radius: 12px; background: var(--fundo-hover); font-size: 20px; }
 .ck-team-settings { padding-top: 14px; border-top: 1px solid var(--linha); }
 .ck-team-icon-settings { margin-bottom: 20px; }
-.ck-team-icon-settings .ck-seletor-icones { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: 8px; max-width: 330px; }
+.ck-team-icon-settings .ck-seletor-icones { gap: 8px; }
 .ck-team-icon-settings .ck-opcao-icone { width: 100%; min-height: 36px; }
 .ck-team-detail-heading h2 { display: flex; align-items: center; gap: 8px; }
 .ck-team-work-panel > ul[data-team-group-id=""] { min-height: 45px; margin: 0 10px 12px; border-radius: 12px; }
@@ -3680,3 +3680,51 @@ input[type="checkbox"]:disabled { opacity: .5; cursor: not-allowed; }
 .ck-shared-notes .ck-team-note-edit-row .ck-campo-largo { width: 100%; box-sizing: border-box; }
 .ck-team-task-edit-row { display: block; padding: 0; overflow: hidden; }
 .ck-team-task-edit-row .ck-team-editor { margin: 0; border: 0; border-radius: 0; background: transparent; }
+@media (max-width: 600px) {
+  .ck-seletor-icones,
+  .ck-social-group-editor .ck-seletor-icones,
+  .ck-team-icon-settings .ck-seletor-icones { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}
+
+/* Regra de paridade: editores e controles de tarefas, anotações e sessões
+   pessoais, de amigos e de equipes seguem o mesmo padrão da checklist pessoal.
+   Só os rótulos e dados de contexto podem variar entre essas áreas. */
+.ck-editor-tarefa {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--barra);
+  border-bottom: 1px solid var(--linha);
+}
+.ck-editor-tarefa > input[type="text"] { flex: 1 1 140px; min-width: 120px; padding: 8px 14px; color: var(--tinta); background: var(--fundo); border: 1px solid var(--linha); border-radius: 999px; font: inherit; }
+.ck-editor-tarefa > input[type="text"]:focus { outline: none; border-color: var(--azul-forte); box-shadow: 0 0 0 1px var(--azul-forte); }
+.ck-editor-tarefa .ck-social-repeat-row > select { padding: 7px 10px; color: var(--tinta); background: var(--fundo); border: 1px solid var(--linha); border-radius: 999px; font: inherit; font-size: 13px; }
+.ck-editor-tarefa > textarea.ck-campo-largo { padding: 8px 14px; color: var(--tinta); background: var(--fundo); border: 1px solid var(--linha); border-radius: 14px; resize: vertical; font: inherit; }
+.ck-editor-tarefa .ck-social-repeat-row { flex: 1 1 100%; }
+.ck-editor-tarefa .ck-prazo-campos { flex: 1 1 100%; min-width: 100%; margin-top: 3px; padding-top: 7px; border-top: 1px solid color-mix(in srgb, var(--linha) 72%, transparent); }
+.ck-editor-tarefa .ck-social-diammes input { width: 40px; min-width: 0; text-align: center; }
+.ck-editor-tarefa .ck-campo-largo { flex: 1 1 100%; width: auto; min-width: 0; box-sizing: border-box; }
+.ck-editor-tarefa .ck-tarefa-form-rodape { flex: 1 1 100%; margin-top: 0; }
+.ck-editor-tarefa .ck-comentario-input { height: 34px; min-height: 34px; max-height: 34px; resize: none; }
+.ck-editor-tarefa .ck-edit-acoes > button[type="button"] { width: 30px; height: 30px; padding: 0; border: 0; border-radius: 9px; color: var(--suave); background: transparent; }
+.ck-editor-tarefa .ck-edit-acoes > button[type="button"]:hover { color: var(--tinta); background: var(--fundo-hover); }
+.ck-editor-tarefa .ck-comentario-botao { width: 30px; height: 30px; }
+
+/* Edição de sessão usa o mesmo seletor de ícone e os mesmos campos em todas as áreas. */
+.ck-social-group-editor { grid-template-columns: minmax(0, 1fr) 30px 30px; grid-template-rows: auto auto; column-gap: 4px; row-gap: 8px; padding-left: 16px; }
+.ck-social-group-editor .ck-seletor-icones { grid-column: 1; grid-row: 1; justify-content: space-between; gap: 4px; width: 100%; padding: 0; }
+.ck-social-group-editor .ck-opcao-icone { flex: none; width: 31px; height: 31px; min-width: 31px; color: var(--suave); }
+.ck-social-group-editor .ck-opcao-icone .ck-sessao-icone { color: var(--suave); }
+.ck-social-group-editor input { grid-column: 1; grid-row: 2; width: 100%; min-width: 0; box-sizing: border-box; padding: 8px 11px; border-radius: 10px; border-color: var(--azul-forte); box-shadow: 0 0 0 3px color-mix(in srgb, var(--azul-forte) 14%, transparent); }
+.ck-social-group-editor > button[type="submit"] { grid-column: 2; grid-row: 2; }
+.ck-social-group-editor > button[type="button"] { grid-column: 3; grid-row: 2; }
+
+/* A anotação compartilhada mantém o mesmo campo de texto de quatro linhas da pessoal. */
+.ck-shared-note-editor > .ck-campo-largo { min-height: 0; }
+.ck-team-task-edit-row .ck-editor-tarefa { background: var(--barra); }
+
+@media (max-width: 600px) {
+  .ck-social-group-editor .ck-seletor-icones { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+}

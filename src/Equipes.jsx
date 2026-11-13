@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "./services/supabase";
+import { scheduleCollaborationNotificationDispatch } from "./services/collaborationNotifications";
 import { AnotacoesCompartilhadas, GroupEditor, IconeGrupo, ICONES_GRUPO } from "./Social";
 
 const z2 = (n) => String(n).padStart(2, "0");
@@ -46,13 +47,13 @@ function EditorTarefa({ tarefa, grupos, onSave, onCancel }) {
   const [comentarioAberto, setComentarioAberto] = useState(Boolean(tarefa?.comment));
   const recurrence = recurrencePayload(repetir, config);
   useEffect(() => { const outside=(e)=>{ const owner=formRef.current?.closest("li.ck-team-task-edit-row")||formRef.current; if(owner && !owner.contains(e.target)) onCancel(); }; document.addEventListener("pointerdown",outside,true); return ()=>document.removeEventListener("pointerdown",outside,true); },[onCancel]);
-  return <form ref={formRef} className="ck-form-grupo ck-team-editor" onSubmit={(e) => { e.preventDefault(); if (titulo.trim() && (recurrence?.tipo!=="semana" || recurrence.diasSemana?.length)) onSave({ title: titulo.trim(), description: descricao.trim(), comment: comentario.trim(), due_date: prazo || (hora ? hoje() : null), due_time: (prazo || hora) ? (hora || null) : null, recurrence, recurrence_time: recurrence ? horaRepeticao : null }); }}>
+  return <form ref={formRef} className="ck-form-grupo ck-editor-tarefa ck-team-editor" onSubmit={(e) => { e.preventDefault(); if (titulo.trim() && (recurrence?.tipo!=="semana" || recurrence.diasSemana?.length)) onSave({ title: titulo.trim(), description: descricao.trim(), comment: comentario.trim(), due_date: prazo || (hora ? hoje() : null), due_time: (prazo || hora) ? (hora || null) : null, recurrence, recurrence_time: recurrence ? horaRepeticao : null }); }} onKeyDown={(e)=>{if(e.key==="Escape")onCancel();else if(e.key==="Enter"&&e.target.tagName==="TEXTAREA"&&!e.shiftKey&&!e.nativeEvent.isComposing){e.preventDefault();e.currentTarget.requestSubmit();}}}>
     <input autoFocus maxLength={200} required value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="O que a equipe precisa fazer?" aria-label="Título da tarefa" onKeyDown={(e)=>e.key==="Escape"&&onCancel()} />
     <div className="ck-social-repeat-row"><select value={repetir} onChange={(e)=>setRepetir(e.target.value)} aria-label="Frequência da tarefa">{OPCOES_REPETE.map(([v,label])=><option key={v} value={v}>{label}</option>)}</select>{repetir!=="0"&&<Hora24Equipe value={horaRepeticao} onChange={setHoraRepeticao}/>}</div>
     {repetir==="personalizado"&&<div className="ck-repeticao-personalizada ck-social-repeat-custom"><label className="ck-repeticao-tipo">Repetir por<select value={config.tipo} onChange={(e)=>setConfig((v)=>({...v,tipo:e.target.value}))}><option value="dias">A cada N dias</option><option value="semana">Dias da semana</option><option value="meses">A cada N meses</option></select></label>{config.tipo==="semana"?<div className="ck-dias-semana" aria-label="Dias da semana">{DIAS.map(([d,label])=><label key={d} className={(config.diasSemana||[]).includes(d)?"selecionado":""}><input type="checkbox" checked={(config.diasSemana||[]).includes(d)} onChange={(e)=>setConfig((v)=>({...v,diasSemana:e.target.checked?[...new Set([...(v.diasSemana||[]),d])].sort((a,b)=>DIAS.findIndex(([x])=>x===a)-DIAS.findIndex(([x])=>x===b)):(v.diasSemana||[]).filter((x)=>x!==d)}))}/>{label}</label>)}</div>:<label className="ck-repeticao-intervalo">A cada<input type="number" min="1" max={config.tipo==="meses"?24:365} value={config.intervalo||1} onChange={(e)=>setConfig((v)=>({...v,intervalo:Math.max(1,Number(e.target.value)||1)}))}/>{config.tipo==="meses"?"meses":"dias"}</label>}</div>}
     <div className="ck-prazo-campos"><span className="ck-prazo-rotulo">Prazo</span><DataDiaMesEquipe value={prazo} onChange={setPrazo}/><Hora24Equipe value={hora} onChange={setHora} opcional/></div>
-    <textarea className="ck-campo-largo" rows={2} maxLength={1000} value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Descrição (opcional)" aria-label="Descrição" onKeyDown={(e)=>{if(e.key==="Escape")onCancel();else if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();e.currentTarget.form?.requestSubmit();}}}/>
-    <div className="ck-tarefa-form-rodape"><div className="ck-tarefa-form-botoes"><span className="ck-edit-acoes"><button type="submit" disabled={!titulo.trim()||(recurrence?.tipo==="semana"&&!recurrence.diasSemana?.length)}>{tarefa?"Salvar":"Adicionar"}</button><button type="button" className="ck-icone" onClick={onCancel} aria-label="Cancelar">×</button></span></div>{comentarioAberto&&<textarea className="ck-comentario-input" rows={1} maxLength={1000} value={comentario} onChange={(e)=>setComentario(e.target.value)} placeholder="Comentário (opcional)" aria-label="Comentário" onKeyDown={(e)=>{if(e.key==="Escape")onCancel();else if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();e.currentTarget.form?.requestSubmit();}}}/>}<button type="button" className="ck-comentario-botao" aria-label={comentarioAberto?"Ocultar comentário":"Adicionar comentário"} aria-expanded={comentarioAberto} title="Comentário" onClick={()=>setComentarioAberto((v)=>!v)}><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M13.5 7.7a5.6 5.6 0 0 1-5.8 5.1 6.2 6.2 0 0 1-2.5-.5L2 13l.8-2.7a5 5 0 0 1-.8-2.6A5.5 5.5 0 0 1 7.8 2.5h.4a5.5 5.5 0 0 1 5.3 5.2z"/></svg></button></div>
+    <textarea className="ck-campo-largo" rows={2} maxLength={1000} value={descricao} onChange={(e) => setDescricao(e.target.value)} placeholder="Descrição (opcional)" aria-label="Descrição" />
+    <div className="ck-tarefa-form-rodape"><div className="ck-tarefa-form-botoes"><span className="ck-edit-acoes"><button type="submit" disabled={!titulo.trim()||(recurrence?.tipo==="semana"&&!recurrence.diasSemana?.length)}>{tarefa?"Salvar":"Adicionar"}</button><button type="button" className="ck-icone" onClick={onCancel} aria-label="Cancelar">×</button></span></div>{comentarioAberto&&<textarea className="ck-comentario-input" rows={2} maxLength={1000} value={comentario} onChange={(e)=>setComentario(e.target.value)} placeholder="Comentário (opcional)" aria-label="Comentário"/>}<button type="button" className="ck-comentario-botao" aria-label={comentarioAberto?"Ocultar comentário":"Adicionar comentário"} aria-expanded={comentarioAberto} title="Comentário" onClick={()=>setComentarioAberto((v)=>!v)}><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M13.5 7.7a5.6 5.6 0 0 1-5.8 5.1 6.2 6.2 0 0 1-2.5-.5L2 13l.8-2.7a5 5 0 0 1-.8-2.6A5.5 5.5 0 0 1 7.8 2.5h.4a5.5 5.5 0 0 1 5.3 5.2z"/></svg></button></div>
   </form>;
 }
 
@@ -213,7 +214,7 @@ export default function Equipes({ user, excluirSemConfirmacao = true }) {
       ? await supabase.from("team_tasks").update({ ...fields, updated_at: new Date().toISOString() }).eq("id", taskEditor.id)
       : await supabase.from("team_tasks").insert({ ...fields, group_id: taskEditor?.groupId || null, team_id: team.id, created_by: user.id, scheduled_for: hoje(), position: tasks.length });
     if (result.error) setError("Não consegui salvar a tarefa compartilhada.");
-    else { setTaskEditor(null); await loadTeam(team.id); }
+    else { scheduleCollaborationNotificationDispatch(); setTaskEditor(null); await loadTeam(team.id); }
     setBusy(false);
   }
   async function saveGroup(fields, group = groupEditor?.group || null) {
@@ -233,16 +234,16 @@ export default function Equipes({ user, excluirSemConfirmacao = true }) {
   async function setTaskStatus(task, partial) {
     const next = task.completed ? { completed: false, partial: false } : task.partial ? { completed: true, partial: false } : partial ? { completed: false, partial: true } : { completed: true, partial: false };
     const { error: updateError } = await supabase.from("team_tasks").update({ ...next, updated_at: new Date().toISOString() }).eq("id", task.id);
-    if (updateError) setError("Não consegui atualizar o status."); else await loadTeam(team.id);
+    if (updateError) setError("Não consegui atualizar o status."); else { scheduleCollaborationNotificationDispatch(); await loadTeam(team.id); }
   }
   async function deleteTask(task) {
-    const remove = async () => { const { error: deleteError } = await supabase.from("team_tasks").delete().eq("id", task.id); setConfirm(null); if (deleteError) setError("Não consegui excluir a tarefa."); else await loadTeam(team.id); };
+    const remove = async () => { const { error: deleteError } = await supabase.from("team_tasks").delete().eq("id", task.id); setConfirm(null); if (deleteError) setError("Não consegui excluir a tarefa."); else { scheduleCollaborationNotificationDispatch(); await loadTeam(team.id); } };
     if (excluirSemConfirmacao) { await remove(); return; }
     setConfirm({ title: "Excluir tarefa compartilhada?", message: `“${task.title}” será removida para todos da equipe.`, action: "Excluir para todos", confirm: remove });
   }
   async function changePriority(task) {
     const { error: updateError } = await supabase.from("team_tasks").update({ priority: ((task.priority || 0) + 1) % 4, updated_at: new Date().toISOString() }).eq("id", task.id);
-    if (updateError) setError("Não consegui atualizar a prioridade."); else await loadTeam(team.id);
+    if (updateError) setError("Não consegui atualizar a prioridade."); else { scheduleCollaborationNotificationDispatch(); await loadTeam(team.id); }
   }
   async function reorderTeamTask(taskId, targetGroupId, targetTaskId = null, after = false) {
     if (!team) return;
