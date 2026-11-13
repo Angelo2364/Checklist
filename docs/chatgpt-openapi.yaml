@@ -1,0 +1,326 @@
+openapi: 3.1.0
+info:
+  title: Crysalis
+  description: Manage the authenticated user's personal Crysalis tasks, sessions, and calendar events.
+  version: 1.0.0
+servers:
+  - url: https://jejubavadsbbdachklru.supabase.co/functions/v1/crysalis-ai
+    description: Crysalis production API
+security:
+  - OAuth2:
+      - openid
+      - email
+      - profile
+paths:
+  /sessions:
+    get:
+      operationId: listTaskSessions
+      summary: List the user's task sessions
+      description: Use this before creating or moving a task into a named session. Sessions are read-only through this connector.
+      responses:
+        '200':
+          description: Available sessions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sessions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Session'
+  /tasks:
+    get:
+      operationId: findTasks
+      summary: Search or list personal tasks
+      description: Search by title and optional date range. Dates use America/Sao_Paulo local calendar dates in YYYY-MM-DD. Use the returned id before editing or deleting.
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+          description: Optional title text to search for.
+        - in: query
+          name: from
+          schema: { type: string, format: date }
+          description: Include scheduled/deadline dates on or after this day.
+        - in: query
+          name: to
+          schema: { type: string, format: date }
+          description: Include scheduled/deadline dates on or before this day.
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 250, default: 100 }
+      responses:
+        '200':
+          description: Matching tasks
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tasks:
+                    type: array
+                    items: { $ref: '#/components/schemas/Task' }
+                  total: { type: integer }
+    post:
+      operationId: createTask
+      summary: Create a personal task
+      description: Creates a task in the user's Crysalis checklist. Use scheduledFor when it should appear only on a specific day; use dueDate/dueTime for its deadline. If a named session is requested, call listTaskSessions first and use its id. Ask the user if the intended date is ambiguous.
+      x-openai-isConsequential: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateTask' }
+      responses:
+        '201':
+          description: Created task
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  task: { $ref: '#/components/schemas/Task' }
+  /tasks/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string }
+    get:
+      operationId: getTask
+      summary: Get a task by id
+      responses:
+        '200':
+          description: Task details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  task: { $ref: '#/components/schemas/Task' }
+    patch:
+      operationId: updateTask
+      summary: Edit a personal task
+      description: Search first when the task id is unknown. Only include fields the user wants to change. Use null to clear optional dates or session. Updates to recurring tasks also update the linked routine.
+      x-openai-isConsequential: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateTask' }
+      responses:
+        '200':
+          description: Updated task
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  task: { $ref: '#/components/schemas/Task' }
+    delete:
+      operationId: deleteTask
+      summary: Delete a personal task
+      description: Search first when the task id is unknown. Deleting a recurring task also stops its linked routine. Confirm the exact matching task with the user before deletion.
+      x-openai-isConsequential: true
+      responses:
+        '200':
+          description: Deleted task
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: boolean }
+                  id: { type: string }
+                  title: { type: string }
+  /events:
+    get:
+      operationId: findEvents
+      summary: Search or list calendar events
+      description: Search by title and date range. Dates and times use America/Sao_Paulo; times use 24-hour HH:mm.
+      parameters:
+        - in: query
+          name: q
+          schema: { type: string }
+        - in: query
+          name: from
+          schema: { type: string, format: date }
+        - in: query
+          name: to
+          schema: { type: string, format: date }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 250, default: 100 }
+      responses:
+        '200':
+          description: Matching events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  events:
+                    type: array
+                    items: { $ref: '#/components/schemas/Event' }
+                  total: { type: integer }
+    post:
+      operationId: createEvent
+      summary: Create a Crysalis calendar event
+      description: Creates an event in the Crysalis calendar. It does not write to Google Calendar. Ask the user if the intended date or time is ambiguous.
+      x-openai-isConsequential: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateEvent' }
+      responses:
+        '201':
+          description: Created event
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  event: { $ref: '#/components/schemas/Event' }
+  /events/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string }
+    get:
+      operationId: getEvent
+      summary: Get a calendar event by id
+      responses:
+        '200':
+          description: Event details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  event: { $ref: '#/components/schemas/Event' }
+    patch:
+      operationId: updateEvent
+      summary: Edit a Crysalis calendar event
+      description: Search first when the event id is unknown. Include only fields the user wants to change.
+      x-openai-isConsequential: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateEvent' }
+      responses:
+        '200':
+          description: Updated event
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  event: { $ref: '#/components/schemas/Event' }
+    delete:
+      operationId: deleteEvent
+      summary: Delete a Crysalis calendar event
+      description: Search first when the event id is unknown. Confirm the exact matching event with the user before deletion.
+      x-openai-isConsequential: true
+      responses:
+        '200':
+          description: Deleted event
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: boolean }
+                  id: { type: string }
+                  title: { type: string }
+components:
+  securitySchemes:
+    OAuth2:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: https://jejubavadsbbdachklru.supabase.co/auth/v1/oauth/authorize
+          tokenUrl: https://jejubavadsbbdachklru.supabase.co/auth/v1/oauth/token
+          scopes:
+            openid: Sign in to Crysalis
+            email: Read the account email for the connection
+            profile: Read basic account profile information
+  schemas:
+    Session:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+    Task:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        status: { type: string, enum: [pending, in_progress, completed] }
+        scheduledFor: { type: [string, 'null'], format: date }
+        dueDate: { type: [string, 'null'], format: date }
+        dueTime: { type: [string, 'null'], pattern: '^([01]\\d|2[0-3]):[0-5]\\d$' }
+        priority: { type: integer, minimum: 0, maximum: 3 }
+        sessionId: { type: [string, 'null'] }
+        sessionName: { type: [string, 'null'] }
+        description: { type: string }
+        comment: { type: string }
+        recurring: { type: boolean }
+    CreateTask:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 160 }
+        scheduledFor: { type: string, format: date, description: The date the task should appear in the checklist. }
+        dueDate: { type: string, format: date, description: Optional deadline date. }
+        dueTime: { type: string, pattern: '^([01]\\d|2[0-3]):[0-5]\\d$', description: Optional 24-hour deadline time. If provided without dueDate, Crysalis uses today's date in Sao Paulo. }
+        priority: { type: integer, minimum: 0, maximum: 3, default: 0, description: '0 none, 1 tranquila, 2 média, 3 urgente.' }
+        sessionId: { type: [string, 'null'] }
+        description: { type: string, maxLength: 4000 }
+        comment: { type: string, maxLength: 1000 }
+    UpdateTask:
+      type: object
+      minProperties: 1
+      properties:
+        title: { type: string, minLength: 1, maxLength: 160 }
+        status: { type: string, enum: [pending, in_progress, completed] }
+        scheduledFor: { type: [string, 'null'], format: date }
+        dueDate: { type: [string, 'null'], format: date }
+        dueTime: { type: [string, 'null'], pattern: '^([01]\\d|2[0-3]):[0-5]\\d$' }
+        priority: { type: integer, minimum: 0, maximum: 3 }
+        sessionId: { type: [string, 'null'] }
+        description: { type: string, maxLength: 4000 }
+        comment: { type: string, maxLength: 1000 }
+    Event:
+      type: object
+      properties:
+        id: { type: string }
+        title: { type: string }
+        date: { type: string, format: date }
+        startTime: { type: string }
+        endTime: { type: string }
+        location: { type: string }
+        description: { type: string }
+    CreateEvent:
+      type: object
+      required: [title, date]
+      properties:
+        title: { type: string, minLength: 1, maxLength: 160 }
+        date: { type: string, format: date }
+        startTime: { type: string, pattern: '^([01]\\d|2[0-3]):[0-5]\\d$' }
+        endTime: { type: string, pattern: '^([01]\\d|2[0-3]):[0-5]\\d$' }
+        location: { type: string, maxLength: 500 }
+        description: { type: string, maxLength: 4000 }
+    UpdateEvent:
+      type: object
+      minProperties: 1
+      properties:
+        title: { type: string, minLength: 1, maxLength: 160 }
+        date: { type: string, format: date }
+        startTime: { type: [string, 'null'], pattern: '^([01]\\d|2[0-3]):[0-5]\\d$' }
+        endTime: { type: [string, 'null'], pattern: '^([01]\\d|2[0-3]):[0-5]\\d$' }
+        location: { type: string, maxLength: 500 }
+        description: { type: string, maxLength: 4000 }

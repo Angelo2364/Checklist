@@ -72,6 +72,14 @@ Se precisar só da parte da noite, apague as seções anteriores.
 
 ---
 
+## 0.94 — Conector de IA para tarefas e agenda
+- Adicionada Edge Function protegida por JWT para consultar, criar, editar e excluir tarefas pessoais e eventos do calendário.
+- Incluídos consulta de sessões para associar tarefas, datas no fuso `America/Sao_Paulo` e confirmação para operações de escrita no OpenAPI do GPT.
+- As alterações são atômicas no Supabase e usam `auth.uid()` + RLS; não compartilham a chave `service_role`.
+- Criada a tela de consentimento OAuth em `/oauth/consent` e o rewrite para a SPA no Vercel.
+- Migração `20261113160058_crysalis_ai_actions` e Edge Function `crysalis-ai` já aplicadas no Supabase de produção. Falta publicar o site, ativar o OAuth Server no painel e cadastrar o GPT Action/OAuth App.
+- Configuração para Gemini Apps fica para uma etapa posterior; o contrato OpenAPI/MCP pode ser reutilizado depois.
+
 ## Pendências e ideias
 - Ícone pequeno (badge) monochrome para a barra de status do Android (precisa do logo em silhueta branca).
 - SMTP próprio no Supabase para o cadastro de amigos (o envio padrão tem limite baixíssimo e só entrega a membros da equipe).

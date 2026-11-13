@@ -37,7 +37,7 @@ const STORAGE_PREF_NOTIFICACOES = "checklist:preferenciasNotificacoes";
 const STORAGE_AVISOS_AGENDA_FECHADOS = "checklist:avisosAgendaFechados";
 const JANELA_AVISOS_PADRAO = { ativa: false, inicio: "08:00", fim: "22:00" };
 const PREFERENCIAS_NOTIFICACAO_PADRAO = { checklistSummary: true, deadlines: true, collaboration: true };
-const APP_VERSION = "0.93";
+const APP_VERSION = "0.94";
 function normalizarIntervaloAviso(valor) {
   const minutos = Number(valor);
   return Number.isInteger(minutos) && minutos >= 5 && minutos <= 1440 ? minutos : 30;
@@ -3661,5 +3661,69 @@ export default function App() {
       />
     );
   }
+  if (window.location.pathname.replace(/\/+$/, "") === "/oauth/consent") return <OAuthConsent user={sessao.user} />;
   return <Checklist key={sessao.user.id} usuario={sessao.user} />;
+}
+
+function OAuthConsent({ user }) {
+  const authorizationId = new URLSearchParams(window.location.search).get("authorization_id");
+  const [details, setDetails] = useState(null);
+  const [loading, setLoading] = useState(Boolean(authorizationId));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(authorizationId ? "" : "Este pedido de conexão está incompleto. Volte ao ChatGPT e tente conectar novamente.");
+
+  useEffect(() => {
+    let active = true;
+    if (!authorizationId) return () => { active = false; };
+    supabase.auth.oauth.getAuthorizationDetails(authorizationId).then(({ data, error: requestError }) => {
+      if (!active) return;
+      if (requestError) setError("Não consegui carregar os detalhes da autorização. Confira se a conexão está ativa e tente novamente.");
+      else if (data && "redirect_url" in data) window.location.assign(data.redirect_url);
+      else if (data?.user?.id !== user.id) setError("A conta autorizada não corresponde à conta conectada no Crysalis. Entre na conta correta e tente novamente.");
+      else setDetails(data);
+      setLoading(false);
+    }).catch(() => {
+      if (active) {
+        setError("Não consegui carregar os detalhes da autorização. Tente novamente.");
+        setLoading(false);
+      }
+    });
+    return () => { active = false; };
+  }, [authorizationId, user.id]);
+
+  async function decide(approve) {
+    if (!authorizationId || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const { data, error: decisionError } = approve
+        ? await supabase.auth.oauth.approveAuthorization(authorizationId, { skipBrowserRedirect: true })
+        : await supabase.auth.oauth.denyAuthorization(authorizationId, { skipBrowserRedirect: true });
+      if (decisionError || !data?.redirect_url) throw decisionError || new Error("Missing OAuth redirect URL");
+      window.location.assign(data.redirect_url);
+    } catch {
+      setError("Não consegui concluir a autorização. Tente novamente.");
+      setBusy(false);
+    }
+  }
+
+  return <main className="ck-oauth-page">
+    <section className="ck-oauth-card" aria-labelledby="ck-oauth-title">
+      <img src={`${import.meta.env.BASE_URL}Logo.svg`} alt="" aria-hidden="true" />
+      <p className="ck-oauth-eyebrow">CONEXÃO SEGURA</p>
+      <h1 id="ck-oauth-title">Conectar ao Crysalis</h1>
+      {loading ? <p>Carregando os detalhes da conexão…</p> : error ? <p className="ck-oauth-error" role="alert">{error}</p> : <>
+        <p><strong>{details?.client?.name || "Um app conectado"}</strong> quer acessar seu Crysalis.</p>
+        <div className="ck-oauth-access"><strong>O que será permitido</strong><ul>
+          <li>Consultar suas tarefas, sessões e eventos pessoais</li>
+          <li>Criar, editar e excluir tarefas e eventos a seu pedido</li>
+        </ul></div>
+        <p className="ck-oauth-account">Conectado como {details?.user?.email || "sua conta Crysalis"}</p>
+        <div className="ck-oauth-actions">
+          <button type="button" className="secundario" onClick={() => decide(false)} disabled={busy}>Recusar</button>
+          <button type="button" className="primario" onClick={() => decide(true)} disabled={busy}>{busy ? "Conectando…" : "Autorizar"}</button>
+        </div>
+      </>}
+    </section>
+  </main>;
 }
