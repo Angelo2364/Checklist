@@ -309,6 +309,15 @@ button.secundario:hover {
   border-bottom: 1px solid var(--linha);
 }
 
+.ck-intro-organizacao {
+  margin: 12px 16px 0;
+  color: var(--suave);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.ck-social-friend-body > .ck-intro-organizacao { margin: 12px 16px 0; }
+.ck-teams-page > .ck-social-empty { margin: 8px 8px 0; padding: 15px 16px; border: 1px dashed var(--linha); border-radius: 14px; background: color-mix(in srgb, var(--fundo-hover) 45%, transparent); line-height: 1.5; }
+
 .ck-link {
   display: block;
   width: 100%;
@@ -397,10 +406,26 @@ button.secundario:hover {
 }
 
 .ck-nova-divisao {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
   padding: 8px 16px;
   background: var(--barra);
   border-bottom: 1px solid var(--linha);
 }
+
+.ck-nova-divisao .ck-seletor-icones {
+  grid-column: 1 / -1;
+  grid-row: 1;
+}
+
+.ck-nova-divisao input {
+  grid-column: 1;
+  grid-row: 2;
+  width: 100%;
+  box-sizing: border-box;
+}
+.ck-nova-divisao > button { grid-column: 2; grid-row: 2; }
 
 .ck-form-grupo {
   padding: 8px 16px;
@@ -432,7 +457,7 @@ button.secundario:hover {
   box-shadow: 0 0 0 1px var(--azul-forte);
 }
 
-.ck-nova-divisao button,
+.ck-nova-divisao > button,
 .ck-form-grupo button {
   padding: 6px 14px;
   font-size: 14px;
@@ -1353,6 +1378,16 @@ a.ck-ev-mapa:hover {
   align-items: center;
   gap: 8px;
 }
+
+button.ck-topo-marca {
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+button.ck-topo-marca:focus-visible { outline: 2px solid var(--azul-forte); outline-offset: 4px; border-radius: 5px; }
 
 .ck-logo-topo {
   flex: none;
@@ -2614,8 +2649,8 @@ body {
 }
 
 .ck > .ck-secao {
-  margin: 8px 12px 0;
-  padding: 11px 14px 8px;
+  margin: 8px 8px 0;
+  padding: 11px 8px 8px;
   border: 0;
   color: var(--suave);
   font-size: 11px;
@@ -3104,6 +3139,7 @@ body {
 .ck-social-shared-session > .ck-grupo-topo .ck-grupo-titulo { padding: 10px 12px; }
 .ck-social-session-body { display: grid; gap: 4px; padding: 0 9px 9px; }
 .ck-social-session-body .ck-social-task-list { padding-top: 8px; }
+.ck-social-session-body > .ck-vazio-grupo { padding: 20px 16px; }
 .ck-social-task-form { display: grid; gap: 8px; margin: 8px 0; padding: 11px; border: 1px solid var(--linha); border-radius: 13px; background: color-mix(in srgb, var(--fundo) 86%, transparent); }
 .ck-social-task-form > input:first-child { width: 100%; box-sizing: border-box; }
 .ck-social-task-form > select, .ck-social-task-form .ck-social-repeat-row > select { min-width: 0; width: 100%; padding: 8px 12px; color: var(--tinta); background: color-mix(in srgb, var(--fundo) 84%, transparent); border: 1px solid var(--linha); border-radius: 999px; font: inherit; }
@@ -3298,7 +3334,7 @@ body {
 .ck-shared-notes { display: grid; gap: 8px; }
 .ck-shared-note-add { display: inline-flex; align-items: center; justify-content: center; justify-self: start; width: auto; min-height: 32px; padding: 5px 10px; color: var(--tinta); background: color-mix(in srgb, var(--fundo-hover) 70%, transparent); border: 1px solid var(--linha); border-radius: 9px; cursor: pointer; }
 .ck-team-tabs { display: flex; flex-wrap: wrap; gap: 7px; }
-.ck-team-tabs button, .ck-team-panel > header > button, .ck-team-new-group button, .ck-team-add-member button { min-height: 34px; padding: 6px 11px; color: var(--tinta); background: color-mix(in srgb, var(--fundo-hover) 70%, transparent); border: 1px solid var(--linha); border-radius: 10px; }
+.ck-team-tabs button, .ck-team-panel > header > button, .ck-team-new-group button, .ck-team-add-member button, .ck-team-add-member-actions button { min-height: 34px; padding: 6px 11px; color: var(--tinta); background: color-mix(in srgb, var(--fundo-hover) 70%, transparent); border: 1px solid var(--linha); border-radius: 10px; }
 .ck-team-tabs button.ativo { color: var(--tinta); border-color: var(--azul-forte); background: color-mix(in srgb, var(--azul) 24%, var(--fundo)); }
 .ck-team-panel { display: grid; gap: 10px; min-width: 0; padding: 13px; border: 1px solid var(--linha); border-radius: 15px; background: color-mix(in srgb, var(--fundo) 78%, transparent); }
 .ck-team-panel > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -3313,7 +3349,8 @@ body {
 .ck-team-create-friends { display: grid; gap: 8px; min-width: 0; margin: 2px 0 0; padding: 11px; border: 1px solid var(--linha); border-radius: 13px; background: color-mix(in srgb, var(--fundo) 42%, transparent); }
 .ck-team-create-friends legend { display: flex; justify-content: space-between; gap: 10px; width: 100%; padding: 0 5px; color: var(--suave); font-size: 12px; }
 .ck-team-selected-count { flex: none; color: var(--azul-forte); font-size: 11px; font-weight: 700; }
-.ck-team-create-friends .ck-team-friend-search { width: 100%; min-width: 0; box-sizing: border-box; }
+.ck-team-create-friends .ck-team-friend-search { width: 100%; min-width: 0; box-sizing: border-box; padding: 9px 11px; color: var(--tinta); background: color-mix(in srgb, var(--fundo) 88%, transparent); border: 1px solid var(--linha); border-radius: 9px; font: inherit; }
+.ck-team-create-friends .ck-team-friend-search:focus { outline: 2px solid color-mix(in srgb, var(--azul-forte) 55%, transparent); outline-offset: 1px; }
 .ck-team-friend-list { display: grid; gap: 5px; max-height: 100px; min-height: 40px; padding: 2px 3px 2px 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-color: color-mix(in srgb, var(--azul-forte) 45%, transparent) transparent; }
 .ck-team-create-friends .ck-team-friend-list label { display: flex; align-items: center; gap: 9px; min-width: 0; padding: 8px 10px; border: 1px solid transparent; border-radius: 10px; background: color-mix(in srgb, var(--fundo-hover) 58%, transparent); cursor: pointer; transition: background .15s, border-color .15s, transform .15s; }
 .ck-team-create-friends .ck-team-friend-list label:hover { border-color: color-mix(in srgb, var(--azul-forte) 32%, var(--linha)); background: color-mix(in srgb, var(--azul-forte) 10%, var(--fundo)); }
@@ -3322,6 +3359,10 @@ body {
 .ck-team-members { display: flex; flex-wrap: wrap; gap: 7px; }
 .ck-team-members > div { display: inline-flex; align-items: center; gap: 5px; padding: 4px 5px 4px 10px; border: 1px solid var(--linha); border-radius: 999px; background: color-mix(in srgb, var(--fundo-hover) 55%, transparent); font-size: 12px; }
 .ck-team-add-member, .ck-team-new-group { display: flex; flex-wrap: wrap; gap: 7px; }
+.ck-team-add-member-form { display: grid; min-width: 0; gap: 8px; }
+.ck-team-add-member-picker { width: 100%; min-width: 0; box-sizing: border-box; }
+.ck-team-add-member-actions { display: flex; flex-wrap: wrap; gap: 7px; }
+.ck-team-add-member-actions .ck-team-delete { background: transparent; }
 .ck-team-add-member select, .ck-team-new-group input, .ck-team-fields input, .ck-team-fields select { min-width: 0; padding: 7px 10px; color: var(--tinta); background: color-mix(in srgb, var(--fundo) 88%, transparent); border: 1px solid var(--linha); border-radius: 9px; font: inherit; }
 .ck-team-add-member select, .ck-team-new-group input { flex: 1; }
 .ck-team-task-group { display: grid; gap: 7px; }
@@ -3365,6 +3406,7 @@ body {
 .ck-team-session > header { display: flex; align-items: center; gap: 5px; padding-right: 7px; background: color-mix(in srgb,var(--grupo-bg) 86%,var(--fundo)); border-bottom: 1px solid var(--linha); }
 .ck-team-session > header .ck-grupo-titulo { padding: 10px; }
 .ck-team-session-body { display: grid; gap: 7px; padding: 8px; }
+.ck-team-session-body > .ck-vazio-grupo { padding: 20px 16px; }
 .ck-team-task-group > h4 { margin: 7px 10px 0; }
 .ck-team-session-editor { display: flex; align-items: center; gap: 7px; padding: 9px 12px; }
 .ck-team-session-editor input { min-width: 0; flex: 1; }
@@ -3430,6 +3472,7 @@ body {
 .ck-social-detail-page .ck-social-page { gap: 12px; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .ck-social-friend-detail { display: block; padding: 0; overflow: visible; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .ck-social-friend-detail > .ck-social-friend-body { display: grid; gap: 10px; padding: 0; }
+.ck-social-friend-detail > .ck-social-friend-body-empty { gap: 0; }
 .ck-social-friend-detail .ck-social-work-tabs { width: 100%; }
 .ck-social-friend-detail .ck-barras-topo { width: 100%; }
 .ck-social-friend-detail .ck-social-task-form { margin: 0; }
@@ -3446,9 +3489,10 @@ body {
 .ck-social-friend-detail .ck-social-session-body { gap: 0; padding: 0; }
 .ck-social-friend-detail .ck-social-session-body > .ck-social-task-form { margin: 8px 10px; }
 .ck-social-friend-detail .ck-social-session-body .ck-social-task-list { padding: 8px 10px 10px; }
-.ck-social-friend-detail .ck-social-unfiled > .ck-secao { margin: 8px 12px 0; padding: 11px 14px 8px; border: 0; font-size: 11px; }
+.ck-social-friend-detail .ck-social-unfiled > .ck-secao { margin: 8px 8px 0; padding: 11px 8px 8px; border: 0; font-size: 11px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
 .ck-social-friend-detail .ck-social-unfiled .ck-social-task-list { padding: 0 10px 10px; }
 .ck-team-work-panel { display: grid; gap: 0; padding: 0; overflow: visible; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.ck-team-work-panel-empty > .ck-team-unfiled-card { margin-top: 0; }
 .ck-team-work-panel > .ck-social-work-tabs { margin-bottom: 8px; }
 .ck-team-work-panel > .ck-barras-topo { margin-bottom: 8px; }
 .ck-team-work-panel > .ck-team-editor,
@@ -3568,6 +3612,20 @@ body {
 .ck-team-icon-settings .ck-seletor-icones { gap: 8px; }
 .ck-team-icon-settings .ck-opcao-icone { width: 100%; min-height: 36px; }
 .ck-team-detail-heading h2 { display: flex; align-items: center; gap: 8px; }
+.ck-team-heading-main { flex: 1; min-width: 0; }
+.ck-team-heading-copy { display: grid !important; flex: 1; min-width: 0; gap: 2px; }
+.ck-team-title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
+.ck-team-title-row h2 { min-width: 0; overflow-wrap: anywhere; }
+.ck-team-settings-anchor { position: relative; flex: none; }
+.ck-team-settings-anchor > .ck-icone { display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border: 1px solid var(--linha); border-radius: 11px; background: color-mix(in srgb, var(--fundo-hover) 78%, transparent); font-size: 19px; }
+.ck-team-settings-popover { position: absolute; z-index: 40; top: calc(100% + 8px); right: 0; width: min(380px, calc(100vw - 36px)); max-height: min(70vh, 560px); overflow: auto; padding: 14px; border: 1px solid var(--linha); border-radius: 16px; background: color-mix(in srgb, var(--fundo) 92%, transparent); box-shadow: 0 14px 38px color-mix(in srgb, #100c22 30%, transparent); -webkit-backdrop-filter: blur(18px) saturate(1.35); backdrop-filter: blur(18px) saturate(1.35); }
+.ck-team-settings-popover h4 { margin: 2px 0; font-size: 13px; }
+.ck-team-settings-popover { padding: 18px; }
+.ck-team-settings-popover .ck-team-icon-settings { display: grid; gap: 10px; margin: 0 0 14px; padding: 2px 0 13px; border-bottom: 1px solid var(--linha); }
+.ck-team-settings-popover .ck-team-icon-settings h4 { margin: 0 0 2px; font-size: 13px; line-height: 1.45; }
+.ck-team-settings-popover .ck-team-icon-settings .ck-seletor-icones { gap: 8px; padding-bottom: 3px; }
+.ck-team-settings-popover.ck-team-settings { gap: 9px; padding: 18px; border-top: 0; }
+.ck-social-friend-detail .ck-social-unfiled > .ck-vazio-grupo { padding: 8px 16px; }
 .ck-team-work-panel > ul[data-team-group-id=""] { min-height: 45px; margin: 0 10px 12px; border-radius: 12px; }
 @media(max-width:600px) { .ck-team-settings-panel { margin: 10px 8px; padding: 12px; } }
 
@@ -3578,6 +3636,7 @@ body {
 .ck-team-unfiled-card { margin: 10px 12px; overflow: hidden; border: 1px solid var(--linha); border-radius: 16px; background: color-mix(in srgb, var(--fundo) 86%, var(--fundo-hover)); }
 .ck-team-unfiled-card > .ck-team-unfiled-title { margin: 0; padding: 11px 14px 8px; border: 0; font-size: 11px; text-transform: none; }
 .ck-team-unfiled-card > .ck-social-task-list { min-height: 45px; padding: 7px 9px; }
+.ck-team-unfiled-card > .ck-vazio-grupo { margin: 0; padding: 14px 24px 12px; }
 .ck-team-unfiled-card > .ck-social-task-list.alvo { outline: 2px dashed var(--azul-forte); outline-offset: -2px; background: color-mix(in srgb,var(--azul) 12%,transparent); }
 .com-fundo .ck-team-unfiled-card { background: color-mix(in srgb, var(--fundo) 76%, transparent); -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4); }
 
@@ -3616,7 +3675,22 @@ body {
   margin: 0;
   padding: 0 8px 8px;
 }
+.ck-team-unfiled-card > .ck-team-unfiled-title {
+  margin: 8px 8px 0;
+  padding: 11px 8px 8px;
+  letter-spacing: .07em;
+}
+.ck-team-unfiled-card > .ck-social-task-list:empty { min-height: 0; padding: 0; }
+.ck-team-unfiled-card > .ck-vazio-grupo { margin: 0; padding: 20px 16px; }
 .ck-team-unfiled-card > .ck-social-task-list > li + li { margin-top: 0; }
+.ck-intro-organizacao,
+.ck-vazio-grupo { font-size: 13px; line-height: 1.5; }
+.ck > .ck-vazio-grupo,
+.ck-grupo > .ck-vazio-grupo,
+.ck-social-session-body > .ck-vazio-grupo,
+.ck-team-session-body > .ck-vazio-grupo,
+.ck-team-unfiled-card > .ck-vazio-grupo,
+.ck-social-friend-detail .ck-social-unfiled > .ck-vazio-grupo { padding-top: 8px; }
 .ck-shared-notes .ck-social-note-unfiled > .ck-anotacao {
   margin: 0 8px 7px;
   padding: 11px 10px 11px 0;

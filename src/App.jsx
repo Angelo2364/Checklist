@@ -2009,11 +2009,43 @@ function Checklist({ usuario }) {
   const [contas, setContas] = useState(() => lerStorage(STORAGE_BILLS, []));
   const [anotacoes, setAnotacoes] = useState(() => lerStorage(STORAGE_NOTES, []));
   const [sessoesAnotacoes, setSessoesAnotacoes] = useState(() => lerStorage(STORAGE_NOTE_GROUPS, []));
-  const [pagina, setPagina] = useState("tarefas");
+  const [pagina, setPaginaState] = useState("tarefas");
   const [amizadeSelecionada, setAmizadeSelecionada] = useState("");
   const [abaConfiguracoes, setAbaConfiguracoes] = useState("preferencias");
   const paginaRef = useRef(pagina);
   paginaRef.current = pagina;
+  const amizadeSelecionadaRef = useRef(amizadeSelecionada);
+  amizadeSelecionadaRef.current = amizadeSelecionada;
+  const historicoInicializadoRef = useRef(false);
+  function setPagina(proxima, detalhes = {}) {
+    const amizadeId = proxima === "amizade" ? (detalhes.friendshipId ?? amizadeSelecionadaRef.current) : "";
+    const mudou = paginaRef.current !== proxima || (proxima === "amizade" && amizadeSelecionadaRef.current !== amizadeId);
+    if (mudou) window.history.pushState({ ...(window.history.state || {}), crysalisPage: proxima, friendshipId: amizadeId }, "");
+    paginaRef.current = proxima;
+    setPaginaState(proxima);
+    amizadeSelecionadaRef.current = amizadeId;
+    setAmizadeSelecionada(amizadeId);
+  }
+  useEffect(() => {
+    if (!historicoInicializadoRef.current) {
+      const inicio = { ...(window.history.state || {}), crysalisPage: paginaRef.current, friendshipId: amizadeSelecionadaRef.current };
+      window.history.replaceState(inicio, "");
+      window.history.pushState(inicio, "");
+      historicoInicializadoRef.current = true;
+    }
+    function aoVoltar(event) {
+      const paginaAnterior = event.state?.crysalisPage;
+      if (["tarefas", "anotacoes", "social", "amizade", "equipes", "configuracoes"].includes(paginaAnterior)) {
+        const amizadeId = paginaAnterior === "amizade" ? (event.state.friendshipId || "") : "";
+        paginaRef.current = paginaAnterior;
+        amizadeSelecionadaRef.current = amizadeId;
+        setPaginaState(paginaAnterior);
+        setAmizadeSelecionada(amizadeId);
+      }
+    }
+    window.addEventListener("popstate", aoVoltar);
+    return () => window.removeEventListener("popstate", aoVoltar);
+  }, []);
   const [nomeSessaoAnotacao, setNomeSessaoAnotacao] = useState("");
   const [iconeSessaoAnotacao, setIconeSessaoAnotacao] = useState("butterfly");
   const [criandoSessaoAnotacao, setCriandoSessaoAnotacao] = useState(false);
@@ -3146,10 +3178,10 @@ function Checklist({ usuario }) {
       <header className="ck-topo">
         <div className="ck-topo-linha">
           <div className="ck-topo-titulo">
-            <div className="ck-topo-marca">
+            <button type="button" className="ck-topo-marca" onClick={() => setPagina("tarefas")} title="Voltar ao início" aria-label="Voltar à tela inicial do Crysalis">
               <img className="ck-logo-topo" src={`${import.meta.env.BASE_URL}Logo.svg`} alt="" aria-hidden="true" />
               <h1>Crysalis</h1>
-            </div>
+            </button>
         <span className="ck-contagem">
           {tarefasVisiveis.length === 0
             ? tarefasFuturas.length > 0 ? `${tarefasFuturas.length} tarefa${tarefasFuturas.length === 1 ? "" : "s"} agendada${tarefasFuturas.length === 1 ? "" : "s"}` : "Nenhuma tarefa"
@@ -3228,7 +3260,7 @@ function Checklist({ usuario }) {
           </div>
         </section>}
       </section>}
-      {pagina === "amizade" ? <section className="ck-social-page-wrap ck-social-detail-page"><Social user={usuario} view="friend-detail" friendshipId={amizadeSelecionada} onBack={() => { setPagina("tarefas"); setAmizadeSelecionada(""); }} /></section> : pagina === "tarefas" ? <>
+      {pagina === "amizade" ? <section className="ck-social-page-wrap ck-social-detail-page"><Social user={usuario} view="friend-detail" friendshipId={amizadeSelecionada} excluirSemConfirmacao={excluirSemConfirmacao} onBack={() => { setPagina("tarefas"); setAmizadeSelecionada(""); }} /></section> : pagina === "tarefas" ? <>
       <div className="ck-barras-topo" data-tutorial="criar">
       {criandoSolta ? (
         <NovaTarefa
@@ -3281,9 +3313,9 @@ function Checklist({ usuario }) {
       )}
       </div>
 
-      {tarefasVisiveis.length === 0 && grupos.length === 0 && (
+      {tarefasVisiveis.length === 0 && grupos.length === 0 && tarefasFuturas.length > 0 && (
         <p className="ck-vazio">
-          {tarefasFuturas.length > 0 ? "As tarefas agendadas aparecem aqui a partir da data escolhida." : "Use as faixas acima para adicionar uma tarefa ou criar uma sessão."}
+          As tarefas agendadas aparecem aqui a partir da data escolhida.
         </p>
       )}
 
@@ -3359,11 +3391,11 @@ function Checklist({ usuario }) {
         );
       })}
 
-      {grupos.length > 0 && (soltas.length > 0 || arrastando?.tipo === "tarefa") && (
-        <h2 className={`ck-secao${ordem.sobre === "__sem_sessao__" && ordem.arrastando?.tipo === "tarefa" ? " alvo" : ""}`} {...alvoProps(ordem, "destinoTarefas", "__sem_sessao__", null)}>Sem sessão</h2>
-      )}
+      {tarefas.length === 0 && grupos.length === 0 && <p className="ck-intro-organizacao">Lembre-se: cresça no seu tempo</p>}
 
-      {soltas.length > 0 && (
+      <h2 className={`ck-secao${ordem.sobre === "__sem_sessao__" && ordem.arrastando?.tipo === "tarefa" ? " alvo" : ""}`} {...alvoProps(ordem, "destinoTarefas", "__sem_sessao__", null)}>Sem sessão</h2>
+
+      {soltas.length > 0 ? (
         <ListaTarefas
           tarefas={soltas}
           alternar={alternar}
@@ -3372,9 +3404,9 @@ function Checklist({ usuario }) {
           ordem={ordem}
           edicao={edicao}
         />
-      )}
+      ) : <p className="ck-vazio-grupo">Nenhuma tarefa aqui ainda.</p>}
 
-      <Social user={usuario} view="tasks" onManage={() => setPagina("social")} onOpenFriend={(id) => { setAmizadeSelecionada(id); setPagina("amizade"); }} onMovePersonalTask={moverTarefaParaSocial} />
+      <Social user={usuario} view="tasks" excluirSemConfirmacao={excluirSemConfirmacao} onManage={() => setPagina("social")} onOpenFriend={(id) => setPagina("amizade", { friendshipId: id })} onMovePersonalTask={moverTarefaParaSocial} />
 
       {feitas > 0 && (
         <button type="button" className="ck-link" onClick={limparFeitas}>
@@ -3485,7 +3517,7 @@ function Checklist({ usuario }) {
         <span aria-hidden="true"> · </span>
         <Contato />
                 <span aria-hidden="true"> · </span>
-                <span aria-hidden="true"> V0.89 </span>
+                <span aria-hidden="true"> V0.9 </span>
       </footer>
     </main>
 

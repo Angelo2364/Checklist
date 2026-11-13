@@ -474,7 +474,7 @@ export function GroupEditor({ group, onSave, onCancel }) {
   </form>;
 }
 
-export default function Social({ user, view = "tasks", friendshipId = "", onBack, onOpenFriend, onManage, onMovePersonalTask }) {
+export default function Social({ user, view = "tasks", friendshipId = "", onBack, onOpenFriend, onManage, onMovePersonalTask, excluirSemConfirmacao = true }) {
   const [friends, setFriends] = useState([]);
   const [friendOrder, setFriendOrder] = useState([]);
   const [requests, setRequests] = useState([]);
@@ -676,6 +676,14 @@ export default function Social({ user, view = "tasks", friendshipId = "", onBack
     const { error: deleteError } = await supabase.from("social_tasks").delete().eq("id", task.id);
     if (deleteError) setTaskError("Não consegui apagar essa tarefa. Tente novamente.");
     else { scheduleCollaborationNotificationDispatch(); await loadTasks().catch(() => {}); }
+  }
+
+  function confirmarExclusaoTarefaAmigo(friend, task) {
+    if (excluirSemConfirmacao) {
+      void deleteTask(task);
+      return;
+    }
+    setConfirm({ type: "task", item: task, title: "Excluir tarefa compartilhada?", message: `“${task.title}” será removida para você e ${nomeVisivel(friend.display_name)}. Essa ação não pode ser desfeita.`, action: "Excluir para ambos" });
   }
 
   async function removerAmizade(friend) {
@@ -1049,14 +1057,14 @@ export default function Social({ user, view = "tasks", friendshipId = "", onBack
       const unfiledTasks = friendTasks.filter((task) => !task.group_id || !friendGroups.some((g) => g.id === task.group_id));
       const addKey = (groupId) => `${friend.friendship_id}:${groupId || "root"}`;
       const openForm = (groupId) => addingFor === addKey(groupId);
-      const taskList = (list, showEmpty = true) => list.length ? <ul className="ck-social-task-list">{[...list].sort((a, b) => a.position - b.position || String(a.created_at || "").localeCompare(String(b.created_at || ""))).map((task) => <TarefaCompartilhada key={task.id} task={task} source={{ type: "task", id: task.id, friendshipId: friend.friendship_id, groupId: task.group_id || null }} dragging={dragging} dropTarget={dropTarget} now={now} busy={savingTask} onKeyboardMove={moverPorTeclado} onPointerStart={iniciarArrastePointer} onToggle={toggleTask} onEdit={(id, fields) => editTask(id, fields)} onDelete={(item) => setConfirm({ type: "task", item, title: "Excluir tarefa compartilhada?", message: `“${item.title}” será removida para você e ${nomeVisivel(friend.display_name)}. Essa ação não pode ser desfeita.`, action: "Excluir para ambos" })} />)}</ul> : showEmpty ? <p className="ck-social-empty">Nenhuma tarefa nesta sessão.</p> : null;
+      const taskList = (list, showEmpty = true) => list.length ? <ul className="ck-social-task-list">{[...list].sort((a, b) => a.position - b.position || String(a.created_at || "").localeCompare(String(b.created_at || ""))).map((task) => <TarefaCompartilhada key={task.id} task={task} source={{ type: "task", id: task.id, friendshipId: friend.friendship_id, groupId: task.group_id || null }} dragging={dragging} dropTarget={dropTarget} now={now} busy={savingTask} onKeyboardMove={moverPorTeclado} onPointerStart={iniciarArrastePointer} onToggle={toggleTask} onEdit={(id, fields) => editTask(id, fields)} onDelete={(item) => confirmarExclusaoTarefaAmigo(friend, item)} />)}</ul> : showEmpty ? <p className="ck-vazio-grupo">Nenhuma tarefa aqui ainda.</p> : null;
       const friendSource = { type: "friend", id: friend.friendship_id };
       const friendDragging = dragging?.type === "friend" && dragging.id === friend.friendship_id;
       const friendTarget = dropTarget?.type === "friend" && dropTarget.id === friend.friendship_id;
       const showBody = opened;
       return <section data-social-drop-kind="friend" data-social-id={friend.friendship_id} data-social-friendship-id={friend.friendship_id} className={`ck-social-friend-group${opened ? " ck-social-friend-detail" : ""}${friendDragging ? " arrastando" : ""}${friendTarget ? " alvo" : ""}`} key={friend.friendship_id}>
         {!opened && <header className="ck-social-friend-heading"><SocialAlca item={friendSource} onKeyboardMove={moverPorTeclado} onPointerStart={iniciarArrastePointer} label={nomeVisivel(friend.display_name)} /><button type="button" className="ck-social-collapse" onClick={() => onOpenFriend?.(friend.friendship_id)} aria-label={`Abrir tarefas com ${nomeVisivel(friend.display_name)}`}><IconePessoa /><strong>{nomeVisivel(friend.display_name)}</strong><span className="ck-grupo-qtd">{friendTasks.filter((t) => t.completed).length}/{friendTasks.length}</span></button></header>}
-        {showBody && <div className="ck-social-friend-body">
+        {showBody && <div className={`ck-social-friend-body${!notesOpen && !friendGroups.length && !friendTasks.length ? " ck-social-friend-body-empty" : ""}`}>
           <div className="ck-abas ck-abas-principais ck-social-work-tabs" role="tablist" aria-label={`${nomeVisivel(friend.display_name)}: tarefas e anotações`}><button type="button" role="tab" className="ck-aba" aria-selected={!notesOpen} onClick={() => { if (notesOpen) alternarVisaoAmigo(friend.friendship_id); }}>Checklist</button><button type="button" role="tab" className="ck-aba" aria-selected={notesOpen} onClick={() => { if (!notesOpen) alternarVisaoAmigo(friend.friendship_id); }}>Anotações</button></div>
           {notesOpen ? <AnotacoesCompartilhadas tipo="amizade" escopoId={friend.friendship_id} /> : <>
           <div className="ck-barras-topo"><button type="button" className="ck-barra-mais" onClick={() => { setAddingFor(openForm(null) ? "" : addKey(null)); setGroupForm(null); }}><span className="ck-mais" aria-hidden="true">+</span><span>Adicionar tarefa</span></button><button type="button" className="ck-barra-mais" onClick={() => { setGroupForm({ friendshipId: friend.friendship_id, group: null }); setAddingFor(""); }}><span className="ck-mais" aria-hidden="true">+</span><span>Adicionar sessão</span></button></div>
@@ -1077,7 +1085,8 @@ export default function Social({ user, view = "tasks", friendshipId = "", onBack
               {!groupCollapsed && <div className="ck-social-session-body">{groupForm?.group?.id === group.id && <GroupEditor group={group} onCancel={() => setGroupForm(null)} onSave={(fields) => salvarGrupo(friend.friendship_id, fields, group)} />}{openForm(group.id) && <TaskEditor groupId={group.id} busy={savingTask} onCancel={() => setAddingFor("")} onSave={(fields) => saveTask(friend, fields)} />}{taskList(groupTasks)}</div>}
             </section>;
           })}
-          {unfiledTasks.length > 0 && <div data-social-drop-kind="unfiled" data-social-friendship-id={friend.friendship_id} className={`ck-social-unfiled${dropTarget?.type === "unfiled" && dropTarget.friendshipId === friend.friendship_id ? " alvo" : ""}`}><h2 className="ck-secao">Sem sessão</h2>{taskList(unfiledTasks)}</div>}
+          {friendGroups.length === 0 && friendTasks.length === 0 && <p className="ck-intro-organizacao">Lembre-se: cresça no seu tempo</p>}
+          <div data-social-drop-kind="unfiled" data-social-friendship-id={friend.friendship_id} className={`ck-social-unfiled${dropTarget?.type === "unfiled" && dropTarget.friendshipId === friend.friendship_id ? " alvo" : ""}`}><h2 className="ck-secao">Sem sessão</h2>{taskList(unfiledTasks)}</div>
           </>}
         </div>}
       </section>;
