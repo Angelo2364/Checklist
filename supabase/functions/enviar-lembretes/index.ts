@@ -138,26 +138,53 @@ async function enviar(sub: any, payload: unknown, opcoes: { TTL: number; urgency
   }
 }
 
+const ORIGENS_PERMITIDAS = new Set([
+  "https://crysalis.me",
+  "https://www.crysalis.me",
+]);
+
+function cabecalhosCors(req: Request) {
+  const origin = req.headers.get("origin") ?? "";
+  const localhost = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+  const headers = new Headers({
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Max-Age": "86400",
+    "Vary": "Origin",
+  });
+  if (ORIGENS_PERMITIDAS.has(origin) || localhost) {
+    headers.set("Access-Control-Allow-Origin", origin);
+  }
+  return headers;
+}
+
+function responder(req: Request, body: BodyInit | null, init: ResponseInit = {}) {
+  const headers = new Headers(init.headers);
+  for (const [key, value] of cabecalhosCors(req)) headers.set(key, value);
+  return new Response(body, { ...init, headers });
+}
+
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return responder(req, null, { status: 204 });
   const cronSecret = Deno.env.get("CRON_SECRET");
   const chamadaCron = Boolean(cronSecret) && req.headers.get("x-cron-secret") === cronSecret;
   let actorId: string | null = null;
   if (!chamadaCron) {
     const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
-    if (!token) return new Response("não autorizado", { status: 401 });
+    if (!token) return responder(req, "não autorizado", { status: 401 });
     const { data: authData, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !authData.user) return new Response("não autorizado", { status: 401 });
+    if (authError || !authData.user) return responder(req, "não autorizado", { status: 401 });
     const body = await req.clone().json().catch(() => ({}));
-    if (body?.colaboracao !== true) return new Response("não autorizado", { status: 403 });
+    if (body?.colaboracao !== true) return responder(req, "não autorizado", { status: 403 });
     actorId = authData.user.id;
   }
   const forcar = chamadaCron && new URL(req.url).searchParams.get("forcar") === "1"; // teste: manda o resumo agora
 
   const { data: subs, error } = await supabase.from("push_subscriptions").select("*").eq("ativo", true);
-  if (error) return new Response(error.message, { status: 500 });
+  if (error) return responder(req, error.message, { status: 500 });
   if (!subs?.length) {
     await supabase.from("collaboration_notifications").update({ sent_at: new Date().toISOString(), claimed_at: null }).is("sent_at", null);
-    return new Response("sem aparelhos; fila de colaboração descartada", { status: 200 });
+    return responder(req, "sem aparelhos; fila de colaboração descartada", { status: 200 });
   }
 
   const ids = [...new Set(subs.map((s) => s.user_id))];
@@ -172,7 +199,7 @@ Deno.serve(async (req) => {
     p_actor_id: actorId,
     p_limit: 500,
   });
-  if (filaError) return new Response(filaError.message, { status: 500 });
+  if (filaError) return responder(req, filaError.message, { status: 500 });
   const porDestinatario = new Map<string, any[]>();
   for (const aviso of colaboracao ?? []) porDestinatario.set(aviso.recipient_id, [...(porDestinatario.get(aviso.recipient_id) ?? []), aviso]);
 
@@ -231,7 +258,7 @@ Deno.serve(async (req) => {
 
   // Chamadas autenticadas do app servem apenas para acordar o envio colaborativo.
   // Resumos pessoais e lembretes de prazo continuam exclusivos do cron.
-  if (actorId) return new Response(JSON.stringify({ enviados, colaboracao: true }), { headers: { "Content-Type": "application/json" } });
+  if (actorId) return responder(req, JSON.stringify({ enviados, colaboracao: true }), { headers: { "Content-Type": "application/json" } });
 
   for (const sub of subs) {
     const dados: any = dadosDe.get(sub.user_id) ?? {};
@@ -293,7 +320,7 @@ Deno.serve(async (req) => {
     }
   }
 
-  return new Response(JSON.stringify({ aparelhos: subs.length, enviados }), {
+  return responder(req, JSON.stringify({ aparelhos: subs.length, enviados }), {
     headers: { "Content-Type": "application/json" },
   });
 });
