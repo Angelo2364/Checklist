@@ -3316,7 +3316,7 @@ function Checklist({ usuario }) {
         </p>
       </section>}
 
-      {pagina !== "amizade" && <div className="ck-abas ck-abas-principais" role="tablist" aria-label="Área principal" data-tutorial="abas">
+      {pagina !== "amizade" && pagina !== "equipes" && <div className="ck-abas ck-abas-principais" role="tablist" aria-label="Área principal" data-tutorial="abas">
         <button type="button" role="tab" className="ck-aba" aria-selected={pagina === "tarefas"} onClick={() => setPagina("tarefas")}>Checklist</button>
         <button type="button" role="tab" className="ck-aba" aria-selected={pagina === "anotacoes"} onClick={() => setPagina("anotacoes")}>Anotações</button>
       </div>}

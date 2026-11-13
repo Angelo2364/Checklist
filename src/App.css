@@ -3484,8 +3484,8 @@ body {
 .ck-social-detail-page .ck-social-page { gap: 12px; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .ck-social-friend-detail { display: block; padding: 0; overflow: visible; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .ck-social-friend-detail > .ck-social-friend-body { display: grid; gap: 10px; padding: 0; }
-.ck-social-friend-detail > .ck-social-friend-body-empty { gap: 0; }
-.ck-social-friend-detail .ck-social-work-tabs { width: 100%; margin-bottom: 8px; }
+.ck-social-friend-detail > .ck-social-friend-body-empty { gap: 10px; }
+.ck-social-friend-detail .ck-social-work-tabs { width: 100%; margin-bottom: 0; }
 .ck-social-friend-detail .ck-barras-topo { width: 100%; }
 .ck-social-friend-detail .ck-social-task-form { margin: 0; }
 .ck-social-friend-detail .ck-social-shared-session,
@@ -3505,7 +3505,7 @@ body {
 .ck-social-friend-detail .ck-social-unfiled .ck-social-task-list { padding: 0 10px 10px; }
 .ck-team-work-panel { display: grid; gap: 0; padding: 0; overflow: visible; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
 .ck-team-work-panel-empty > .ck-team-unfiled-card { margin-top: 0; }
-.ck-team-work-panel > .ck-social-work-tabs { margin-bottom: 8px; }
+.ck-team-work-panel > .ck-social-work-tabs { margin-bottom: 10px; }
 .ck-team-work-panel > .ck-barras-topo { margin-bottom: 8px; }
 .ck-team-work-panel > .ck-team-editor,
 .ck-team-work-panel > .ck-team-note-editor { margin: 8px 0; }
