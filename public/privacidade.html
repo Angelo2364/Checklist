@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#211b35">
+  <title>Privacidade · Crysalis</title>
+  <style>
+    :root { color-scheme: dark; font-family: system-ui, -apple-system, Segoe UI, sans-serif; color: #f4eeff; background: #171326; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; padding: 28px 16px; background: radial-gradient(ellipse at 10% 0%, #803a9b 0, transparent 42rem), radial-gradient(ellipse at 100% 45%, #14218b 0, transparent 42rem), #171326; }
+    main { width: min(760px, 100%); margin: 0 auto; padding: clamp(20px, 5vw, 38px); border: 1px solid #514369; border-radius: 22px; background: #211b35e8; box-shadow: 0 18px 55px #09062666; backdrop-filter: blur(18px); }
+    a { color: #8ed1ff; }
+    .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; color: #c5b8db; font-weight: 700; }
+    .brand img { width: 30px; height: 30px; }
+    h1 { margin: 0 0 8px; font-size: clamp(26px, 5vw, 36px); }
+    .updated, .muted { color: #b4abc8; font-size: 14px; }
+    h2 { margin: 28px 0 8px; font-size: 19px; }
+    p, li { line-height: 1.65; }
+    ul { padding-left: 22px; }
+    .back { display: inline-flex; margin-top: 18px; padding: 10px 16px; border: 1px solid #514369; border-radius: 999px; text-decoration: none; color: inherit; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="brand"><img src="/Logo.svg" alt=""><span>Crysalis</span></div>
+    <h1>Política de privacidade</h1>
+    <p class="updated">Atualizada em 17 de novembro de 2026</p>
+    <p>O Crysalis ajuda você a organizar tarefas, rotinas, anotações e compromissos. Esta política explica quais dados usamos e como você pode controlar essa utilização.</p>
+
+    <h2>Dados da conta e do Crysalis</h2>
+    <p>Para manter sua conta e sincronizar seus dados entre aparelhos, o Crysalis processa seu email, identificador de conta, tarefas, anotações, eventos, preferências e informações de colaboração. Esses dados são armazenados no Supabase, que fornece a infraestrutura de autenticação e banco de dados do app.</p>
+
+    <h2>Conexão com o Google Calendar</h2>
+    <p>A conexão com o Google é opcional e só começa depois que você escolhe conectá-la e autoriza o acesso na tela oficial do Google. O Crysalis usa os dados do Google Calendar para:</p>
+    <ul>
+      <li>mostrar no calendário do Crysalis os eventos dos calendários Google que você selecionar, inclusive calendários públicos de feriados aos quais sua conta esteja inscrita;</li>
+      <li>criar, atualizar e excluir no calendário principal do Google os eventos correspondentes que você criar ou alterar no Crysalis;</li>
+      <li>permitir editar e excluir pelo Crysalis eventos de calendários Google que você possui, quando você escolher fazer isso;</li>
+      <li>associar um evento do Crysalis ao evento correspondente no Google para evitar duplicatas.</li>
+    </ul>
+    <p>Eventos de calendários que você não possui aparecem como somente leitura; os eventos de calendários que você possui podem ser editados ou excluídos no Crysalis. O Crysalis não usa dados do Google para publicidade, não os vende e não os utiliza para treinar modelos de inteligência artificial.</p>
+
+    <h2>Armazenamento e segurança dos dados Google</h2>
+    <p>O Crysalis guarda no Supabase um token de renovação OAuth criptografado no servidor para permitir futuras sincronizações sem pedir nova autorização a cada acesso, além dos identificadores necessários para relacionar eventos criados nos dois serviços. O navegador não recebe o segredo OAuth nem o token de renovação. Eventos lidos dos outros calendários são consultados para exibição e não são copiados para a lista pessoal do Crysalis. O acesso de leitura abrange os calendários que você selecionar; a escrita de eventos pessoais fica limitada a calendários que você possui e, para eventos do Crysalis, ao calendário principal.</p>
+    <p>O acesso é limitado às finalidades descritas acima, protegido por autenticação e controles de acesso. O Crysalis não compartilha dados Google com terceiros, exceto com os provedores técnicos necessários para operar o serviço, como Supabase, e com o próprio Google para executar a sincronização solicitada.</p>
+
+    <h2>Controle, revogação e exclusão</h2>
+    <p>Você pode desconectar o Google a qualquer momento em Configurações. O Crysalis revoga a autorização e remove o token de renovação guardado; os eventos que já foram criados no Google permanecem lá. Para evitar cópias duplicadas se você conectar de novo, o Crysalis mantém os identificadores que relacionam cada evento do Crysalis ao evento correspondente do Google enquanto sua conta existir. Você também pode revogar o acesso do Crysalis nas configurações de segurança da sua Conta Google. Desconectar o Google não apaga seus dados pessoais do Crysalis.</p>
+    <p>Para solicitar acesso, correção ou exclusão dos dados da sua conta Crysalis, escreva para <a href="mailto:sayaokaua@gmail.com">sayaokaua@gmail.com</a>. Quando a conta é excluída, os dados associados a ela e a autorização armazenada são removidos, observadas obrigações legais e registros técnicos necessários para segurança.</p>
+
+    <h2>Alterações e contato</h2>
+    <p>Podemos atualizar esta política quando o Crysalis ganhar novas funcionalidades. A versão vigente ficará publicada nesta página. Para dúvidas sobre privacidade, entre em contato pelo email <a href="mailto:sayaokaua@gmail.com">sayaokaua@gmail.com</a>.</p>
+    <a class="back" href="/">Voltar ao Crysalis</a>
+  </main>
+</body>
+</html>

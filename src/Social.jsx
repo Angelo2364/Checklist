@@ -227,7 +227,7 @@ export function AnotacoesCompartilhadas({ tipo, escopoId }) {
   }
 
   function beginNote(note = null, groupId = null) {
-    const noteDate = note ? (note.note_date === undefined ? note.created_at?.slice(0, 10) || "" : note.note_date || "") : hojeISO();
+    const noteDate = note ? (note.note_date === undefined ? note.created_at?.slice(0, 10) || "" : note.note_date || "") : "";
     setNoteForm({ id: note?.id || null, title: note?.title || "", body: note?.body || "", date: noteDate, groupId: note?.group_id ?? groupId });
     setGroupForm(null);
   }
@@ -327,7 +327,7 @@ export function AnotacoesCompartilhadas({ tipo, escopoId }) {
         {!collapsed && <>{groupForm?.group?.id === group.id && <GroupEditor group={group} onCancel={() => setGroupForm(null)} onSave={(fields) => saveGroup(fields, group)}/ >}{noteForm && !noteForm.id && noteForm.groupId === group.id && <NoteFormInline form={noteForm} setForm={setNoteForm} onSubmit={saveNote} onCancel={() => setNoteForm(null)}/ >}{groupNotes.map(noteRow)}{!groupNotes.length && !groupForm?.group && !noteForm?.groupId && <p className="ck-vazio-grupo">Nenhuma anotação nesta sessão.</p>}</>}
       </section>;
     })}
-    {<section data-shared-note-group="" className={"ck-grupo ck-social-note-unfiled" + (noteDropTarget && !noteDropTarget.noteId && noteDropTarget.groupId == null ? " alvo" : "")}><h2 className="ck-secao">Sem sessão</h2>{notesFor(null).map(noteRow)}</section>}
+    {<section data-shared-note-group="" className={"ck-grupo ck-social-note-unfiled" + (noteDropTarget && !noteDropTarget.noteId && noteDropTarget.groupId == null ? " alvo" : "")}><h2 className="ck-secao">Sem sessão</h2>{notesFor(null).map(noteRow)}{!notesFor(null).length && <p className="ck-vazio-grupo">Nenhuma anotação aqui ainda.</p>}</section>}
     {!groups.length && !notes.length && !noteForm && <p className="ck-vazio">Adicione uma anotação ou crie uma sessão.</p>}
     <ConfirmacaoSocial confirm={deleteConfirm} busy={deleteBusy} onCancel={() => setDeleteConfirm(null)} onConfirm={confirmDelete} />
   </div>;

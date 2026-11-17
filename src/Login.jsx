@@ -37,6 +37,7 @@ function ApresentacaoCrysalis() {
       <li><span className="ck-login-about-icon notas" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M4 3.5h12v13H4zM7 7h6M7 10h6M7 13h3"/></svg></span><span><strong>Anotações e colaboração</strong><small>Guarde ideias e compartilhe com amigos ou equipes.</small></span></li>
     </ul>
     <div className="ck-login-about-slogan">Organize seus dias. Cresça no seu tempo.</div>
+    <a className="ck-login-privacy" href={`${import.meta.env.BASE_URL}privacidade.html`}>Política de privacidade</a>
   </aside>;
 }
 

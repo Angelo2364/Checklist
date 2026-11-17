@@ -97,9 +97,9 @@ body {
 
 .ck-topo h1 {
   margin: 0;
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 800;
-  line-height: 24px;
+  line-height: 28px;
 }
 
 .ck-contagem {
@@ -1380,6 +1380,7 @@ a.ck-ev-mapa:hover {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  min-height: 46px;
 }
 
 .ck-topo-titulo {
@@ -1405,8 +1406,8 @@ button.ck-topo-marca:focus-visible { outline: 2px solid var(--azul-forte); outli
 
 .ck-logo-topo {
   flex: none;
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   object-fit: contain;
   filter: brightness(0) invert(1);
 }
@@ -1625,6 +1626,18 @@ button.ck-topo-marca:focus-visible { outline: 2px solid var(--azul-forte); outli
 .ck-periodo-avisos .ck-hora24 input[type="text"] { flex: none; width: 40px; min-width: 0; padding: 7px 4px; border: 0; border-radius: 6px; color: var(--tinta); background: transparent; text-align: center; font: inherit; font-variant-numeric: tabular-nums; }
 .ck-periodo-avisos .ck-hora24 input[type="text"]:focus-visible { outline: 2px solid var(--azul-forte); outline-offset: 1px; }
 .ck-pref-card > small { display: block; margin-top: 8px; color: var(--suave); font-size: 12px; line-height: 1.5; }
+.ck-google-status { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; color: var(--tinta); font-size: 13px; font-weight: 700; }
+.ck-google-status-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--prio-verde); box-shadow: 0 0 0 3px color-mix(in srgb, var(--prio-verde) 18%, transparent); }
+.ck-google-calendars { display: grid; gap: 9px; margin: 12px 0; padding: 12px; border: 1px solid var(--linha); border-radius: 12px; background: color-mix(in srgb, var(--fundo) 70%, transparent); }
+.ck-google-calendars > strong { font-size: 13px; }
+.ck-google-calendars > .ck-limite-horario { width: 100%; font-size: 13px; }
+.ck-google-calendars > .ck-limite-horario span { min-width: 0; overflow-wrap: anywhere; }
+.ck-google-calendars > small { color: var(--suave); }
+.ck-google-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.ck-google-actions button { padding: 7px 11px; font-size: 12px; }
+.ck-ev-info.ck-google-event-source { color: var(--azul-forte); font-size: 11px; }
+.ck-aviso-google p { gap: 12px; }
+.ck-aviso-google p > span { flex: 1; }
 .ck-pref-card > .ck-ajuste, .ck-pref-card > .ck-arquivo { margin: 2px 0 8px; }
 .ck-ajuste-segmentado { display: inline-flex; width: fit-content; gap: 0; overflow: hidden; padding: 3px; border: 1px solid var(--linha); border-radius: 11px; background: color-mix(in srgb, var(--fundo-hover) 65%, transparent); }
 .ck-ajuste-segmentado .ck-ajuste-btn { border-color: transparent; border-radius: 8px; }
@@ -1743,9 +1756,9 @@ body {
   letter-spacing: -0.025em;
 }
 
-.ck-contagem {
-  margin-top: 2px;
-}
+.ck-topo-rodape { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 22px; margin-top: 8px; padding-top: 7px; border-top: 1px solid color-mix(in srgb, var(--linha) 75%, transparent); }
+.ck-topo-rodape .ck-contagem { min-width: 0; margin: 0; font-size: 12px; line-height: 1.35; }
+.ck-topo-rodape .ck-sync { flex: none; margin: 0; font-size: 11px; }
 
 .ck-abas-principais {
   gap: 4px;
@@ -2171,6 +2184,7 @@ body {
 .ck-login-about-icon.agenda { color: #d49820; }
 .ck-login-about-icon.notas { color: #bd5c88; }
 .ck-login-about-slogan { padding-top: 10px; border-top: 1px solid color-mix(in srgb, var(--linha) 75%, transparent); color: var(--suave); font-size: 11px; font-weight: 700; }
+.ck-login-privacy { justify-self: start; color: var(--azul-forte); font-size: 11px; text-decoration-color: color-mix(in srgb, var(--azul-forte) 45%, transparent); text-underline-offset: 3px; }
 
 .ck-login-card h1 {
   margin: 0;
@@ -3718,6 +3732,51 @@ body {
   border-radius: 13px;
 }
 .ck-shared-notes .ck-social-note-unfiled { min-height: 90px; }
+
+/* Unfiled annotations match the personal checklist section in every context. */
+.ck-anotacoes .ck-anotacoes-sem-sessao,
+.ck-shared-notes .ck-social-note-unfiled {
+  min-height: 0;
+  margin: 8px 0 0;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.com-fundo .ck-anotacoes .ck-anotacoes-sem-sessao,
+:root[data-tema="claro"] .com-fundo .ck-anotacoes .ck-anotacoes-sem-sessao {
+  background: transparent;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+.ck-anotacoes .ck-anotacoes-sem-sessao > .ck-secao,
+.ck-shared-notes .ck-social-note-unfiled > .ck-secao {
+  margin: 8px 8px 0;
+  padding: 11px 8px 8px;
+  border: 0;
+  color: var(--suave);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+.ck-anotacoes .ck-anotacoes-sem-sessao > .ck-anotacao,
+.ck-shared-notes .ck-social-note-unfiled > .ck-anotacao {
+  margin: 7px 9px;
+}
+.ck-anotacoes .ck-anotacoes-sem-sessao > .ck-vazio-grupo,
+.ck-shared-notes .ck-social-note-unfiled > .ck-vazio-grupo {
+  margin: 0;
+  padding: 8px 16px;
+  border: 0;
+  color: var(--suave);
+  background: transparent;
+}
 
 /* Custom checkboxes across the app; hidden task inputs retain their custom circles. */
 input[type="checkbox"] {

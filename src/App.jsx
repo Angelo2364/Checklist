@@ -6,6 +6,7 @@ import { pushSuportado, motivoSemPush, ativarPush, atualizarPush, desativarPush 
 import Login, { NovaSenha } from "./Login";
 import Social from "./Social";
 import Equipes from "./Equipes";
+import GoogleCalendarSettings from "./GoogleCalendarSettings";
 
 const STORAGE_TASKS = "checklist:tarefas";
 const STORAGE_GROUPS = "checklist:divisoes";
@@ -294,6 +295,13 @@ function linkGoogle(e) {
   return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(e.titulo)}&dates=${datas}` +
     (e.endereco ? `&location=${encodeURIComponent(e.endereco)}` : "") +
     (e.descricao ? `&details=${encodeURIComponent(e.descricao)}` : "");
+}
+
+async function googleCalendarApi(body) {
+  const { data, error } = await supabase.functions.invoke("google-calendar", { body });
+  if (data?.error) throw new Error(data.error);
+  if (error) throw new Error("google_calendar_request_failed");
+  return data || {};
 }
 
 /* Horário em 24 horas, digitado livremente (as setas ↑ ↓ também funcionam) */
@@ -663,7 +671,7 @@ function SeletorRepeticao({ value, onChange, config, onConfigChange }) {
 }
 
 /* Calendário do mês com eventos */
-function Calendario({ eventos, tarefasAgendadas, adicionar, editar, apagar, agendarTarefa, editarTarefa, apagarTarefa, alternarTarefaAgendada }) {
+function Calendario({ eventos, tarefasAgendadas, googleConnected, adicionar, editar, apagar, editarGoogle, apagarGoogle, agendarTarefa, editarTarefa, apagarTarefa, alternarTarefaAgendada }) {
   const hojeISO = iso(new Date());
   const [mes, setMes] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [sel, setSel] = useState(hojeISO);
@@ -674,21 +682,35 @@ function Calendario({ eventos, tarefasAgendadas, adicionar, editar, apagar, agen
   const [endereco, setEndereco] = useState("");
   const [descricao, setDescricao] = useState("");
   const [editandoId, setEditandoId] = useState(null); // evento sendo editado
+  const [editandoGoogle, setEditandoGoogle] = useState(null);
   const [dataEdit, setDataEdit] = useState("");
   const [abrindoTarefa, setAbrindoTarefa] = useState(false);
   const [editandoTarefaId, setEditandoTarefaId] = useState(null);
+  const [eventosGoogle, setEventosGoogle] = useState([]);
   const eventoFormRef = useRef(null);
 
   const ano = mes.getFullYear();
   const m = mes.getMonth();
   const vazios = new Date(ano, m, 1).getDay();
   const total = new Date(ano, m + 1, 0).getDate();
-  const comEvento = new Set(eventos.map((e) => e.data));
+  const eventosVisiveis = [...eventos, ...eventosGoogle];
+  const comEvento = new Set(eventosVisiveis.map((e) => e.data));
   const comTarefa = new Set(tarefasAgendadas.map((t) => t.agendadaPara));
-  const doDia = eventos
+  const doDia = eventosVisiveis
     .filter((e) => e.data === sel)
     .sort((a, b) => (a.hora || "").localeCompare(b.hora || ""));
   const tarefasDoDia = tarefasAgendadas.filter((t) => t.agendadaPara === sel);
+
+  useEffect(() => {
+    if (!googleConnected) { setEventosGoogle([]); return; }
+    let ativo = true;
+    const inicio = new Date(ano, m, 1);
+    const fim = new Date(ano, m + 1, 1);
+    googleCalendarApi({ action: "events", timeMin: inicio.toISOString(), timeMax: fim.toISOString(), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone })
+      .then((result) => { if (ativo) setEventosGoogle(Array.isArray(result.events) ? result.events : []); })
+      .catch(() => { if (ativo) setEventosGoogle([]); });
+    return () => { ativo = false; };
+  }, [ano, m, googleConnected]);
 
   function limparCampos() {
     setTitulo("");
@@ -701,12 +723,14 @@ function Calendario({ eventos, tarefasAgendadas, adicionar, editar, apagar, agen
   function cancelar() {
     setAbrindo(false);
     setEditandoId(null);
+    setEditandoGoogle(null);
     limparCampos();
   }
   useFecharFora(eventoFormRef, abrindo, cancelar);
 
   function comecarEdicao(ev) {
     setEditandoId(ev.id);
+    setEditandoGoogle(ev.googleWritable ? { calendarId: ev.googleCalendarId, googleEventId: ev.googleEventId } : null);
     setDataEdit(ev.data);
     setTitulo(ev.titulo || "");
     setHora(ev.hora || "");
@@ -728,7 +752,16 @@ function Calendario({ eventos, tarefasAgendadas, adicionar, editar, apagar, agen
     };
     if (editandoId) {
       const novaData = dataEdit || sel;
-      editar(editandoId, { ...campos, data: novaData });
+      const atualizado = { ...campos, data: novaData };
+      if (editandoGoogle) {
+        editarGoogle(editandoGoogle, atualizado).then(() => {
+          setEventosGoogle((current) => current.map((evento) => evento.googleEventId === editandoGoogle.googleEventId && evento.googleCalendarId === editandoGoogle.calendarId ? { ...evento, ...atualizado } : evento));
+          setSel(novaData);
+          cancelar();
+        }).catch(() => {});
+        return;
+      }
+      editar(editandoId, atualizado);
       setSel(novaData);
       cancelar();
       return;
@@ -801,14 +834,21 @@ function Calendario({ eventos, tarefasAgendadas, adicionar, editar, apagar, agen
                   </a>
                 )}
                 {e.descricao && <span className="ck-ev-info ck-ev-desc">{e.descricao}</span>}
+                {e.googleReadOnly && e.googleCalendarName && <span className="ck-ev-info ck-google-event-source">{e.googleCalendarName}</span>}
               </span>
-              <button type="button" className="ck-icone" onClick={() => comecarEdicao(e)} title="Editar evento" aria-label={`Editar ${e.titulo}`}>
-                <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" />
-                </svg>
-              </button>
-              <a className="ck-apagar" href={linkGoogle(e)} target="_blank" rel="noreferrer" title="Abrir no Google Agenda">Google</a>
-              <BotaoApagar nome={`evento ${e.titulo}`} onClick={() => apagar(e.id)} />
+              {e.googleReadOnly ? <>
+                {e.googleWritable && <button type="button" className="ck-icone" onClick={() => comecarEdicao(e)} title="Editar evento do Google" aria-label={`Editar ${e.titulo}`}>
+                  <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" /></svg>
+                </button>}
+                <a className="ck-apagar" href={e.googleUrl || "https://calendar.google.com/"} target="_blank" rel="noreferrer" title="Abrir no Google Agenda">Google</a>
+                {e.googleWritable && <BotaoApagar nome={`evento ${e.titulo} do Google`} onClick={() => apagarGoogle({ calendarId: e.googleCalendarId, googleEventId: e.googleEventId }).then(() => setEventosGoogle((current) => current.filter((evento) => evento.googleEventId !== e.googleEventId || evento.googleCalendarId !== e.googleCalendarId))).catch(() => {})} />}
+              </> : <>
+                <button type="button" className="ck-icone" onClick={() => comecarEdicao(e)} title="Editar evento" aria-label={`Editar ${e.titulo}`}>
+                  <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" /></svg>
+                </button>
+                <a className="ck-apagar" href={linkGoogle(e)} target="_blank" rel="noreferrer" title="Abrir no Google Agenda">Google</a>
+                <BotaoApagar nome={`evento ${e.titulo}`} onClick={() => apagar(e.id)} />
+              </>}
             </li>
           ))}
           {tarefasDoDia.map((t) => editandoTarefaId === t.id ? (
@@ -1780,7 +1820,7 @@ function FormularioAnotacao({ form, onSalvar, onChange, onCancelar }) {
   );
 }
 
-function ConfiguracoesVisuais({ tema, setTema, modoTablet, setModoTablet, desfoque, setDesfoque, ajusteFundo, setAjusteFundo, escolherFundo, fundo, removerFundo, erroFundo, janelaAvisos, setJanelaAvisos, excluirSemConfirmacao, setExcluirSemConfirmacao, notificationPreferences, setNotificationPreferences, iniciarTutorial }) {
+function ConfiguracoesVisuais({ tema, setTema, modoTablet, setModoTablet, googleCalendarConnected, setGoogleCalendarConnected, desfoque, setDesfoque, ajusteFundo, setAjusteFundo, escolherFundo, fundo, removerFundo, erroFundo, janelaAvisos, setJanelaAvisos, excluirSemConfirmacao, setExcluirSemConfirmacao, notificationPreferences, setNotificationPreferences, iniciarTutorial }) {
   return <div className="ck-config-preferencias">
     <section className="ck-pref-card">
       <h3>Tema</h3>
@@ -1817,6 +1857,7 @@ function ConfiguracoesVisuais({ tema, setTema, modoTablet, setModoTablet, desfoq
         <span>Usar layout horizontal em tablets</span>
       </label>
     </section>
+    <GoogleCalendarSettings connected={googleCalendarConnected} onConnectedChange={setGoogleCalendarConnected} />
     <section className="ck-pref-card">
       <h3>Horário dos lembretes</h3>
       <p>Escolha em que período você quer receber os resumos e os avisos de prazo.</p>
@@ -2040,6 +2081,8 @@ function Checklist({ usuario }) {
   const [tarefas, setTarefas] = useState(() => lerStorage(STORAGE_TASKS, []));
   const [grupos, setGrupos] = useState(() => lerStorage(STORAGE_GROUPS, []));
   const [eventos, setEventos] = useState(() => lerStorage(STORAGE_EVENTS, []));
+  const [googleCalendarConnected, setGoogleCalendarConnected] = useState(false);
+  const [googleCalendarNotice, setGoogleCalendarNotice] = useState("");
   const [avisosAgendaFechados, setAvisosAgendaFechados] = useState(() => lerStorage(STORAGE_AVISOS_AGENDA_FECHADOS, {}));
   const [rotinas, setRotinas] = useState(() => lerStorage(STORAGE_ROUTINES, []));
   const [contas, setContas] = useState(() => lerStorage(STORAGE_BILLS, []));
@@ -2084,6 +2127,22 @@ function Checklist({ usuario }) {
     window.addEventListener("popstate", aoVoltar);
     return () => window.removeEventListener("popstate", aoVoltar);
   }, []);
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
+    const resultado = query.get("googleCalendar");
+    if (resultado) {
+      setGoogleCalendarNotice(resultado === "connected" ? "Conta Google conectada. Escolha os calendários exibidos em Configurações." : "Não foi possível conectar o Google Calendar. Confira as configurações e tente novamente.");
+      query.delete("googleCalendar");
+      query.delete("reason");
+      const search = query.toString();
+      window.history.replaceState(window.history.state, "", `${window.location.pathname}${search ? `?${search}` : ""}${window.location.hash}`);
+    }
+    let ativo = true;
+    googleCalendarApi({ action: "status" }).then((status) => {
+      if (ativo) setGoogleCalendarConnected(status.connected === true);
+    }).catch(() => { if (ativo) setGoogleCalendarConnected(false); });
+    return () => { ativo = false; };
+  }, [usuario.id]);
   const [nomeSessaoAnotacao, setNomeSessaoAnotacao] = useState("");
   const [iconeSessaoAnotacao, setIconeSessaoAnotacao] = useState("butterfly");
   const [criandoSessaoAnotacao, setCriandoSessaoAnotacao] = useState(false);
@@ -2781,15 +2840,41 @@ function Checklist({ usuario }) {
   }
 
   function adicionarEvento(ev) {
-    setEventos((atual) => [...atual, { id: novoId(), ...ev }]);
+    const evento = { id: novoId(), ...ev };
+    setEventos((atual) => [...atual, evento]);
+    if (googleCalendarConnected) googleCalendarApi({ action: "upsert-event", event: evento }).then(() => setGoogleCalendarNotice("")).catch(() => setGoogleCalendarNotice("O evento foi salvo no Crysalis, mas não consegui sincronizá-lo com o Google Calendar."));
   }
 
   function editarEvento(id, campos) {
+    const anterior = eventosRef.current.find((evento) => evento.id === id);
+    const atualizado = anterior ? { ...anterior, ...campos } : null;
     setEventos((atual) => atual.map((e) => (e.id === id ? { ...e, ...campos } : e)));
+    if (googleCalendarConnected && atualizado) googleCalendarApi({ action: "upsert-event", event: atualizado }).then(() => setGoogleCalendarNotice("")).catch(() => setGoogleCalendarNotice("O evento foi alterado no Crysalis, mas a alteração não chegou ao Google Calendar."));
   }
 
   function apagarEvento(id) {
+    if (googleCalendarConnected) googleCalendarApi({ action: "delete-event", eventId: id }).then(() => setGoogleCalendarNotice("")).catch(() => setGoogleCalendarNotice("O evento foi removido do Crysalis, mas não consegui removê-lo do Google Calendar."));
     setEventos((atual) => atual.filter((e) => e.id !== id));
+  }
+
+  async function editarEventoGoogle(referencia, evento) {
+    try {
+      await googleCalendarApi({ action: "edit-google-event", ...referencia, event: evento });
+      setGoogleCalendarNotice("");
+    } catch (error) {
+      setGoogleCalendarNotice("Não consegui alterar esse evento no Google Calendar. Ele permanece como estava no Google.");
+      throw error;
+    }
+  }
+
+  async function apagarEventoGoogle(referencia) {
+    try {
+      await googleCalendarApi({ action: "delete-google-event", ...referencia });
+      setGoogleCalendarNotice("");
+    } catch (error) {
+      setGoogleCalendarNotice("Não consegui excluir esse evento do Google Calendar. Ele permanece no Google.");
+      throw error;
+    }
   }
 
   function dispensarAvisoAgenda(evento) {
@@ -3010,7 +3095,7 @@ function Checklist({ usuario }) {
   }
 
   function abrirNovaAnotacao(sessaoId = null) {
-    setFormAnotacao({ titulo: "", texto: "", data: iso(new Date()), sessaoId });
+    setFormAnotacao({ titulo: "", texto: "", data: "", sessaoId });
   }
 
   function criarSessaoAnotacao(e) {
@@ -3271,20 +3356,8 @@ function Checklist({ usuario }) {
               <img className="ck-logo-topo" src={`${import.meta.env.BASE_URL}Logo.svg`} alt="" aria-hidden="true" />
               <h1>Crysalis</h1>
             </button>
-        <span className="ck-contagem">
-          {tarefasVisiveis.length === 0
-            ? tarefasFuturas.length > 0 ? `${tarefasFuturas.length} tarefa${tarefasFuturas.length === 1 ? "" : "s"} agendada${tarefasFuturas.length === 1 ? "" : "s"}` : "Nenhuma tarefa"
-            :
-            `${feitas} de ${tarefasVisiveis.length} concluídas${
-                meias > 0 ? ` · ${meias} pela metade` : ""
-              }`}
-        </span>
           </div>
           <div className="ck-topo-botoes">
-          <span className={`ck-sync ck-sync-${sync}`} role="status" title="Sincronização com a nuvem">
-            {{ salvando: "Salvando…", salvo: "Salvo", erro: "Sem conexão", conflito: "Conflito" }[sync] || ""}
-          </span>
-
           <button type="button" className="ck-social-nav" onClick={() => setPagina("social")} title="Social" aria-label="Abrir Social">
             <svg viewBox="0 0 20 20" width="17" height="17" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="7" cy="6.5" r="2.5" /><circle cx="14" cy="7.5" r="2" /><path d="M2 16c.3-2.7 2.1-4.2 5-4.2s4.7 1.5 5 4.2M12 12.3c2.8-.6 5.2.9 5.7 3.7" /></svg><span>Social</span>
           </button>
@@ -3293,6 +3366,16 @@ function Checklist({ usuario }) {
             <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6.5 1.8h3l.4 1.7a5 5 0 0 1 1.2.7l1.7-.5 1.5 2.6-1.3 1.2v1.4l1.3 1.2-1.5 2.6-1.7-.5a5 5 0 0 1-1.2.7l-.4 1.7h-3l-.4-1.7a5 5 0 0 1-1.2-.7l-1.7.5-1.5-2.6L3 8.9V7.5L1.7 6.3l1.5-2.6 1.7.5a5 5 0 0 1 1.2-.7z"/><circle cx="8" cy="8.2" r="2.1"/></svg>
           </button>
           </div>
+        </div>
+        <div className="ck-topo-rodape">
+          <span className="ck-contagem">
+            {tarefasVisiveis.length === 0
+              ? tarefasFuturas.length > 0 ? `${tarefasFuturas.length} tarefa${tarefasFuturas.length === 1 ? "" : "s"} agendada${tarefasFuturas.length === 1 ? "" : "s"}` : "Nenhuma tarefa"
+              : `${feitas} de ${tarefasVisiveis.length} concluídas${meias > 0 ? ` · ${meias} pela metade` : ""}`}
+          </span>
+          <span className={`ck-sync ck-sync-${sync}`} role="status" title="Sincronização com a nuvem">
+            {{ salvando: "Salvando…", salvo: "Salvo", erro: "Sem conexão", conflito: "Conflito" }[sync] || ""}
+          </span>
         </div>
         {sync === "conflito" && (
           <div className="ck-conflito" role="alert">
@@ -3306,6 +3389,9 @@ function Checklist({ usuario }) {
 
       </header>
 
+      {googleCalendarNotice && <section className="ck-aviso-agenda ck-aviso-google" role="status">
+        <p><span>{googleCalendarNotice}</span><button type="button" className="ck-aviso-agenda-fechar" onClick={() => setGoogleCalendarNotice("")} aria-label="Fechar aviso do Google Calendar" title="Fechar aviso"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="m4 4 8 8m0-8-8 8" /></svg></button></p>
+      </section>}
       {atualizacaoDisponivel && <section className="ck-aviso-agenda ck-aviso-versao" role="status" aria-label="Atualização disponível">
         <p><span>Uma nova versão do Crysalis está disponível.</span><button type="button" className="ck-aviso-versao-atualizar" onClick={() => window.location.reload()}>Atualizar agora</button></p>
       </section>}
@@ -3337,7 +3423,7 @@ function Checklist({ usuario }) {
           <button type="button" role="tab" className="ck-aba" aria-selected={abaConfiguracoes === "preferencias"} onClick={() => setAbaConfiguracoes("preferencias")}>Preferências</button>
           <button type="button" role="tab" className="ck-aba" aria-selected={abaConfiguracoes === "conta"} onClick={() => setAbaConfiguracoes("conta")}>Conta</button>
         </div>
-        {abaConfiguracoes === "preferencias" ? <ConfiguracoesVisuais tema={tema} setTema={setTema} modoTablet={modoTablet} setModoTablet={setModoTablet} desfoque={desfoque} setDesfoque={setDesfoque} ajusteFundo={ajusteFundo} setAjusteFundo={setAjusteFundo} escolherFundo={escolherFundo} fundo={fundo} removerFundo={removerFundo} erroFundo={erroFundo} janelaAvisos={janelaAvisos} setJanelaAvisos={setJanelaAvisos} excluirSemConfirmacao={excluirSemConfirmacao} setExcluirSemConfirmacao={setExcluirSemConfirmacao} notificationPreferences={notificationPreferences} setNotificationPreferences={setNotificationPreferences} iniciarTutorial={iniciarTutorial} /> : <section className="ck-conta-config">
+        {abaConfiguracoes === "preferencias" ? <ConfiguracoesVisuais tema={tema} setTema={setTema} modoTablet={modoTablet} setModoTablet={setModoTablet} googleCalendarConnected={googleCalendarConnected} setGoogleCalendarConnected={setGoogleCalendarConnected} desfoque={desfoque} setDesfoque={setDesfoque} ajusteFundo={ajusteFundo} setAjusteFundo={setAjusteFundo} escolherFundo={escolherFundo} fundo={fundo} removerFundo={removerFundo} erroFundo={erroFundo} janelaAvisos={janelaAvisos} setJanelaAvisos={setJanelaAvisos} excluirSemConfirmacao={excluirSemConfirmacao} setExcluirSemConfirmacao={setExcluirSemConfirmacao} notificationPreferences={notificationPreferences} setNotificationPreferences={setNotificationPreferences} iniciarTutorial={iniciarTutorial} /> : <section className="ck-conta-config">
           <div className="ck-conta-identidade"><span className="ck-conta-avatar" aria-hidden="true">{(usuario.email || "?").slice(0, 1).toUpperCase()}</span><div><small>Conta conectada</small><strong>{usuario.email}</strong></div></div>
           <ConfiguracaoNomeUsuario usuario={usuario} onNomeSalvo={setNomeUsuarioDefinido} />
           <button type="button" className="ck-sair-conta" onClick={sair}><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"><path d="M6.5 2.5H4a1.5 1.5 0 0 0-1.5 1.5v8A1.5 1.5 0 0 0 4 13.5h2.5"/><path d="M10 5l3 3-3 3M13 8H6.5"/></svg>Sair da conta</button>
@@ -3600,7 +3686,7 @@ function Checklist({ usuario }) {
             <div className="ck-anotacao-corpo"><div><strong>{a.titulo}</strong>{a.data && <time>{new Date(`${a.data}T00:00`).toLocaleDateString("pt-BR")}</time>}</div>{a.texto && !descricoesAnotacaoFechadas[a.id] && <p>{a.texto}</p>}</div>{a.texto && <ToggleDescricao fechada={descricoesAnotacaoFechadas[a.id]} onClick={() => setDescricoesAnotacaoFechadas((atual) => ({ ...atual, [a.id]: !atual[a.id] }))} />}<button type="button" className="ck-icone" title="Editar anotação" aria-label={`Editar ${a.titulo}`} onClick={() => setFormAnotacao({ ...a })}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" /></svg></button><BotaoApagar nome={`anotação ${a.titulo}`} onClick={() => setAnotacoes((xs) => xs.filter((x) => x.id !== a.id))} />
           </article>)}
         </section>)}
-        {(anotacoes.some((a) => !a.sessaoId || !sessoesAnotacoes.some((s) => s.id === a.sessaoId)) || arrastando?.tipo === "anotacao") && <section className="ck-grupo"><h2 className={`ck-secao${ordem.sobre === "__sem_sessao__" && ordem.arrastando?.tipo === "anotacao" ? " alvo" : ""}`} {...alvoProps(ordem, "destinoAnotacoes", "__sem_sessao__", null)}>Sem sessão</h2>{anotacoes.filter((a) => !a.sessaoId || !sessoesAnotacoes.some((s) => s.id === a.sessaoId)).map((a) => <article className={`ck-anotacao${ordem.sobre === a.id && ordem.arrastando?.tipo === "anotacao" ? " alvo" : ""}`} key={a.id} {...alvoProps(ordem, "anotacao", a.id, null)}><Alca id={a.id} tipo="anotacao" grupo={null} ordem={ordem} imagem=".ck-anotacao" /><div className="ck-anotacao-corpo"><div><strong>{a.titulo}</strong>{a.data && <time>{new Date(`${a.data}T00:00`).toLocaleDateString("pt-BR")}</time>}</div>{a.texto && !descricoesAnotacaoFechadas[a.id] && <p>{a.texto}</p>}</div>{a.texto && <ToggleDescricao fechada={descricoesAnotacaoFechadas[a.id]} onClick={() => setDescricoesAnotacaoFechadas((atual) => ({ ...atual, [a.id]: !atual[a.id] }))} />}<button type="button" className="ck-icone" title="Editar anotação" aria-label={`Editar ${a.titulo}`} onClick={() => setFormAnotacao({ ...a })}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" /></svg></button><BotaoApagar nome={`anotação ${a.titulo}`} onClick={() => setAnotacoes((xs) => xs.filter((x) => x.id !== a.id))} /></article>)}</section>}
+        <section className="ck-grupo ck-anotacoes-sem-sessao"><h2 className={`ck-secao${ordem.sobre === "__sem_sessao__" && ordem.arrastando?.tipo === "anotacao" ? " alvo" : ""}`} {...alvoProps(ordem, "destinoAnotacoes", "__sem_sessao__", null)}>Sem sessão</h2>{anotacoes.filter((a) => !a.sessaoId || !sessoesAnotacoes.some((s) => s.id === a.sessaoId)).map((a) => <article className={`ck-anotacao${ordem.sobre === a.id && ordem.arrastando?.tipo === "anotacao" ? " alvo" : ""}`} key={a.id} {...alvoProps(ordem, "anotacao", a.id, null)}><Alca id={a.id} tipo="anotacao" grupo={null} ordem={ordem} imagem=".ck-anotacao" /><div className="ck-anotacao-corpo"><div><strong>{a.titulo}</strong>{a.data && <time>{new Date(`${a.data}T00:00`).toLocaleDateString("pt-BR")}</time>}</div>{a.texto && !descricoesAnotacaoFechadas[a.id] && <p>{a.texto}</p>}</div>{a.texto && <ToggleDescricao fechada={descricoesAnotacaoFechadas[a.id]} onClick={() => setDescricoesAnotacaoFechadas((atual) => ({ ...atual, [a.id]: !atual[a.id] }))} />}<button type="button" className="ck-icone" title="Editar anotação" aria-label={`Editar ${a.titulo}`} onClick={() => setFormAnotacao({ ...a })}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" /></svg></button><BotaoApagar nome={`anotação ${a.titulo}`} onClick={() => setAnotacoes((xs) => xs.filter((x) => x.id !== a.id))} /></article>)}{!anotacoes.some((a) => !a.sessaoId || !sessoesAnotacoes.some((s) => s.id === a.sessaoId)) && <p className="ck-vazio-grupo">Nenhuma anotação aqui ainda.</p>}</section>
         {!formAnotacao && anotacoes.length === 0 && sessoesAnotacoes.length === 0 && <p className="ck-vazio">Adicione uma anotação ou crie uma sessão.</p>}
       </section> : null}
 
@@ -3617,7 +3703,7 @@ function Checklist({ usuario }) {
     </main>
 
     <aside className="ck-lateral">
-      <Calendario eventos={eventos} tarefasAgendadas={tarefas.filter((t) => t.agendadaPara)} adicionar={adicionarEvento} editar={editarEvento} apagar={apagarEvento} agendarTarefa={agendarTarefa} editarTarefa={salvarEdicao} apagarTarefa={apagar} alternarTarefaAgendada={alternar} />
+      <Calendario eventos={eventos} tarefasAgendadas={tarefas.filter((t) => t.agendadaPara)} googleConnected={googleCalendarConnected} adicionar={adicionarEvento} editar={editarEvento} apagar={apagarEvento} editarGoogle={editarEventoGoogle} apagarGoogle={apagarEventoGoogle} agendarTarefa={agendarTarefa} editarTarefa={salvarEdicao} apagarTarefa={apagar} alternarTarefaAgendada={alternar} />
       <section className="ck-painel" data-tutorial="painel-lateral">
         <div className="ck-abas" role="tablist">
           <button type="button" role="tab" className="ck-aba" aria-selected={aba === "rotinas"} onClick={() => setAba("rotinas")}>

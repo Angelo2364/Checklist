@@ -8,6 +8,10 @@ project_id = "checklist"
 # A função valida CRON_SECRET para o agendamento e JWT para o acionamento do app.
 verify_jwt = false
 
+[functions.google-calendar]
+# O callback OAuth é público; os demais endpoints validam o JWT do Supabase dentro da função.
+verify_jwt = false
+
 [api]
 enabled = true
 # Port to use for the API URL.
