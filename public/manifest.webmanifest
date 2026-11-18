@@ -1,0 +1,31 @@
+{
+  "id": "/",
+  "name": "Crysalis",
+  "short_name": "Crysalis",
+  "description": "Organize suas tarefas, acompanhe sua rotina e cresça no seu próprio tempo.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#211d39",
+  "theme_color": "#211d39",
+  "icons": [
+    {
+      "src": "/pwa-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/Logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "monochrome"
+    }
+  ]
+}
