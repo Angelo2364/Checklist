@@ -76,6 +76,8 @@ body {
 .ck {
   width: 100%;
   max-width: 600px;
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
   margin: 0;
   background: var(--fundo);
@@ -657,13 +659,16 @@ button.secundario:hover {
 }
 
 @media (max-width: 1000px) {
-  .ck-layout { flex-direction: column; align-items: stretch; }
+  .ck-layout { flex-direction: column; align-items: stretch; min-height: 100dvh; }
   .ck, .ck-lateral { width: 100%; max-width: 600px; margin: 0 auto; }
+  .ck { min-height: 0; }
   .ck-lateral {
     position: static;
     min-height: 0;
     max-height: none;
     border-left: 1px solid var(--linha);
+    border-bottom: 1px solid var(--linha);
+    border-radius: 0 0 14px 14px;
     border-top: 8px solid var(--fundo-hover);
   }
 }
@@ -672,9 +677,8 @@ button.secundario:hover {
   .ck-lateral { border-left: 0; border-right: 0; }
 }
 
-/* Em celulares grandes e tablets compactos, o modo tablet mantém o calendário
-   ao lado da checklist quando o aparelho está em paisagem. */
-@media (min-width: 680px) and (max-width: 1000px) and (orientation: landscape) {
+/* Em celulares e tablets, o modo horizontal mantém checklist e calendário lado a lado. */
+@media (max-width: 1000px) and (orientation: landscape) {
   .ck-layout.ck-modo-tablet { flex-direction: row; align-items: flex-start; max-width: none; min-height: 100dvh; }
   .ck-layout.ck-modo-tablet > .ck { flex: 1 1 auto; width: calc(100% - 320px); min-width: 0; max-width: none; margin: 0; }
   .ck-layout.ck-modo-tablet > .ck-lateral { flex: 0 0 320px; width: 320px; max-width: none; min-height: 100dvh; max-height: 100dvh; margin: 0; position: sticky; top: 0; border: 0; border-left: 1px solid var(--linha); border-top: 0; }
@@ -2397,12 +2401,18 @@ body {
 
 /* ---------- rodapé ---------- */
 .ck-rodape {
+  margin-top: auto;
   padding: 22px 16px 30px;
+  color: var(--suave);
   text-align: center;
   font-size: 12px;
-  color: var(--suave);
+  line-height: 1.45;
   opacity: 0.85;
 }
+
+.ck-rodape-mobile { display: none; }
+.ck-rodape p { margin: 0; }
+.ck-rodape p + p { margin-top: 4px; }
 
 .ck-rodape a {
   color: inherit;
@@ -2410,9 +2420,7 @@ body {
   border-bottom: 1px dotted currentColor;
 }
 
-.ck-rodape a:hover {
-  color: var(--tinta);
-}
+.ck-rodape a:hover { color: var(--tinta); }
 
 .ck-nome-rodape {
   position: relative;
@@ -2422,7 +2430,6 @@ body {
   outline: none;
 }
 
-/* ao parar o mouse (ou tocar) no nome, aparece o nome secreto */
 .ck-nome-rodape::after {
   content: attr(data-secreto);
   position: absolute;
@@ -2443,13 +2450,27 @@ body {
   pointer-events: none;
 }
 
-/* easter egg: só aparece depois de ~3 s com o mouse parado em cima do nome
-   (ao tirar o mouse some na hora, porque o atraso só vale na entrada) */
 .ck-nome-rodape:hover::after,
 .ck-nome-rodape:focus-visible::after {
   opacity: 1;
   transform: translate(-50%, 0);
   transition: opacity 0.6s ease 3s, transform 0.6s ease 3s;
+}
+
+@media (max-width: 1000px) {
+  .ck-rodape-desktop { display: none; }
+  .ck-rodape-mobile {
+    display: block;
+    width: 100%;
+    max-width: 600px;
+    margin: auto auto 0;
+  }
+}
+
+@media (max-width: 1000px) and (orientation: landscape) {
+  .ck-layout.ck-modo-tablet > .ck { min-height: 100dvh; }
+  .ck-rodape-desktop { display: block; }
+  .ck-rodape-mobile { display: none; }
 }
 
 /* ---------- prazo da tarefa ---------- */
@@ -3306,8 +3327,10 @@ body {
   padding-bottom: 2px;
 }
 .ck-opcao-icone {
+  position: relative;
   display: grid;
   place-items: center;
+  justify-self: center;
   width: 31px;
   height: 31px;
   padding: 4px;
@@ -3317,13 +3340,24 @@ body {
   border-radius: 9px;
 }
 .ck-opcao-icone[aria-pressed="true"] { border-color: var(--azul-forte); background: color-mix(in srgb, var(--azul) 24%, var(--fundo)); box-shadow: 0 0 0 1px var(--azul-forte); }
-.ck-opcao-icone .ck-sessao-icone { width: 18px; height: 18px; }
+.ck-opcao-icone > .ck-sessao-icone { position: absolute; top: 50%; left: 50%; width: 18px; height: 18px; margin: 0; transform: translate(-50%, -50%); }
 .ck-editar-sessao .ck-seletor-icones { grid-column: 1; grid-row: 1; justify-content: space-between; gap: 4px; width: 100%; padding: 0; }
 .ck-editar-sessao .ck-opcao-icone { flex: none; width: 31px; height: 31px; min-width: 31px; color: var(--suave); }
 .ck-editar-sessao .ck-opcao-icone .ck-sessao-icone { color: var(--suave); }
 .ck-editar-sessao input { grid-column: 1; grid-row: 2; width: 100%; min-width: 0; box-sizing: border-box; }
 .ck-editar-sessao > button[type="submit"] { grid-column: 2; grid-row: 2; }
 .ck-editar-sessao > button[type="button"] { grid-column: 3; grid-row: 2; }
+.ck-editar-sessao .ck-sessao-prazo { grid-column: 1 / -1; grid-row: 3; display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; padding: 8px 10px; color: var(--suave); border: 1px solid var(--linha); border-radius: 10px; background: color-mix(in srgb, var(--fundo) 78%, transparent); font-size: 12px; }
+.ck-editar-sessao .ck-sessao-prazo > .ck-hora24 { flex: none; }
+.ck-editar-sessao-com-prazo .ck-seletor-icones,
+.ck-social-group-editor.ck-group-editor-deadline .ck-seletor-icones { grid-column: 1; grid-row: 1; }
+.ck-social-group-editor.ck-group-editor-deadline .ck-sessao-prazo { grid-column: 1 / -1; grid-row: 3; }
+.ck-nova-divisao .ck-seletor-icones { grid-template-columns: repeat(10, 31px); justify-content: center; gap: 6px; width: 100%; }
+.ck-nova-divisao > .ck-sessao-prazo { grid-column: 1 / -1; grid-row: 3; }
+.ck-sessao-prazo-controles { display: flex; align-items: center; justify-content: flex-end; flex: 1; gap: 8px; min-width: 0; }
+.ck-sessao-prazo .ck-hora24 { display: inline-flex; align-items: center; gap: 3px; min-height: 32px; padding: 2px 8px; color: var(--suave); border: 1px solid var(--linha); border-radius: 999px; background: color-mix(in srgb, var(--fundo) 78%, transparent); }
+.ck-sessao-prazo .ck-hora24 input[type="text"] { flex: none; width: 31px; min-width: 0; box-sizing: border-box; padding: 5px 0; color: var(--tinta); background: transparent; border: 0; border-radius: 999px; box-shadow: none; text-align: center; font: inherit; font-size: 13px; }
+.ck-sessao-prazo .ck-hora24 input[type="text"]:focus-visible { outline: 2px solid var(--azul-forte); outline-offset: 1px; }
 .ck-painel .ck-rotinas ul { display: grid; gap: 9px; margin: 0; padding: 0 12px 14px; }
 .ck-painel .ck-rotinas li {
   min-height: 62px;
@@ -3874,12 +3908,20 @@ input[type="checkbox"]:disabled { opacity: .5; cursor: not-allowed; }
 .ck-social-group-editor input { grid-column: 1; grid-row: 2; width: 100%; min-width: 0; box-sizing: border-box; padding: 8px 11px; border-radius: 10px; border-color: var(--azul-forte); box-shadow: 0 0 0 3px color-mix(in srgb, var(--azul-forte) 14%, transparent); }
 .ck-social-group-editor > button[type="submit"] { grid-column: 2; grid-row: 2; }
 .ck-social-group-editor > button[type="button"] { grid-column: 3; grid-row: 2; }
+.ck-nova-divisao.ck-nova-sessao-pessoal { display: block; }
+.ck-nova-sessao-pessoal > .ck-editar-sessao { padding: 0; }
+.ck-nova-sessao-pessoal .ck-seletor-icones { grid-template-columns: repeat(10, minmax(0, 1fr)); justify-content: space-between; gap: 6px; width: 100%; }
 
 /* A anotação compartilhada mantém o mesmo campo de texto de quatro linhas da pessoal. */
 .ck-shared-note-editor > .ck-campo-largo { min-height: 0; }
 .ck-team-task-edit-row .ck-editor-tarefa { background: var(--barra); }
 
 @media (max-width: 600px) {
+  .ck-nova-divisao .ck-seletor-icones { grid-template-columns: repeat(5, 31px); }
+  .ck-nova-sessao-pessoal .ck-seletor-icones,
+  .ck-editar-sessao .ck-seletor-icones { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .ck-sessao-prazo { align-items: flex-start; }
+  .ck-sessao-prazo-controles { flex-wrap: wrap; }
   .ck-social-group-editor .ck-seletor-icones { grid-template-columns: repeat(5, minmax(0, 1fr)); }
 }
 

@@ -347,13 +347,14 @@ function IconeGrupoMais() {
   return <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M8 3v10M3 8h10"/></svg>;
 }
 
-function TaskEditor({ initial, groupId = null, onSave, onCancel, busy }) {
+function TaskEditor({ initial, groupId = null, sessionDueDate = "", sessionDueTime = "", onSave, onCancel, busy }) {
   const formRef = useRef(null);
   const [title, setTitle] = useState(initial?.title || "");
   const [description, setDescription] = useState(initial?.description || "");
   const [comment, setComment] = useState(initial?.comment || "");
-  const [dueDate, setDueDate] = useState(initial?.due_date || "");
-  const [dueTime, setDueTime] = useState(initial?.due_time?.slice(0, 5) || "");
+  const [dueDate, setDueDate] = useState(initial?.due_date || sessionDueDate || (sessionDueTime ? hojeISO() : ""));
+  const [dueDateInherited, setDueDateInherited] = useState(Boolean(initial?.due_date_inherited || (!initial && (sessionDueDate || sessionDueTime))));
+  const [dueTime, setDueTime] = useState(initial?.due_time?.slice(0, 5) || (!initial ? sessionDueTime : ""));
   const [repeatTime, setRepeatTime] = useState(initial?.recurrence_time?.slice(0, 5) || "00:00");
   const [repeat, setRepeat] = useState(repeticaoDaTask(initial));
   const [repeatConfig, setRepeatConfig] = useState(configRepeticaoDaTask(initial));
@@ -377,7 +378,7 @@ function TaskEditor({ initial, groupId = null, onSave, onCancel, busy }) {
     const prazoResolvido = dueDate || (dueTime ? hojeISO() : null);
     await onSave({
       title: cleanTitle, description: description.trim(), comment: comment.trim(),
-      due_date: prazoResolvido, due_time: prazoResolvido ? (dueTime || null) : null,
+      due_date: prazoResolvido, due_date_inherited: dueDateInherited, due_time: prazoResolvido ? (dueTime || null) : null,
       recurrence: repeatData, recurrence_time: repeatData ? (repeatTime || "00:00") : null,
       scheduled_for: initial?.scheduled_for || hojeISO(), group_id: initial?.group_id || groupId,
     });
@@ -400,7 +401,7 @@ function TaskEditor({ initial, groupId = null, onSave, onCancel, busy }) {
       {repeatConfig.tipo === "semana" ? <div className="ck-dias-semana" aria-label="Dias da semana">{DIAS_SEMANA.map(([n, label]) => <label key={n} className={(repeatConfig.diasSemana || []).includes(n) ? "selecionado" : ""}><input type="checkbox" checked={(repeatConfig.diasSemana || []).includes(n)} onChange={(e) => setRepeatConfig((v) => ({ ...v, diasSemana: e.target.checked ? [...new Set([...(v.diasSemana || []), n])].sort((a, b) => DIAS_SEMANA.findIndex(([d]) => d === a) - DIAS_SEMANA.findIndex(([d]) => d === b)) : (v.diasSemana || []).filter((d) => d !== n) }))} />{label}</label>)}</div>
         : <label className="ck-repeticao-intervalo">A cada <input type="number" min="0" max={repeatConfig.tipo === "meses" ? 24 : 365} value={repeatConfig.intervalo ?? ""} aria-label="Intervalo (vazio ou zero significa não repetir)" title="Deixe vazio ou use 0 para não repetir" onChange={(e) => setRepeatConfig((v) => ({ ...v, intervalo: e.target.value === "" ? "" : Math.max(0, Number(e.target.value) || 0) }))} />{repeatConfig.tipo === "meses" ? "meses" : "dias"}</label>}
     </div>}
-    <div className="ck-prazo-campos"><span className="ck-prazo-rotulo">Prazo</span><DataDiaMes value={dueDate} onChange={setDueDate} /><Hora24Social value={dueTime} onChange={setDueTime} rotulo="Horário do prazo (opcional)" opcional /></div>
+    <div className="ck-prazo-campos"><span className="ck-prazo-rotulo">Prazo</span><DataDiaMes value={dueDate} onChange={(value) => { const next = value || sessionDueDate || (dueTime ? hojeISO() : ""); setDueDate(next); setDueDateInherited(Boolean((sessionDueDate || sessionDueTime) && next === (sessionDueDate || (sessionDueTime ? hojeISO() : "")) && (dueTime || "") === (sessionDueTime || ""))); }} /><Hora24Social value={dueTime} onChange={(value) => { const next = value || sessionDueTime || ""; setDueTime(next); setDueDateInherited(Boolean((sessionDueDate || sessionDueTime) && dueDate === (sessionDueDate || (sessionDueTime ? hojeISO() : "")) && next === (sessionDueTime || ""))); if (next && !dueDate) setDueDate(hojeISO()); }} rotulo="Horário do prazo (opcional)" opcional /></div>
     <textarea className="ck-campo-largo" rows={2} maxLength={1000} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Descrição (opcional)" aria-label="Descrição da tarefa compartilhada" />
     <div className="ck-tarefa-form-rodape">
       <div className="ck-tarefa-form-botoes"><span className="ck-edit-acoes"><button type="submit" disabled={busy || !title.trim() || (repeatData?.tipo === "semana" && !repeatData.diasSemana?.length)}>{busy ? "Salvando…" : initial ? "Salvar" : "Adicionar"}</button><button type="button" className="ck-icone" onClick={onCancel} title="Cancelar (Esc)" aria-label="Cancelar">×</button></span></div>
@@ -410,7 +411,7 @@ function TaskEditor({ initial, groupId = null, onSave, onCancel, busy }) {
   </form>;
 }
 
-function TarefaCompartilhada({ task, onToggle, onEdit, onDelete, busy, now, source, dragging, dropTarget, onKeyboardMove, onPointerStart }) {
+function TarefaCompartilhada({ task, onToggle, onEdit, onDelete, busy, now, source, dragging, dropTarget, onKeyboardMove, onPointerStart, sessionDueDate = "", sessionDueTime = "" }) {
   const [editing, setEditing] = useState(false);
   const chaveDescricao = `crysalis:descricao-tarefa-compartilhada:${task.id}`;
   const [descriptionOpen, setDescriptionOpen] = useState(() => lerPreferenciaLocal(chaveDescricao, false));
@@ -426,7 +427,7 @@ function TarefaCompartilhada({ task, onToggle, onEdit, onDelete, busy, now, sour
   const sameListTarget = dragging?.type === "task" && dragging.friendshipId === task.friendship_id && (dragging.groupId || null) === (task.group_id || null);
   const placementClass = isTarget && !sameListTarget ? ` insercao-${dropTarget.placement || "before"}` : "";
   return <li data-social-drop-kind="task" data-social-id={task.id} data-social-friendship-id={task.friendship_id} data-social-group-id={task.group_id || ""} className={`ck-social-task-card${task.completed ? " feita" : ""}${editing ? " editando" : ""}${isDragging ? " arrastando" : ""}${isTarget ? " alvo" : ""}${placementClass}`}>
-    {editing ? <TaskEditor initial={task} busy={busy} onCancel={() => setEditing(false)} onSave={async (fields) => { if (await onEdit(task.id, fields)) setEditing(false); }} /> : <>
+    {editing ? <TaskEditor initial={task} sessionDueDate={sessionDueDate} sessionDueTime={sessionDueTime} busy={busy} onCancel={() => setEditing(false)} onSave={async (fields) => { if (await onEdit(task.id, fields)) setEditing(false); }} /> : <>
       <SocialAlca item={source} onKeyboardMove={onKeyboardMove} onPointerStart={onPointerStart} label={task.title} />
       <label className="ck-social-task-label"><input ref={checkboxRef} type="checkbox" checked={task.completed} onChange={() => onToggle(task)} aria-label={`Status: ${task.completed ? "pronta" : task.partial ? "meio pronta" : "pendente"}. Clique para avançar o status.`} /><span className="ck-caixa" aria-hidden="true" /><span className="ck-corpo"><span className="ck-texto">{task.title}</span>
         {(task.recurrence || dueText || task.comment) && <span className="ck-meta">{task.recurrence && <span className="ck-repete">{recurrenceLabel(task)}{task.recurrence_time && task.recurrence_time.slice(0, 5) !== "00:00" ? ` às ${task.recurrence_time.slice(0, 5)}` : ""}</span>}{dueText && <span className="ck-prazo">⏰ até {dueText}</span>}{task.comment && <span className="ck-tarefa-comentario"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M13.5 7.7a5.6 5.6 0 0 1-5.8 5.1 6.2 6.2 0 0 1-2.5-.5L2 13l.8-2.7a5 5 0 0 1-.8-2.6A5.5 5.5 0 0 1 7.8 2.5h.4a5.5 5.5 0 0 1 5.3 5.2z" /></svg><span>{task.comment}</span></span>}</span>}
@@ -467,10 +468,12 @@ export function IconeGrupo({ tipo = "folder" }) {
   return <svg className="ck-sessao-icone" viewBox="0 0 18 18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">{paths[tipo] || paths.folder}</svg>;
 }
 
-export function GroupEditor({ group, onSave, onCancel }) {
+export function GroupEditor({ group, onSave, onCancel, withDeadline = false }) {
   const formRef = useRef(null);
   const [name, setName] = useState(group?.name || "");
   const [icon, setIcon] = useState(group?.icon || "butterfly");
+  const [dueDate, setDueDate] = useState(group?.due_date || "");
+  const [dueTime, setDueTime] = useState(group?.due_time?.slice(0, 5) || "");
   useEffect(() => {
     const closeOutside = (event) => {
       if (formRef.current && !formRef.current.contains(event.target)) window.setTimeout(() => onCancel?.(), 0);
@@ -478,9 +481,10 @@ export function GroupEditor({ group, onSave, onCancel }) {
     document.addEventListener("pointerdown", closeOutside, true);
     return () => document.removeEventListener("pointerdown", closeOutside, true);
   }, [onCancel]);
-  return <form ref={formRef} className="ck-editar-sessao ck-social-group-editor" onSubmit={(e) => { e.preventDefault(); if (name.trim()) onSave({ name: name.trim(), icon }); }} onKeyDown={(event) => { if (event.key === "Escape") onCancel?.(); }}>
+  return <form ref={formRef} className={`ck-editar-sessao ck-social-group-editor${withDeadline ? " ck-group-editor-deadline" : ""}`} onSubmit={(e) => { e.preventDefault(); if (name.trim()) onSave({ name: name.trim(), icon, ...(withDeadline ? { due_date: dueDate || (dueTime ? hojeISO() : null), due_time: dueDate || dueTime ? dueTime || null : null } : {}) }); }} onKeyDown={(event) => { if (event.key === "Escape") onCancel?.(); }}>
     <div className="ck-seletor-icones">{ICONES_GRUPO.map(([item, label]) => <button type="button" className="ck-opcao-icone" key={item} aria-pressed={icon === item} aria-label={`Ícone ${label}`} title={label} onClick={() => setIcon(item)}><IconeGrupo tipo={item} /></button>)}</div>
     <input autoFocus maxLength={60} value={name} onChange={(e) => setName(e.target.value)} placeholder="Nome da sessão" aria-label="Nome da sessão compartilhada" required />
+    {withDeadline && <div className="ck-sessao-prazo"><span className="ck-prazo-rotulo">Prazo</span><div className="ck-sessao-prazo-controles"><DataDiaMes value={dueDate} onChange={(value) => setDueDate(value || (dueTime ? hojeISO() : ""))} rotulo="Prazo da sessão" /><Hora24Social value={dueTime} onChange={(value) => { setDueTime(value); if (value && !dueDate) setDueDate(hojeISO()); }} opcional rotulo="Horário do prazo da sessão (opcional)" /></div></div>}
     <button type="submit" className="ck-icone" aria-label="Salvar sessão" title="Salvar sessão"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m3 8 3.2 3.2L13 4.5" /></svg></button>
     <button type="button" className="ck-icone" onClick={onCancel} aria-label="Cancelar" title="Cancelar">×</button>
   </form>;
@@ -709,11 +713,12 @@ export default function Social({ user, view = "tasks", friendshipId = "", onBack
 
   async function salvarGrupo(friendshipId, values, group = null) {
     const query = group
-      ? supabase.from("social_task_groups").update({ name: values.name, icon: values.icon, updated_at: new Date().toISOString() }).eq("id", group.id)
-      : supabase.from("social_task_groups").insert({ friendship_id: friendshipId, created_by: user.id, name: values.name, icon: values.icon, position: taskGroups.filter((g) => g.friendship_id === friendshipId).length });
+      ? supabase.from("social_task_groups").update({ name: values.name, icon: values.icon, due_date: values.due_date || null, due_time: values.due_time || null, updated_at: new Date().toISOString() }).eq("id", group.id)
+      : supabase.from("social_task_groups").insert({ friendship_id: friendshipId, created_by: user.id, name: values.name, icon: values.icon, due_date: values.due_date || null, due_time: values.due_time || null, position: taskGroups.filter((g) => g.friendship_id === friendshipId).length });
     const { error: groupError } = await query;
     if (groupError) { setTaskError("Não consegui salvar essa sessão compartilhada. Confira se a migração foi aplicada."); return false; }
     setGroupForm(null);
+    if (group && (group.due_date !== (values.due_date || null) || (group.due_time?.slice(0, 5) || null) !== (values.due_time || null))) scheduleCollaborationNotificationDispatch();
     await loadTasks().catch(() => {});
     return true;
   }
@@ -1074,7 +1079,7 @@ export default function Social({ user, view = "tasks", friendshipId = "", onBack
       const unfiledTasks = friendTasks.filter((task) => !task.group_id || !friendGroups.some((g) => g.id === task.group_id));
       const addKey = (groupId) => `${friend.friendship_id}:${groupId || "root"}`;
       const openForm = (groupId) => addingFor === addKey(groupId);
-      const taskList = (list, showEmpty = true) => list.length ? <ul className="ck-social-task-list">{[...list].sort((a, b) => a.position - b.position || String(a.created_at || "").localeCompare(String(b.created_at || ""))).map((task) => <TarefaCompartilhada key={task.id} task={task} source={{ type: "task", id: task.id, friendshipId: friend.friendship_id, groupId: task.group_id || null }} dragging={dragging} dropTarget={dropTarget} now={now} busy={savingTask} onKeyboardMove={moverPorTeclado} onPointerStart={iniciarArrastePointer} onToggle={toggleTask} onEdit={(id, fields) => editTask(id, fields)} onDelete={(item) => confirmarExclusaoTarefaAmigo(friend, item)} />)}</ul> : showEmpty ? <p className="ck-vazio-grupo">Nenhuma tarefa aqui ainda.</p> : null;
+      const taskList = (list, showEmpty = true) => list.length ? <ul className="ck-social-task-list">{[...list].sort((a, b) => a.position - b.position || String(a.created_at || "").localeCompare(String(b.created_at || ""))).map((task) => <TarefaCompartilhada key={task.id} task={task} sessionDueDate={friendGroups.find((group) => group.id === task.group_id)?.due_date || ""} sessionDueTime={friendGroups.find((group) => group.id === task.group_id)?.due_time?.slice(0, 5) || ""} source={{ type: "task", id: task.id, friendshipId: friend.friendship_id, groupId: task.group_id || null }} dragging={dragging} dropTarget={dropTarget} now={now} busy={savingTask} onKeyboardMove={moverPorTeclado} onPointerStart={iniciarArrastePointer} onToggle={toggleTask} onEdit={(id, fields) => editTask(id, fields)} onDelete={(item) => confirmarExclusaoTarefaAmigo(friend, item)} />)}</ul> : showEmpty ? <p className="ck-vazio-grupo">Nenhuma tarefa aqui ainda.</p> : null;
       const friendSource = { type: "friend", id: friend.friendship_id };
       const friendDragging = dragging?.type === "friend" && dragging.id === friend.friendship_id;
       const friendTarget = dropTarget?.type === "friend" && dropTarget.id === friend.friendship_id;
@@ -1086,7 +1091,7 @@ export default function Social({ user, view = "tasks", friendshipId = "", onBack
           {notesOpen ? <AnotacoesCompartilhadas key={`amizade:${friend.friendship_id}`} tipo="amizade" escopoId={friend.friendship_id} /> : <>
           <div className="ck-barras-topo"><button type="button" className="ck-barra-mais" onClick={() => { setAddingFor(openForm(null) ? "" : addKey(null)); setGroupForm(null); }}><span className="ck-mais" aria-hidden="true">+</span><span>Adicionar tarefa</span></button><button type="button" className="ck-barra-mais" onClick={() => { setGroupForm({ friendshipId: friend.friendship_id, group: null }); setAddingFor(""); }}><span className="ck-mais" aria-hidden="true">+</span><span>Adicionar sessão</span></button></div>
           {openForm(null) && <TaskEditor busy={savingTask} onCancel={() => setAddingFor("")} onSave={(fields) => saveTask(friend, fields)} />}
-          {groupForm?.friendshipId === friend.friendship_id && !groupForm.group && <GroupEditor onCancel={() => setGroupForm(null)} onSave={(fields) => salvarGrupo(friend.friendship_id, fields)} />}
+          {groupForm?.friendshipId === friend.friendship_id && !groupForm.group && <GroupEditor withDeadline onCancel={() => setGroupForm(null)} onSave={(fields) => salvarGrupo(friend.friendship_id, fields)} />}
           {friendGroups.map((group) => {
             const groupCollapsed = Boolean(collapsedGroups[group.id]);
             const groupTasks = friendTasks.filter((task) => task.group_id === group.id);
@@ -1099,7 +1104,7 @@ export default function Social({ user, view = "tasks", friendshipId = "", onBack
                 <button type="button" className="ck-grupo-titulo" aria-expanded={!groupCollapsed} onClick={() => setCollapsedGroups((v) => ({ ...v, [group.id]: !v[group.id] }))}><span className={`ck-seta ${!groupCollapsed ? "aberta" : ""}`}>›</span><IconeGrupo tipo={group.icon} /><span className="ck-grupo-nome">{group.name}</span><span className="ck-grupo-qtd">{groupTasks.filter((t) => t.completed).length}/{groupTasks.length}</span></button>
                 {groupForm?.group?.id !== group.id && <><button type="button" className="ck-mais ck-mais-circular" onClick={() => { setCollapsedGroups((v) => ({ ...v, [group.id]: false })); setAddingFor(openForm(group.id) ? "" : addKey(group.id)); setGroupForm(null); }} aria-label={`Adicionar tarefa em ${group.name}`} title="Adicionar tarefa"><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M8 3v10M3 8h10" /></svg></button><button type="button" className="ck-icone" title="Editar sessão" aria-label="Editar sessão" onClick={() => { setCollapsedGroups((v) => ({ ...v, [group.id]: false })); setGroupForm({ friendshipId: friend.friendship_id, group }); }}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M11 2.5l2.5 2.5L5.5 13H3v-2.5L11 2.5z" /></svg></button><button type="button" className="ck-icone ck-social-remove" title="Apagar sessão" aria-label="Apagar sessão" onClick={() => setConfirm({ type: "group", item: group, title: "Apagar sessão?", message: `A sessão “${group.name}” será removida. As tarefas ficam em “Sem sessão” para vocês dois.`, action: "Apagar sessão" })}>×</button></>}
               </header>
-              {!groupCollapsed && <div className="ck-social-session-body">{groupForm?.group?.id === group.id && <GroupEditor group={group} onCancel={() => setGroupForm(null)} onSave={(fields) => salvarGrupo(friend.friendship_id, fields, group)} />}{openForm(group.id) && <TaskEditor groupId={group.id} busy={savingTask} onCancel={() => setAddingFor("")} onSave={(fields) => saveTask(friend, fields)} />}{taskList(groupTasks)}</div>}
+              {!groupCollapsed && <div className="ck-social-session-body">{groupForm?.group?.id === group.id && <GroupEditor group={group} withDeadline onCancel={() => setGroupForm(null)} onSave={(fields) => salvarGrupo(friend.friendship_id, fields, group)} />}{openForm(group.id) && <TaskEditor groupId={group.id} sessionDueDate={group.due_date || ""} sessionDueTime={group.due_time?.slice(0, 5) || ""} busy={savingTask} onCancel={() => setAddingFor("")} onSave={(fields) => saveTask(friend, fields)} />}{taskList(groupTasks)}</div>}
             </section>;
           })}
           {friendGroups.length === 0 && friendTasks.length === 0 && <p className="ck-intro-organizacao">Lembre-se: cresça no seu tempo</p>}

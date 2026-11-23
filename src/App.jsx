@@ -26,7 +26,7 @@ const STORAGE_PRAZOS = "checklist:avisosPrazo";
 const STORAGE_BG = "checklist:fundo";
 const STORAGE_BLUR = "checklist:desfoqueFundo"; // chave nova: o padrão agora é 10px
 const DESFOQUE_PADRAO = 10;
-const NOME_RODAPE = "Moony"; // aparece no rodapé; ao passar o mouse mostra o nome secreto
+const NOME_RODAPE = "Moony";
 const NOME_SECRETO = "Luna";
 const EMAIL_CONTATO = "sayaokaua@gmail.com";
 const STORAGE_INTERVALO = "checklist:intervaloAviso"; // minutos entre os lembretes
@@ -38,7 +38,7 @@ const STORAGE_PREF_NOTIFICACOES = "checklist:preferenciasNotificacoes";
 const STORAGE_AVISOS_AGENDA_FECHADOS = "checklist:avisosAgendaFechados";
 const JANELA_AVISOS_PADRAO = { ativa: false, inicio: "08:00", fim: "22:00" };
 const PREFERENCIAS_NOTIFICACAO_PADRAO = { checklistSummary: true, deadlines: true, collaboration: true };
-const APP_VERSION = "1.0";
+const APP_VERSION = "1.0.2";
 function normalizarIntervaloAviso(valor) {
   const minutos = Number(valor);
   return Number.isInteger(minutos) && minutos >= 5 && minutos <= 1440 ? minutos : 30;
@@ -1194,6 +1194,7 @@ function EditarRotina({ rotina, grupos, onSalvar, onCancelar }) {
   const [configRepeticao, setConfigRepeticao] = useState(configRecorrenciaPadrao(rotina.recorrencia, rotina.cada));
   const [hora, setHora] = useState(rotina.hora || "00:00");
   const [limite, setLimite] = useState(rotina.limite || (rotina.limiteHora ? iso(new Date()) : ""));
+  const [limiteDaSessao, setLimiteDaSessao] = useState(Boolean(rotina.limiteDaSessao));
   const [limiteHora, setLimiteHora] = useState(rotina.limiteHora || "");
   const [proxima, setProxima] = useState(rotina.proxima || iso(new Date()));
   const [descricao, setDescricao] = useState(rotina.descricao || "");
@@ -1216,7 +1217,7 @@ function EditarRotina({ rotina, grupos, onSalvar, onCancelar }) {
     if (!texto.trim() || !proxima) return;
     const recorrencia = recorrenciaSelecionada(repeticao, configRepeticao);
     if (recorrencia?.tipo === "semana" && !recorrencia.diasSemana?.length) return;
-    onSalvar({ texto: texto.trim(), cada: intervaloLegado(recorrencia), recorrencia, hora: hora || "00:00", limite: limite || (limiteHora ? iso(new Date()) : ""), limiteHora, proxima, descricao: descricao.trim(), comentario: comentario.trim(), grupoId: grupoId || null });
+    onSalvar({ texto: texto.trim(), cada: intervaloLegado(recorrencia), recorrencia, hora: hora || "00:00", limite: limite || (limiteHora ? iso(new Date()) : ""), limiteDaSessao, limiteHora, proxima, descricao: descricao.trim(), comentario: comentario.trim(), grupoId: grupoId || null });
   }
 
   return <form ref={formularioRef} className="ck-form-grupo ck-form-rotina" onSubmit={enviar} onBlur={(e) => { const cartao = e.currentTarget.closest("li.ck-item-editando") || e.currentTarget; if (e.relatedTarget && !cartao.contains(e.relatedTarget)) onCancelar(); }} onKeyDown={(e) => { if (e.key === "Escape") onCancelar(); else if (e.target.matches("textarea") && !e.target.classList.contains("ck-comentario-input")) enviarAoEnter(e); }}>
@@ -1225,8 +1226,8 @@ function EditarRotina({ rotina, grupos, onSalvar, onCancelar }) {
       <SeletorRepeticao value={repeticao} onChange={setRepeticao} config={configRepeticao} onConfigChange={setConfigRepeticao} />
       <Hora24 value={hora} onChange={setHora} rotulo="Horário da rotina" />
     </div>
-    <CampoPrazo limite={limite} hora={limiteHora} onLimite={setLimite} onHora={setLimiteHora} />
-    <select value={grupoId} onChange={(e) => setGrupoId(e.target.value)} aria-label="Sessão das próximas tarefas">
+    <CampoPrazo limite={limite} hora={limiteHora} onLimite={(valor) => { const group = grupos.find((g) => g.id === grupoId); const deadline = group?.limite || ""; const deadlineTime = group?.limiteHora || ""; setLimite(valor || deadline || (limiteHora ? iso(new Date()) : "")); setLimiteDaSessao(Boolean((deadline || deadlineTime) && (!valor || valor === deadline) && (limiteHora || "") === deadlineTime)); }} onHora={(valor) => { const group = grupos.find((g) => g.id === grupoId); setLimiteHora(valor); setLimiteDaSessao(Boolean((group?.limite || group?.limiteHora) && limite === (group?.limite || "") && (valor || "") === (group?.limiteHora || ""))); if (valor && !limite) setLimite(iso(new Date())); }} />
+    <select value={grupoId} onChange={(e) => { const nextId = e.target.value; const group = grupos.find((g) => g.id === nextId); const deadline = group?.limite || ""; const deadlineTime = group?.limiteHora || ""; setGrupoId(nextId); if (deadline || deadlineTime) { setLimite(deadline || iso(new Date())); setLimiteHora(deadlineTime); setLimiteDaSessao(true); } else if (limiteDaSessao) { setLimite(""); setLimiteHora(""); setLimiteDaSessao(false); } }} aria-label="Sessão das próximas tarefas">
       <option value="">Sem sessão</option>
       {grupos.map((g) => <option key={g.id} value={g.id}>{g.nome}</option>)}
     </select>
@@ -1364,8 +1365,6 @@ async function mostrarNotificacao(titulo, opcoes = {}) {
   }
 }
 
-// Email do rodapé: clicar copia o endereço (nem todo computador tem programa de email configurado,
-// e nesses o mailto: não faz nada)
 function Contato() {
   const [copiado, setCopiado] = useState(false);
 
@@ -1374,17 +1373,29 @@ function Contato() {
     try {
       await navigator.clipboard.writeText(EMAIL_CONTATO);
     } catch {
-      window.location.href = `mailto:${EMAIL_CONTATO}`; // sem permissão pra copiar: tenta abrir o programa de email
+      window.location.href = `mailto:${EMAIL_CONTATO}`;
       return;
     }
     setCopiado(true);
     setTimeout(() => setCopiado(false), 2000);
   }
 
+  return <a href={`mailto:${EMAIL_CONTATO}`} onClick={copiar} title="Clique para copiar o email">{copiado ? "email copiado ✓" : EMAIL_CONTATO}</a>;
+}
+
+function Rodape({ mobile = false }) {
   return (
-    <a href={`mailto:${EMAIL_CONTATO}`} onClick={copiar} title="Clique para copiar o email">
-      {copiado ? "email copiado ✓" : EMAIL_CONTATO}
-    </a>
+    <footer className={`ck-rodape ${mobile ? "ck-rodape-mobile" : "ck-rodape-desktop"}`}>
+      <p>
+        feito por{" "}
+        <span className="ck-nome-rodape" data-secreto={NOME_SECRETO} tabIndex={0}>{NOME_RODAPE}</span>
+        <span aria-hidden="true"> · </span>
+        <span>© Kauã Sayão — 2026</span>
+        <span aria-hidden="true"> · </span>
+        <span>V{APP_VERSION}</span>
+      </p>
+      <p>Reporte bugs ou deixe feedback em <Contato /></p>
+    </footer>
   );
 }
 
@@ -1598,7 +1609,7 @@ function alvoProps(ordem, tipo, id, grupo) {
 }
 
 /* Formulário para editar uma tarefa já criada */
-function EditarTarefa({ tarefa, onSalvar, onCancelar, incluirDataAgenda = false }) {
+function EditarTarefa({ tarefa, onSalvar, onCancelar, incluirDataAgenda = false, prazoSessao = "", prazoHoraSessao = "" }) {
   const formularioRef = useRef(null);
   const cancelarRef = useRef(onCancelar);
   const [texto, setTexto] = useState(tarefa.texto);
@@ -1607,6 +1618,7 @@ function EditarTarefa({ tarefa, onSalvar, onCancelar, incluirDataAgenda = false 
   const [hora, setHora] = useState(tarefa.repeteHora || "00:00");
   const [limite, setLimite] = useState(tarefa.limite || (tarefa.limiteHora ? iso(new Date()) : ""));
   const [limiteHora, setLimiteHora] = useState(tarefa.limiteHora || "");
+  const [limiteDaSessao, setLimiteDaSessao] = useState(Boolean(tarefa.limiteDaSessao));
   const [descricao, setDescricao] = useState(tarefa.descricao || "");
   const [comentario, setComentario] = useState(tarefa.comentario || "");
   const [agendadaPara, setAgendadaPara] = useState(tarefa.agendadaPara || iso(new Date()));
@@ -1632,7 +1644,7 @@ function EditarTarefa({ tarefa, onSalvar, onCancelar, incluirDataAgenda = false 
           const recorrencia = recorrenciaSelecionada(repete, configRepeticao);
           if (recorrencia?.tipo === "semana" && !recorrencia.diasSemana?.length) return;
           onSalvar(texto.trim(), intervaloLegado(recorrencia), hora || "00:00", {
-          limite: limite || (limiteHora ? iso(new Date()) : ""), limiteHora, descricao, comentario, recorrencia,
+          limite: limite || (limiteHora ? iso(new Date()) : ""), limiteHora, limiteDaSessao, descricao, comentario, recorrencia,
           ...(incluirDataAgenda ? { agendadaPara } : {}),
         });
         }
@@ -1654,7 +1666,7 @@ function EditarTarefa({ tarefa, onSalvar, onCancelar, incluirDataAgenda = false 
       {repete !== "0" && (
         <Hora24 value={hora} onChange={setHora} rotulo="Horário em que a tarefa volta" />
       )}
-      <CampoPrazo limite={limite} hora={limiteHora} onLimite={setLimite} onHora={setLimiteHora} />
+      <CampoPrazo limite={limite} hora={limiteHora} onLimite={(valor) => { setLimite(valor || prazoSessao || ""); setLimiteDaSessao(Boolean(prazoSessao && (!valor || valor === prazoSessao) && (limiteHora || "") === (prazoHoraSessao || ""))); }} onHora={(valor) => { setLimiteHora(valor); setLimiteDaSessao(Boolean(prazoSessao && limite === prazoSessao && (valor || "") === (prazoHoraSessao || ""))); }} />
       <textarea
         className="ck-campo-largo"
         value={descricao}
@@ -1716,25 +1728,28 @@ function SeletorIconeSessao({ value, onChange }) {
   </div>;
 }
 
-function EditarNomeSessao({ sessao, onSalvar, onCancelar }) {
+function EditarNomeSessao({ sessao, onSalvar, onCancelar, mostrarPrazo = false, fecharFora = true, rotuloAcao = "Salvar nome da sessão", placeholder = "" }) {
   const formRef = useRef(null);
   const [nome, setNome] = useState(sessao.nome);
   const [icone, setIcone] = useState(sessao.icone || "butterfly");
-  useFecharFora(formRef, true, onCancelar);
-  return <form ref={formRef} className="ck-editar-sessao" onSubmit={(e) => { e.preventDefault(); if (nome.trim()) onSalvar(nome.trim(), icone); }} onKeyDown={(e) => { if (e.key === "Escape") onCancelar(); }}>
+  const [prazo, setPrazo] = useState(sessao.limite || "");
+  const [horaPrazo, setHoraPrazo] = useState(sessao.limiteHora || "");
+  useFecharFora(formRef, fecharFora, onCancelar);
+  return <form ref={formRef} className={`ck-editar-sessao${mostrarPrazo ? " ck-editar-sessao-com-prazo" : ""}`} onSubmit={(e) => { e.preventDefault(); if (nome.trim()) onSalvar(nome.trim(), icone, prazo, horaPrazo); }} onKeyDown={(e) => { if (e.key === "Escape") onCancelar(); }}>
     <SeletorIconeSessao value={icone} onChange={setIcone} />
-    <input autoFocus type="text" value={nome} onChange={(e) => setNome(e.target.value)} maxLength={60} required aria-label="Nome da sessão" />
-    <button type="submit" className="ck-icone" title="Salvar nome da sessão" aria-label="Salvar nome da sessão" disabled={!nome.trim()}><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m3 8 3.2 3.2L13 4.5" /></svg></button>
+    <input autoFocus type="text" value={nome} onChange={(e) => setNome(e.target.value)} maxLength={60} required aria-label="Nome da sessão" placeholder={placeholder} />
+    {mostrarPrazo && <div className="ck-sessao-prazo"><span className="ck-prazo-rotulo">Prazo</span><div className="ck-sessao-prazo-controles"><DiaMes value={prazo} onChange={(value) => setPrazo(value || (horaPrazo ? iso(new Date()) : ""))} rotulo="Prazo da sessão" /><Hora24 value={horaPrazo} onChange={(value) => { setHoraPrazo(value); if (value && !prazo) setPrazo(iso(new Date())); }} opcional rotulo="Horário do prazo da sessão (opcional)" /></div></div>}
+    <button type="submit" className="ck-icone" title={rotuloAcao} aria-label={rotuloAcao} disabled={!nome.trim()}><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="m3 8 3.2 3.2L13 4.5" /></svg></button>
     <button type="button" className="ck-icone" title="Cancelar" aria-label="Cancelar edição do nome" onClick={onCancelar}><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M3.5 3.5l9 9m0-9-9 9" /></svg></button>
   </form>;
 }
 
-function ListaTarefas({ tarefas, alternar, apagar, mudarPrioridade, ordem, edicao, descricoesAbertas, alternarDescricao }) {
+function ListaTarefas({ tarefas, alternar, apagar, mudarPrioridade, ordem, edicao, descricoesAbertas, alternarDescricao, grupos = [] }) {
   return (
     <ul className="ck-lista">
       {tarefas.map((t) => edicao.id === t.id ? (
         <li key={t.id} className="editando">
-          <EditarTarefa tarefa={t} onSalvar={(texto, dias, hora, prazo) => edicao.salvar(t.id, texto, dias, hora, prazo)} onCancelar={edicao.cancelar} />
+          <EditarTarefa tarefa={t} prazoSessao={grupos.find((grupo) => grupo.id === t.grupoId)?.limite || ""} prazoHoraSessao={grupos.find((grupo) => grupo.id === t.grupoId)?.limiteHora || ""} onSalvar={(texto, dias, hora, prazo) => edicao.salvar(t.id, texto, dias, hora, prazo)} onCancelar={edicao.cancelar} />
         </li>
       ) : (
         <li
@@ -1820,7 +1835,7 @@ function FormularioAnotacao({ form, onSalvar, onChange, onCancelar }) {
   );
 }
 
-function ConfiguracoesVisuais({ tema, setTema, modoTablet, setModoTablet, googleCalendarConnected, setGoogleCalendarConnected, desfoque, setDesfoque, ajusteFundo, setAjusteFundo, escolherFundo, fundo, removerFundo, erroFundo, janelaAvisos, setJanelaAvisos, excluirSemConfirmacao, setExcluirSemConfirmacao, notificationPreferences, setNotificationPreferences, iniciarTutorial }) {
+function ConfiguracoesVisuais({ tema, setTema, modoTablet, onModoTabletChange, avisoModoTablet, googleCalendarConnected, setGoogleCalendarConnected, desfoque, setDesfoque, ajusteFundo, setAjusteFundo, escolherFundo, fundo, removerFundo, erroFundo, janelaAvisos, setJanelaAvisos, excluirSemConfirmacao, setExcluirSemConfirmacao, notificationPreferences, setNotificationPreferences, iniciarTutorial }) {
   return <div className="ck-config-preferencias">
     <section className="ck-pref-card">
       <h3>Tema</h3>
@@ -1850,12 +1865,13 @@ function ConfiguracoesVisuais({ tema, setTema, modoTablet, setModoTablet, google
       <label className="ck-limite-horario"><input type="checkbox" checked={notificationPreferences.collaboration} onChange={(e) => setNotificationPreferences((p) => ({ ...p, collaboration: e.target.checked }))} /><span>Atualizações de tarefas com amigos e equipes</span></label>
     </section>
     <section className="ck-pref-card">
-      <h3>Modo tablet</h3>
-      <p>Em telas menores, mostra checklist e calendário lado a lado quando o aparelho estiver na horizontal. A rotação continua sendo controlada pelo aparelho.</p>
+      <h3>Rotação da tela</h3>
+      <p>Permite usar o Crysalis na horizontal em celulares e tablets. A rotação automática do aparelho precisa estar ativada.</p>
       <label className="ck-limite-horario">
-        <input type="checkbox" checked={modoTablet} onChange={(e) => setModoTablet(e.target.checked)} />
-        <span>Usar layout horizontal em tablets</span>
+        <input type="checkbox" checked={modoTablet} onChange={(e) => onModoTabletChange(e.target.checked)} />
+        <span>Ativar modo horizontal</span>
       </label>
+      {avisoModoTablet && <small role="status">{avisoModoTablet}</small>}
     </section>
     <GoogleCalendarSettings connected={googleCalendarConnected} onConnectedChange={setGoogleCalendarConnected} />
     <section className="ck-pref-card">
@@ -2155,6 +2171,7 @@ function Checklist({ usuario }) {
   const [desfoque, setDesfoque] = useState(() => lerStorage(STORAGE_BLUR, DESFOQUE_PADRAO));
   const [ajusteFundo, setAjusteFundo] = useState(() => lerStorage(STORAGE_BG_AJUSTE, "preencher"));
   const [modoTablet, setModoTablet] = useState(() => lerStorage(STORAGE_MODO_TABLET, false) === true);
+  const [avisoModoTablet, setAvisoModoTablet] = useState("");
   const [pushAtivo, setPushAtivo] = useState(false); // este aparelho recebe avisos do servidor (app fechado)
   const [avisoPush, setAvisoPush] = useState("");
   const [intervaloAviso, setIntervaloAviso] = useState(() => normalizarIntervaloAviso(lerStorage(STORAGE_INTERVALO, 30)));
@@ -2173,6 +2190,24 @@ function Checklist({ usuario }) {
     salvarStorage(STORAGE_TEMA, tema);
   }, [tema]);
   useEffect(() => { salvarStorage(STORAGE_MODO_TABLET, modoTablet); }, [modoTablet]);
+  async function alterarModoTablet(ativado) {
+    setModoTablet(ativado);
+    setAvisoModoTablet("");
+    const orientacao = window.screen?.orientation;
+    if (!ativado) {
+      try { orientacao?.unlock?.(); } catch { /* alguns navegadores não implementam unlock */ }
+      return;
+    }
+    if (typeof orientacao?.lock !== "function") {
+      setAvisoModoTablet("Este navegador não consegue virar a tela sozinho. Ative a rotação automática do aparelho e gire o celular.");
+      return;
+    }
+    try {
+      await orientacao.lock("landscape");
+    } catch {
+      setAvisoModoTablet("O navegador bloqueou a rotação automática. Ative a rotação do aparelho e gire o celular; o layout horizontal continuará disponível.");
+    }
+  }
   useEffect(() => {
     let ativo = true;
     async function conferirVersao() {
@@ -2200,12 +2235,14 @@ function Checklist({ usuario }) {
   const [sobre, setSobre] = useState(null);
   const [nomeGrupo, setNomeGrupo] = useState("");
   const [iconeGrupo, setIconeGrupo] = useState("butterfly");
+  const [limiteGrupoNovo, setLimiteGrupoNovo] = useState("");
+  const [horaLimiteGrupoNovo, setHoraLimiteGrupoNovo] = useState("");
   const [sessaoEmEdicao, setSessaoEmEdicao] = useState(null);
   const [criandoSolta, setCriandoSolta] = useState(false);
   const [criandoGrupo, setCriandoGrupo] = useState(false);
   const sessaoChecklistNovaRef = useRef(null);
   const [grupoAdd, setGrupoAdd] = useState(null); // sessão com campo aberto
-  useFecharFora(sessaoChecklistNovaRef, criandoGrupo, () => { setCriandoGrupo(false); setNomeGrupo(""); });
+  useFecharFora(sessaoChecklistNovaRef, criandoGrupo, cancelarCriacaoGrupo);
   useFecharFora(sessaoAnotacaoNovaRef, criandoSessaoAnotacao, () => { setCriandoSessaoAnotacao(false); setNomeSessaoAnotacao(""); });
   const [notificar, setNotificar] = useState(() =>
     lerStorage(STORAGE_NOTIFY, false)
@@ -2552,7 +2589,7 @@ function Checklist({ usuario }) {
             id: novoId(), texto: r.texto, feita: false, meio: false,
             grupoId: r.grupoId, prioridade: r.prioridade || 0,
             rotinaId: r.id, repeteDias: r.cada, repeteHora: r.hora || "00:00", recorrencia: r.recorrencia,
-            limite: (r.limite || r.limiteHora) ? r.proxima : "", limiteHora: r.limiteHora || "", criadaEm: Date.now(),
+            limite: r.limiteDaSessao ? r.limite : (r.limite || r.limiteHora) ? r.proxima : "", limiteDaSessao: Boolean(r.limiteDaSessao), limiteHora: r.limiteDaSessao ? "" : r.limiteHora || "", criadaEm: Date.now(),
             descricao: r.descricao || "", comentario: r.comentario || "",
           })),
       ]);
@@ -2819,6 +2856,11 @@ function Checklist({ usuario }) {
 
   /* tarefas */
   function adicionarTarefa(texto, grupoId = null, repetirDias = 0, hora = "00:00", prazo = {}) {
+    const prazoSessao = grupos.find((grupo) => grupo.id === grupoId)?.limite || "";
+    const horaPrazoSessao = grupos.find((grupo) => grupo.id === grupoId)?.limiteHora || "";
+    const limiteTarefa = prazo.limite || prazoSessao;
+    const limiteHoraTarefa = prazo.limiteHora || horaPrazoSessao;
+    const limiteHerdado = Boolean(prazoSessao && !prazo.limite && !prazo.limiteHora);
     let rotinaId;
     const recorrencia = prazo.recorrencia || recorrenciaSimples(repetirDias);
     const cada = intervaloLegado(recorrencia);
@@ -2828,13 +2870,13 @@ function Checklist({ usuario }) {
         ...atual,
         { id: rotinaId, texto, cada, recorrencia, hora, grupoId, prioridade: 0,
           proxima: proximaDataRotina(iso(new Date()), recorrencia), descricao: (prazo.descricao || "").trim(), comentario: (prazo.comentario || "").trim(),
-          limite: prazo.limite || "", limiteHora: prazo.limite ? prazo.limiteHora || "" : "" },
+          limite: limiteTarefa, limiteDaSessao: limiteHerdado, limiteHora: limiteTarefa ? limiteHoraTarefa : "" },
       ]);
     }
     setTarefas((atual) => [
       ...atual,
       { id: novoId(), texto, feita: false, grupoId, rotinaId, repeteDias: cada, repeteHora: hora, recorrencia, criadaEm: Date.now(),
-        limite: prazo.limite || "", limiteHora: prazo.limite ? prazo.limiteHora || "" : "",
+        limite: limiteTarefa, limiteDaSessao: limiteHerdado, limiteHora: limiteTarefa ? limiteHoraTarefa : "",
         descricao: (prazo.descricao || "").trim(), comentario: (prazo.comentario || "").trim() },
     ]);
   }
@@ -2928,18 +2970,25 @@ function Checklist({ usuario }) {
       setTarefas((atual) => atual.map((t) => t.rotinaId === id ? { ...t, rotinaId: null, repeteDias: 0, repeteHora: undefined, recorrencia: null } : t));
       return;
     }
-    setRotinas((atual) => atual.map((r) => r.id === id ? { ...r, ...campos } : r));
+    const rotinaAtual = rotinas.find((r) => r.id === id);
+    const grupoPrazo = grupos.find((g) => g.id === campos.grupoId);
+    const prazoGrupo = grupoPrazo?.limite || "";
+    const horaGrupo = grupoPrazo?.limiteHora || "";
+    const deveHerdar = Boolean((prazoGrupo || horaGrupo) && (campos.grupoId !== rotinaAtual?.grupoId || campos.limiteDaSessao));
+    const dados = { ...campos, limite: deveHerdar ? (prazoGrupo || iso(new Date())) : campos.limite || "", limiteHora: deveHerdar ? horaGrupo : campos.limite ? campos.limiteHora || "" : "", limiteDaSessao: deveHerdar };
+    setRotinas((atual) => atual.map((r) => r.id === id ? { ...r, ...dados } : r));
     setTarefas((atual) => atual.map((t) => t.rotinaId === id && !t.feita ? {
       ...t,
       texto: campos.texto,
       repeteDias: campos.cada,
       repeteHora: campos.hora,
       recorrencia: campos.recorrencia,
-      limite: campos.limite || "",
-      limiteHora: campos.limite ? campos.limiteHora || "" : "",
+      limite: dados.limite || "",
+      limiteDaSessao: dados.limiteDaSessao,
+      limiteHora: dados.limiteHora,
       descricao: campos.descricao,
       comentario: campos.comentario || "",
-      grupoId: campos.grupoId,
+      grupoId: dados.grupoId,
     } : t));
   }
 
@@ -2992,7 +3041,15 @@ function Checklist({ usuario }) {
       if (destinoGrupo !== undefined) {
         const origem = tarefas.find((x) => x.id === idA);
         if ((origem?.grupoId || null) === destinoGrupo) moverItem(setTarefas, idA, idB);
-        else setTarefas((xs) => xs.map((x) => x.id === idA ? { ...x, grupoId: destinoGrupo } : x));
+        else {
+          const prazoDestino = grupos.find((grupo) => grupo.id === destinoGrupo)?.limite || "";
+          const horaDestino = grupos.find((grupo) => grupo.id === destinoGrupo)?.limiteHora || "";
+          const atualizado = { ...origem, grupoId: destinoGrupo };
+          if (prazoDestino) Object.assign(atualizado, { limite: prazoDestino, limiteHora: horaDestino, limiteDaSessao: true });
+          else if (origem?.limiteDaSessao) Object.assign(atualizado, { limite: "", limiteHora: "", limiteDaSessao: false });
+          setTarefas((xs) => xs.map((x) => x.id === idA ? atualizado : x));
+          if (origem?.rotinaId) setRotinas((xs) => xs.map((x) => x.id === origem.rotinaId ? { ...x, grupoId: destinoGrupo, ...(prazoDestino ? { limite: prazoDestino, limiteHora: horaDestino, limiteDaSessao: true } : origem.limiteDaSessao ? { limite: "", limiteHora: "", limiteDaSessao: false } : {}) } : x));
+        }
       }
       else moverItem(setTarefas, idA, idB);
     }
@@ -3047,7 +3104,7 @@ function Checklist({ usuario }) {
       setRotinas((a) =>
         a.map((r) =>
           r.id === rotina.id
-            ? { ...r, texto, cada, recorrencia, hora, limite: prazo.limite || "", limiteHora: prazo.limite ? prazo.limiteHora || "" : "", descricao: (prazo.descricao || "").trim(), comentario: (prazo.comentario || "").trim(), proxima: JSON.stringify(recorrencia) === JSON.stringify(r.recorrencia || recorrenciaSimples(r.cada)) ? r.proxima : proximaDataRotina(iso(new Date()), recorrencia) }
+              ? { ...r, texto, cada, recorrencia, hora, limite: prazo.limite || "", limiteDaSessao: Boolean(prazo.limiteDaSessao), limiteHora: prazo.limite && !prazo.limiteDaSessao ? prazo.limiteHora || "" : "", descricao: (prazo.descricao || "").trim(), comentario: (prazo.comentario || "").trim(), proxima: JSON.stringify(recorrencia) === JSON.stringify(r.recorrencia || recorrenciaSimples(r.cada)) ? r.proxima : proximaDataRotina(iso(new Date()), recorrencia) }
             : r
         )
       );
@@ -3055,7 +3112,7 @@ function Checklist({ usuario }) {
       rotinaId = novoId(); // passou a repetir
       setRotinas((a) => [
         ...a,
-        { id: rotinaId, texto, cada, recorrencia, hora, limite: prazo.limite || "", limiteHora: prazo.limite ? prazo.limiteHora || "" : "", descricao: (prazo.descricao || "").trim(), comentario: (prazo.comentario || "").trim(), grupoId: t.grupoId || null, prioridade: t.prioridade || 0, proxima: proximaDataRotina(t.agendadaPara || iso(new Date()), recorrencia) },
+        { id: rotinaId, texto, cada, recorrencia, hora, limite: prazo.limite || "", limiteDaSessao: Boolean(prazo.limiteDaSessao), limiteHora: prazo.limite && !prazo.limiteDaSessao ? prazo.limiteHora || "" : "", descricao: (prazo.descricao || "").trim(), comentario: (prazo.comentario || "").trim(), grupoId: t.grupoId || null, prioridade: t.prioridade || 0, proxima: proximaDataRotina(t.agendadaPara || iso(new Date()), recorrencia) },
       ]);
     } else if (rotina) {
       setRotinas((a) => a.filter((r) => r.id !== rotina.id)); // parou de repetir
@@ -3064,7 +3121,7 @@ function Checklist({ usuario }) {
     setTarefas((a) =>
       a.map((x) => (x.id === id ? {
         ...x, texto, repeteDias: cada, repeteHora: recorrencia ? hora : undefined, recorrencia, rotinaId, criadaEm: x.criadaEm || Number(x.id) || Date.now(),
-        limite: prazo.limite || "", limiteHora: prazo.limite ? prazo.limiteHora || "" : "",
+        limite: prazo.limite || "", limiteDaSessao: Boolean(prazo.limiteDaSessao), limiteHora: prazo.limite && !prazo.limiteDaSessao ? prazo.limiteHora || "" : "",
         descricao: (prazo.descricao || "").trim(),
         comentario: (prazo.comentario || "").trim(),
         ...(prazo.agendadaPara ? { agendadaPara: prazo.agendadaPara } : {}),
@@ -3224,23 +3281,48 @@ function Checklist({ usuario }) {
   }
 
   /* sessões */
-  function criarGrupo(e) {
-    e.preventDefault();
-    const limpo = nomeGrupo.trim();
-    if (!limpo) return;
-    setGrupos((atual) => [...atual, { id: novoId(), nome: limpo, icone: iconeGrupo, aberta: true }]);
+  function cancelarCriacaoGrupo() {
+    setCriandoGrupo(false);
     setNomeGrupo("");
     setIconeGrupo("butterfly");
-    setCriandoGrupo(false);
+    setLimiteGrupoNovo("");
+    setHoraLimiteGrupoNovo("");
+  }
+
+  function criarGrupo(e, campos = null) {
+    e?.preventDefault();
+    const limpo = (campos?.nome ?? nomeGrupo).trim();
+    if (!limpo) return;
+    const limitePrazo = campos?.prazo ?? limiteGrupoNovo;
+    const horaPrazo = campos?.horaPrazo ?? horaLimiteGrupoNovo;
+    const limite = limitePrazo || (horaPrazo ? iso(new Date()) : "");
+    setGrupos((atual) => [...atual, { id: novoId(), nome: limpo, icone: campos?.icone ?? iconeGrupo, aberta: true, limite, limiteHora: limite ? horaPrazo : "" }]);
+    cancelarCriacaoGrupo();
   }
 
   function iniciarEdicaoSessao(tipo, sessao) {
-    setSessaoEmEdicao({ tipo, id: sessao.id, nome: sessao.nome, icone: sessao.icone || "butterfly" });
+    setSessaoEmEdicao({ tipo, id: sessao.id, nome: sessao.nome, icone: sessao.icone || "butterfly", limite: sessao.limite || "", limiteHora: sessao.limiteHora || "" });
   }
 
-  function salvarNomeSessao(tipo, id, nome, icone) {
+  function salvarNomeSessao(tipo, id, nome, icone, limite = "", limiteHora = "") {
     const atualizar = tipo === "checklist" ? setGrupos : setSessoesAnotacoes;
-    atualizar((itens) => itens.map((sessao) => sessao.id === id ? { ...sessao, nome, ...(icone ? { icone } : {}) } : sessao));
+    if (tipo === "checklist") {
+      const anterior = grupos.find((sessao) => sessao.id === id);
+      const prazoAnterior = anterior?.limite || "";
+      const horaAnterior = anterior?.limiteHora || "";
+      const novoLimite = limite || (limiteHora ? iso(new Date()) : "");
+      atualizar((itens) => itens.map((sessao) => sessao.id === id ? { ...sessao, nome, limite: novoLimite, limiteHora: novoLimite ? limiteHora || "" : "", ...(icone ? { icone } : {}) } : sessao));
+      if (anterior && (prazoAnterior !== novoLimite || horaAnterior !== (novoLimite ? limiteHora || "" : ""))) {
+        setTarefas((itens) => itens.map((tarefa) => {
+          if (tarefa.grupoId !== id || ((prazoAnterior || horaAnterior) && !tarefa.limiteDaSessao)) return tarefa;
+          return { ...tarefa, limite: novoLimite, limiteHora: novoLimite ? limiteHora || "" : "", limiteDaSessao: Boolean(novoLimite) };
+        }));
+        setRotinas((itens) => itens.map((rotina) => {
+          if (rotina.grupoId !== id || ((prazoAnterior || horaAnterior) && !rotina.limiteDaSessao)) return rotina;
+          return { ...rotina, limite: novoLimite, limiteHora: novoLimite ? limiteHora || "" : "", limiteDaSessao: Boolean(novoLimite) };
+        }));
+      }
+    } else atualizar((itens) => itens.map((sessao) => sessao.id === id ? { ...sessao, nome, ...(icone ? { icone } : {}) } : sessao));
     setSessaoEmEdicao(null);
   }
 
@@ -3273,8 +3355,8 @@ function Checklist({ usuario }) {
       action: "Excluir sessão",
       confirm: () => {
         setGrupos((atual) => atual.filter((item) => item.id !== grupo.id));
-        setTarefas((atual) => atual.map((item) => item.grupoId === grupo.id ? { ...item, grupoId: null } : item));
-        setRotinas((atual) => atual.map((item) => item.grupoId === grupo.id ? { ...item, grupoId: null } : item));
+        setTarefas((atual) => atual.map((item) => item.grupoId === grupo.id ? { ...item, grupoId: null, ...(item.limiteDaSessao ? { limite: "", limiteHora: "", limiteDaSessao: false } : {}) } : item));
+        setRotinas((atual) => atual.map((item) => item.grupoId === grupo.id ? { ...item, grupoId: null, ...(item.limiteDaSessao ? { limite: "", limiteHora: "", limiteDaSessao: false } : {}) } : item));
       },
     });
   }
@@ -3423,7 +3505,7 @@ function Checklist({ usuario }) {
           <button type="button" role="tab" className="ck-aba" aria-selected={abaConfiguracoes === "preferencias"} onClick={() => setAbaConfiguracoes("preferencias")}>Preferências</button>
           <button type="button" role="tab" className="ck-aba" aria-selected={abaConfiguracoes === "conta"} onClick={() => setAbaConfiguracoes("conta")}>Conta</button>
         </div>
-        {abaConfiguracoes === "preferencias" ? <ConfiguracoesVisuais tema={tema} setTema={setTema} modoTablet={modoTablet} setModoTablet={setModoTablet} googleCalendarConnected={googleCalendarConnected} setGoogleCalendarConnected={setGoogleCalendarConnected} desfoque={desfoque} setDesfoque={setDesfoque} ajusteFundo={ajusteFundo} setAjusteFundo={setAjusteFundo} escolherFundo={escolherFundo} fundo={fundo} removerFundo={removerFundo} erroFundo={erroFundo} janelaAvisos={janelaAvisos} setJanelaAvisos={setJanelaAvisos} excluirSemConfirmacao={excluirSemConfirmacao} setExcluirSemConfirmacao={setExcluirSemConfirmacao} notificationPreferences={notificationPreferences} setNotificationPreferences={setNotificationPreferences} iniciarTutorial={iniciarTutorial} /> : <section className="ck-conta-config">
+        {abaConfiguracoes === "preferencias" ? <ConfiguracoesVisuais tema={tema} setTema={setTema} modoTablet={modoTablet} onModoTabletChange={alterarModoTablet} avisoModoTablet={avisoModoTablet} googleCalendarConnected={googleCalendarConnected} setGoogleCalendarConnected={setGoogleCalendarConnected} desfoque={desfoque} setDesfoque={setDesfoque} ajusteFundo={ajusteFundo} setAjusteFundo={setAjusteFundo} escolherFundo={escolherFundo} fundo={fundo} removerFundo={removerFundo} erroFundo={erroFundo} janelaAvisos={janelaAvisos} setJanelaAvisos={setJanelaAvisos} excluirSemConfirmacao={excluirSemConfirmacao} setExcluirSemConfirmacao={setExcluirSemConfirmacao} notificationPreferences={notificationPreferences} setNotificationPreferences={setNotificationPreferences} iniciarTutorial={iniciarTutorial} /> : <section className="ck-conta-config">
           <div className="ck-conta-identidade"><span className="ck-conta-avatar" aria-hidden="true">{(usuario.email || "?").slice(0, 1).toUpperCase()}</span><div><small>Conta conectada</small><strong>{usuario.email}</strong></div></div>
           <ConfiguracaoNomeUsuario usuario={usuario} onNomeSalvo={setNomeUsuarioDefinido} />
           <button type="button" className="ck-sair-conta" onClick={sair}><svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round"><path d="M6.5 2.5H4a1.5 1.5 0 0 0-1.5 1.5v8A1.5 1.5 0 0 0 4 13.5h2.5"/><path d="M10 5l3 3-3 3M13 8H6.5"/></svg>Sair da conta</button>
@@ -3457,32 +3539,20 @@ function Checklist({ usuario }) {
       )}
 
       {criandoGrupo ? (
-        <form
+        <div
           ref={sessaoChecklistNovaRef}
-          className="ck-nova-divisao"
-          onSubmit={criarGrupo}
+          className="ck-nova-divisao ck-nova-sessao-pessoal"
         >
-          <SeletorIconeSessao value={iconeGrupo} onChange={setIconeGrupo} />
-          <input
-            type="text"
-            value={nomeGrupo}
-            autoFocus
-            onChange={(e) => setNomeGrupo(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") {
-                setCriandoGrupo(false);
-                setNomeGrupo("");
-              }
-            }}
+          <EditarNomeSessao
+            sessao={{ nome: nomeGrupo, icone: iconeGrupo, limite: limiteGrupoNovo, limiteHora: horaLimiteGrupoNovo }}
+            mostrarPrazo
+            fecharFora={false}
+            rotuloAcao="Criar sessão"
             placeholder="Nome da sessão (ex: Afazeres do RPG)"
-            id="campo-sessao"
-            aria-label="Nome da nova sessão"
-            maxLength={60}
+            onSalvar={(nome, icone, prazo, horaPrazo) => criarGrupo(null, { nome, icone, prazo, horaPrazo })}
+            onCancelar={cancelarCriacaoGrupo}
           />
-          <button type="submit" disabled={!nomeGrupo.trim()}>
-            Criar
-          </button>
-        </form>
+        </div>
       ) : (
         <BarraMais
           rotulo="Adicionar sessão"
@@ -3513,7 +3583,8 @@ function Checklist({ usuario }) {
               <Alca id={g.id} tipo="grupo" grupo={null} ordem={ordem} imagem=".ck-grupo-topo" />
               {sessaoEmEdicao?.tipo === "checklist" && sessaoEmEdicao.id === g.id ? <EditarNomeSessao
                 sessao={g}
-                onSalvar={(nome, icone) => salvarNomeSessao("checklist", g.id, nome, icone)}
+                mostrarPrazo
+                onSalvar={(nome, icone, limite, limiteHora) => salvarNomeSessao("checklist", g.id, nome, icone, limite, limiteHora)}
                 onCancelar={() => cancelarEdicaoSessao("checklist", g.id)}
               /> : <button
                 type="button"
@@ -3564,6 +3635,7 @@ function Checklist({ usuario }) {
                     edicao={edicao}
                     descricoesAbertas={descricoesTarefasAbertas}
                     alternarDescricao={alternarDescricaoTarefa}
+                    grupos={grupos}
                   />
                 )}
               </>
@@ -3586,6 +3658,7 @@ function Checklist({ usuario }) {
           edicao={edicao}
           descricoesAbertas={descricoesTarefasAbertas}
           alternarDescricao={alternarDescricaoTarefa}
+          grupos={grupos}
         />
       ) : <p className="ck-vazio-grupo">Nenhuma tarefa aqui ainda.</p>}
 
@@ -3690,16 +3763,7 @@ function Checklist({ usuario }) {
         {!formAnotacao && anotacoes.length === 0 && sessoesAnotacoes.length === 0 && <p className="ck-vazio">Adicione uma anotação ou crie uma sessão.</p>}
       </section> : null}
 
-      <footer className="ck-rodape">
-        <span>
-          feito por{" "}
-          <span className="ck-nome-rodape" data-secreto={NOME_SECRETO} tabIndex={0}>{NOME_RODAPE}</span>
-        </span>
-        <span aria-hidden="true"> · </span>
-        <Contato />
-                <span aria-hidden="true"> · </span>
-                <span aria-hidden="true"> V{APP_VERSION} </span>
-      </footer>
+      <Rodape />
     </main>
 
     <aside className="ck-lateral">
@@ -3721,6 +3785,7 @@ function Checklist({ usuario }) {
         )}
       </section>
     </aside>
+    <Rodape mobile />
     <ConfirmacaoChecklist dialog={confirmacaoExcluir} onCancel={() => setConfirmacaoExcluir(null)} onConfirm={() => { confirmacaoExcluir?.confirm(); setConfirmacaoExcluir(null); }} />
     {tutorialAtivo && <TutorialGuia onEncerrar={encerrarTutorial} />}
     </div>
