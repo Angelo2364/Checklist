@@ -3865,6 +3865,49 @@ input[type="checkbox"]:disabled { opacity: .5; cursor: not-allowed; }
 }
 .ck-shared-notes .ck-team-note-edit-row .ck-shared-note-editor { margin: 0; padding: 0; border: 0; background: transparent; }
 .ck-shared-notes .ck-team-note-edit-row .ck-anotacao-titulo-data { margin-bottom: 8px; }
+.ck-anotacoes .ck-barras-topo > .ck-social-group-editor { flex: 1 1 100%; min-width: 0; margin: 0 2px 8px; }
+
+/* Planilha opcional embutida em anotações pessoais */
+.ck-anotacao-planilha-area { flex: 1 1 100%; min-width: 0; }
+.ck-anotacao-planilha-toggle { display: inline-flex; align-items: center; gap: 7px; min-height: 30px; padding: 5px 10px; border: 1px solid color-mix(in srgb, var(--linha) 88%, transparent); border-radius: 10px; color: var(--suave); background: color-mix(in srgb, var(--fundo-hover) 55%, transparent); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; transition: color .15s, border-color .15s, background .15s; }
+.ck-anotacao-planilha-toggle:hover { color: var(--azul-forte); border-color: color-mix(in srgb, var(--azul-forte) 45%, var(--linha)); background: color-mix(in srgb, var(--azul) 9%, var(--fundo)); }
+.ck-anotacao-planilha-toggle span { font-size: 16px; line-height: 1; }
+.ck-anotacao-planilha-editor,
+.ck-anotacao-planilha-visualizacao { min-width: 0; margin-top: 9px; padding: 9px; border: 1px solid color-mix(in srgb, var(--linha) 88%, transparent); border-radius: 12px; background: color-mix(in srgb, var(--fundo) 86%, var(--fundo-hover)); }
+.ck-anotacao-planilha-scroll { max-width: 100%; overflow: auto; border-radius: 8px; scrollbar-color: var(--linha) transparent; }
+.ck-anotacao-planilha-scroll table { width: 100%; min-width: 360px; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
+.ck-anotacao-planilha-scroll th,
+.ck-anotacao-planilha-scroll td { min-width: 80px; padding: 4px; border-right: 1px solid var(--linha); border-bottom: 1px solid var(--linha); text-align: left; }
+.ck-anotacao-planilha-editor .ck-anotacao-planilha-scroll tr > :first-child { width: 34px; min-width: 34px; color: var(--suave); text-align: center; }
+.ck-anotacao-planilha-scroll thead th { color: var(--suave); background: color-mix(in srgb, var(--fundo-hover) 75%, transparent); font-size: 11px; }
+.ck-anotacao-planilha-scroll thead tr > :first-child { border-top-left-radius: 8px; }
+.ck-anotacao-planilha-scroll thead tr > :last-child { border-top-right-radius: 8px; }
+.ck-anotacao-planilha-scroll tbody tr:last-child > * { border-bottom: 0; }
+.ck-anotacao-planilha-scroll tr > :last-child { border-right: 0; }
+.ck-anotacao-planilha-scroll td input,
+.ck-anotacao-planilha-scroll th input { display: block; width: 100%; min-width: 0; min-height: 32px; padding: 6px 7px; border: 1px solid transparent; border-radius: 7px; outline: 0; color: var(--tinta); background: transparent; font: inherit; font-size: 12px; }
+.ck-anotacao-planilha-scroll td input:focus,
+.ck-anotacao-planilha-scroll th input:focus { border-color: var(--azul-forte); background: var(--fundo); box-shadow: 0 0 0 2px color-mix(in srgb, var(--azul-forte) 18%, transparent); }
+.ck-anotacao-planilha-scroll th input { font-weight: 750; }
+.ck-anotacao-planilha-apagar { display: inline-grid; place-items: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 6px; color: var(--suave); background: transparent; font: inherit; font-size: 17px; line-height: 1; cursor: pointer; }
+.ck-anotacao-planilha-apagar:hover { color: var(--perigo); background: color-mix(in srgb, var(--perigo) 10%, transparent); }
+.ck-anotacao-planilha-acao-linha { width: 30px; min-width: 30px !important; text-align: center !important; }
+.ck-anotacao-planilha-acoes { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 9px; }
+.ck-anotacao-planilha-acoes button { padding: 5px 9px; font-size: 12px; }
+.ck-anotacao-planilha-acoes button:disabled { opacity: .48; cursor: not-allowed; }
+.ck-anotacao-planilha-visualizacao { margin-top: 8px; padding: 7px; }
+.ck-anotacao-planilha-visualizacao .ck-anotacao-planilha-scroll table { min-width: 220px; }
+.ck-anotacao-planilha-visualizacao th,
+.ck-anotacao-planilha-visualizacao td { padding: 8px 10px; color: color-mix(in srgb, var(--tinta) 88%, var(--suave)); font-size: 12px; overflow-wrap: anywhere; }
+.ck-anotacao-planilha-visualizacao th { color: var(--tinta); background: color-mix(in srgb, var(--fundo-hover) 75%, transparent); }
+.ck-anotacao-corpo > .ck-anotacao-planilha-visualizacao { max-width: 100%; }
+@media (max-width: 600px) {
+  .ck-anotacao-planilha-editor,
+  .ck-anotacao-planilha-visualizacao { padding: 6px; }
+  .ck-anotacao-planilha-scroll table { min-width: 320px; }
+  .ck-anotacao-planilha-scroll th,
+  .ck-anotacao-planilha-scroll td { padding: 3px; }
+}
 .ck-shared-notes .ck-team-note-edit-row .ck-campo-largo { width: 100%; box-sizing: border-box; }
 .ck-team-task-edit-row { display: block; padding: 0; overflow: hidden; }
 .ck-team-task-edit-row .ck-team-editor { margin: 0; border: 0; border-radius: 0; background: transparent; }
